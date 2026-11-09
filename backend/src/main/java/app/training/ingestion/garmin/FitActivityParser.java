@@ -1,0 +1,91 @@
+package app.training.ingestion.garmin;
+
+import app.training.ingestion.RawRows.StreamPoint;
+import com.garmin.fit.Decode;
+import com.garmin.fit.FileIdMesg;
+import com.garmin.fit.FileIdMesgListener;
+import com.garmin.fit.FitRuntimeException;
+import com.garmin.fit.MesgBroadcaster;
+import com.garmin.fit.RecordMesg;
+import com.garmin.fit.RecordMesgListener;
+import com.garmin.fit.SessionMesg;
+import com.garmin.fit.SessionMesgListener;
+import java.io.ByteArrayInputStream;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Decodes a FIT activity file into a session summary plus its per-second stream. */
+public final class FitActivityParser {
+    private FitActivityParser() {}
+
+    public record Session(
+            Instant start, String sport, String subSport, Float timerTimeS, Float elapsedTimeS, Float distanceM,
+            Integer ascentM, Integer avgHr, Integer maxHr, Integer calories, Float aerobicTe, Float anaerobicTe) {}
+
+    /**
+     * @param activity   false when the file is not an activity (monitoring, settings, courses...)
+     * @param sessions   one per sport in the file; multisport files have several
+     */
+    public record Parsed(boolean activity, Long serialNumber, Instant timeCreated, List<Session> sessions,
+                         List<StreamPoint> stream) {}
+
+    public static Parsed parse(byte[] bytes) {
+        var decode = new Decode();
+        var broadcaster = new MesgBroadcaster(decode);
+        var sessions = new ArrayList<Session>();
+        var stream = new ArrayList<StreamPoint>();
+        var fileId = new FileIdMesg[1];
+
+        broadcaster.addListener((FileIdMesgListener) m -> {
+            if (fileId[0] == null) fileId[0] = m;
+        });
+        broadcaster.addListener((SessionMesgListener) m -> sessions.add(session(m)));
+        broadcaster.addListener((RecordMesgListener) m -> {
+            if (m.getTimestamp() == null) return;
+            stream.add(new StreamPoint(
+                    m.getTimestamp().getDate().toInstant(),
+                    toInt(m.getHeartRate()),
+                    m.getEnhancedSpeed() != null ? m.getEnhancedSpeed() : m.getSpeed(),
+                    toInt(m.getCadence()),
+                    m.getPower(),
+                    m.getEnhancedAltitude() != null ? m.getEnhancedAltitude() : m.getAltitude(),
+                    m.getDistance()));
+        });
+
+        try {
+            decode.read(new ByteArrayInputStream(bytes), broadcaster, broadcaster);
+        } catch (FitRuntimeException e) {
+            throw new IllegalArgumentException("Not a readable FIT file: " + e.getMessage(), e);
+        }
+
+        FileIdMesg id = fileId[0];
+        boolean isActivity = id != null && id.getType() == com.garmin.fit.File.ACTIVITY && !sessions.isEmpty();
+        return new Parsed(
+                isActivity,
+                id == null ? null : id.getSerialNumber(),
+                id == null || id.getTimeCreated() == null ? null : id.getTimeCreated().getDate().toInstant(),
+                sessions,
+                stream);
+    }
+
+    private static Session session(SessionMesg m) {
+        return new Session(
+                m.getStartTime() == null ? null : m.getStartTime().getDate().toInstant(),
+                m.getSport() == null ? null : m.getSport().name(),
+                m.getSubSport() == null ? null : m.getSubSport().name(),
+                m.getTotalTimerTime(),
+                m.getTotalElapsedTime(),
+                m.getTotalDistance(),
+                m.getTotalAscent(),
+                toInt(m.getAvgHeartRate()),
+                toInt(m.getMaxHeartRate()),
+                m.getTotalCalories(),
+                m.getTotalTrainingEffect(),
+                m.getTotalAnaerobicTrainingEffect());
+    }
+
+    private static Integer toInt(Short s) {
+        return s == null ? null : s.intValue();
+    }
+}

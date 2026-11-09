@@ -1,0 +1,69 @@
+# One-command local setup: cp .env.example .env && docker compose up --build
+name: training-intelligence
+
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-training}
+      POSTGRES_USER: ${POSTGRES_USER:-training}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-training}
+      DB_USER: ${POSTGRES_USER:-training}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      COACH_USERNAME: ${COACH_USERNAME:-}
+      COACH_PASSWORD: ${COACH_PASSWORD:-}
+      COACH_DISPLAY_NAME: ${COACH_DISPLAY_NAME:-Coach}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      - import-work:/var/lib/training-imports
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+  # Garmin Connect sync sidecar. Phase 0 ships only the adapter interface and a
+  # health endpoint; real sync arrives in Phase 1.
+  garmin-sync:
+    build: ./garmin-sync
+    restart: unless-stopped
+    expose:
+      - "8090"
+
+  backup:
+    build: ./deploy/backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-training}
+      POSTGRES_USER: ${POSTGRES_USER:-training}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?set BACKUP_PASSPHRASE in .env}
+    volumes:
+      - ./backups:/backups
+
+volumes:
+  db-data:
+  import-work:

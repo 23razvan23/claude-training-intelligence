@@ -150,8 +150,14 @@ public class GarminExportImporter {
                         dec(s.aerobicTe(), 1),
                         dec(s.anaerobicTe(), 1),
                         null)));
-        ctx.stats().inserted("fit_file", 1);
+        long streamRowsBefore = ctx.stats().inserted("activity_stream");
         writer.stream(ctx, activityId, parsed.stream());
+        // A FIT file counts as new only if it added stream rows.
+        if (ctx.stats().inserted("activity_stream") > streamRowsBefore || parsed.stream().isEmpty()) {
+            ctx.stats().inserted("fit_file", 1);
+        } else {
+            ctx.stats().duplicates("fit_file", 1);
+        }
     }
 
     // ---------------------------------------------------------------- JSON entries

@@ -42,6 +42,11 @@ public final class ImportStats {
         return out;
     }
 
+    public long inserted(String table) {
+        long[] v = counters.get(table);
+        return v == null ? 0 : v[0];
+    }
+
     public long insertedTotal() {
         return counters.values().stream().mapToLong(v -> v[0]).sum();
     }

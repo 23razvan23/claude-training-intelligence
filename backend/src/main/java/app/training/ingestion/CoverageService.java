@@ -1,5 +1,6 @@
 package app.training.ingestion;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -30,14 +31,17 @@ public class CoverageService {
     public record Day(
             LocalDate date, boolean garminRestingHr, boolean garminHrv, boolean garminSleep, int garminActivities,
             boolean whoopRecovery, boolean whoopStrain, boolean whoopSleep) {
+        @JsonProperty
         public boolean garminComplete() {
             return garminRestingHr && garminHrv && garminSleep;
         }
 
+        @JsonProperty
         public boolean whoopComplete() {
             return whoopRecovery && whoopStrain;
         }
 
+        @JsonProperty
         public boolean paired() {
             return garminComplete() && whoopComplete();
         }

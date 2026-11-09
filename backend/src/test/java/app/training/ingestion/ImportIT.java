@@ -120,6 +120,8 @@ class ImportIT extends IntegrationTest {
         var second = run(athlete, ImportKind.GARMIN_EXPORT, List.of(zip));
         assertThat(second.status()).isEqualTo("SUCCEEDED");
         assertThat(rawCounts(athlete)).isEqualTo(afterFirst);
+        assertThat(second.stats().path("fit_file").path("duplicates").asLong()).isEqualTo(5);
+        assertThat(second.stats().path("fit_file").path("inserted").asLong()).isZero();
 
         // Unit conversions from the summarized-activities JSON (ms, cm).
         var act = jdbc.sql("SELECT duration_s, distance_m, elevation_gain_m, training_load, sport FROM activity WHERE athlete_id = ? ORDER BY start_at LIMIT 1")

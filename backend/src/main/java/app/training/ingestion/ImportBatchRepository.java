@@ -29,7 +29,13 @@ public class ImportBatchRepository {
     }
 
     public void markRunning(long id) {
-        jdbc.sql("UPDATE import_batch SET status = 'RUNNING' WHERE id = ?").param(id).update();
+        jdbc.sql("UPDATE import_batch SET status = 'RUNNING', started_at = now() WHERE id = ?").param(id).update();
+    }
+
+    public void updateProgress(long id, ImportProgress p) {
+        var node = json.createObjectNode().put("phase", p.phase()).put("done", p.done());
+        if (p.total() != null) node.put("total", p.total());
+        jdbc.sql("UPDATE import_batch SET progress = CAST(? AS jsonb) WHERE id = ?").params(write(node), id).update();
     }
 
     public void markFinished(long id, ImportStats stats) {
@@ -87,6 +93,8 @@ public class ImportBatchRepository {
     private ImportBatch map(ResultSet rs, int row) throws SQLException {
         try {
             var finished = rs.getTimestamp("finished_at");
+            var started = rs.getTimestamp("started_at");
+            var progress = rs.getString("progress");
             return new ImportBatch(
                     rs.getLong("id"),
                     rs.getLong("athlete_id"),
@@ -97,7 +105,9 @@ public class ImportBatchRepository {
                     json.readTree(rs.getString("warnings")),
                     rs.getString("error"),
                     rs.getTimestamp("created_at").toInstant(),
-                    finished == null ? null : finished.toInstant());
+                    started == null ? null : started.toInstant(),
+                    finished == null ? null : finished.toInstant(),
+                    progress == null ? null : json.readTree(progress));
         } catch (JsonProcessingException e) {
             throw new SQLException(e);
         }

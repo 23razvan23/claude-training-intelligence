@@ -13,4 +13,6 @@ public record ImportBatch(
         JsonNode warnings,
         String error,
         Instant createdAt,
-        Instant finishedAt) {}
+        Instant startedAt,
+        Instant finishedAt,
+        JsonNode progress) {}

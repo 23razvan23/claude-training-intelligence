@@ -88,6 +88,26 @@ function UploadCard({ kind, athleteId }: { kind: Kind; athleteId: number }) {
   );
 }
 
+function Progress({ batch }: { batch: ImportBatch }) {
+  const { t } = useTranslation();
+  const p = batch.progress;
+  if (!p) return null;
+  const minutes = batch.startedAt ? Math.floor((Date.now() - new Date(batch.startedAt).getTime()) / 60000) : 0;
+  const key = p.total != null && p.phase !== 'wellness' && p.phase !== 'activities' ? `${p.phase}_total` : p.phase;
+  const pct = p.total ? Math.min(100, Math.round((100 * p.done) / p.total)) : null;
+  return (
+    <div className="stack small">
+      <span>
+        {t(`imports.progress.${key}`, { done: p.done.toLocaleString(), total: p.total?.toLocaleString() })}
+        {minutes > 0 && <span className="muted"> · {t('imports.progress.elapsed', { minutes })}</span>}
+      </span>
+      <span className="progress-track" role="progressbar" aria-valuenow={pct ?? undefined}>
+        <span className={pct == null ? 'progress-bar indeterminate' : 'progress-bar'} style={pct == null ? undefined : { width: `${pct}%` }} />
+      </span>
+    </div>
+  );
+}
+
 function BatchRow({ batch }: { batch: ImportBatch }) {
   const { t } = useTranslation();
   const totals = Object.values(batch.stats ?? {}).reduce(
@@ -107,6 +127,7 @@ function BatchRow({ batch }: { batch: ImportBatch }) {
         <span className="spacer" />
         <span className="muted small">{new Date(batch.createdAt).toLocaleString()}</span>
       </div>
+      {(batch.status === 'RUNNING' || batch.status === 'PENDING') && <Progress batch={batch} />}
       {batch.status === 'SUCCEEDED' && <div className="small">{t('imports.summary', totals)}</div>}
       {batch.error && <div className="error small">{batch.error}</div>}
       {(batch.status === 'SUCCEEDED' || batch.status === 'FAILED') && Object.keys(batch.stats ?? {}).length > 0 && (

@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -27,16 +29,42 @@ public class ImportRunner {
     private final RawWriter writer;
     private final WhoopCsvImporter whoop;
     private final GarminExportImporter garmin;
+    private static final long PROGRESS_INTERVAL_MS = 2_000;
+    private static final long PROGRESS_LOG_INTERVAL_NANOS = 30_000_000_000L;
+
     private final TransactionTemplate tx;
+    private final TransactionTemplate progressTx;
 
     public ImportRunner(ImportBatchRepository batches, AthleteRepository athletes, RawWriter writer,
-                        WhoopCsvImporter whoop, GarminExportImporter garmin, TransactionTemplate tx) {
+                        WhoopCsvImporter whoop, GarminExportImporter garmin, TransactionTemplate tx,
+                        PlatformTransactionManager txManager) {
         this.batches = batches;
         this.athletes = athletes;
         this.writer = writer;
         this.whoop = whoop;
         this.garmin = garmin;
         this.tx = tx;
+        this.progressTx = new TransactionTemplate(txManager);
+        this.progressTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    /**
+     * Progress for a batch, committed in its own transaction so pollers see it while the
+     * import's long transaction is still open. Also logs a line on each phase change and
+     * every 30 s.
+     */
+    ImportProgress progressFor(long batchId) {
+        var lastLog = new long[] {0};
+        var lastPhase = new String[] {null};
+        return new ImportProgress(p -> {
+            progressTx.executeWithoutResult(s -> batches.updateProgress(batchId, p));
+            long now = System.nanoTime();
+            if (!java.util.Objects.equals(p.phase(), lastPhase[0]) || now - lastLog[0] >= PROGRESS_LOG_INTERVAL_NANOS) {
+                lastPhase[0] = p.phase();
+                lastLog[0] = now;
+                log.info("Import batch {}: {} {}{}", batchId, p.phase(), p.done(), p.total() == null ? "" : "/" + p.total());
+            }
+        }, PROGRESS_INTERVAL_MS);
     }
 
     @Async
@@ -48,11 +76,13 @@ public class ImportRunner {
         var stats = new ImportStats();
         try {
             batches.markRunning(batchId);
+            log.info("Import batch {} ({}) started: {} file(s)", batchId, kind, files.size());
             if (sha256 != null) {
                 batches.previousSuccessWithHash(athleteId, sha256, batchId).ifPresent(prev ->
                         stats.warn("This exact file was already imported in batch " + prev + "; duplicates were skipped."));
             }
-            var ctx = new RawWriter.Ctx(athleteId, batchId, stats);
+            var progress = progressFor(batchId);
+            var ctx = new RawWriter.Ctx(athleteId, batchId, stats, progress);
             var zone = athletes.zoneOf(athleteId);
             tx.executeWithoutResult(status -> {
                 try {
@@ -60,7 +90,11 @@ public class ImportRunner {
                         case WHOOP_EXPORT -> whoop.importFiles(ctx, files, zone);
                         case GARMIN_EXPORT -> garmin.importExport(ctx, files.getFirst(), zone);
                         case FIT_UPLOAD -> {
-                            for (Path p : files) garmin.fit(ctx, p.getFileName().toString(), Files.readAllBytes(p), zone);
+                            progress.phase("fit", (long) files.size());
+                            for (Path p : files) {
+                                garmin.fit(ctx, p.getFileName().toString(), Files.readAllBytes(p), zone);
+                                progress.step();
+                            }
                         }
                         case GARMIN_SYNC -> throw new UnsupportedOperationException("Garmin sync arrives in Phase 1");
                     }
@@ -68,6 +102,7 @@ public class ImportRunner {
                     throw new java.io.UncheckedIOException(e);
                 }
             });
+            progress.flush();
             batches.markFinished(batchId, stats);
             log.info("Import batch {} ({}) finished: {} rows inserted", batchId, kind, stats.insertedTotal());
         } catch (RuntimeException e) {

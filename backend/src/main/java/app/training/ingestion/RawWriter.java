@@ -22,7 +22,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class RawWriter {
-    private static final int STREAM_BATCH = 2_000;
+    /** 8 parameters per row; 2,000 rows = 16,000 parameters, under PostgreSQL's 32,767 limit. */
+    static final int STREAM_ROWS_PER_STATEMENT = 2_000;
 
     private final JdbcClient jdbc;
     private final JdbcTemplate template;
@@ -32,7 +33,11 @@ public class RawWriter {
         this.template = template;
     }
 
-    public record Ctx(long athleteId, long batchId, ImportStats stats) {}
+    public record Ctx(long athleteId, long batchId, ImportStats stats, ImportProgress progress) {
+        public Ctx(long athleteId, long batchId, ImportStats stats) {
+            this(athleteId, batchId, stats, ImportProgress.NONE);
+        }
+    }
 
     private static Timestamp ts(Instant i) {
         return i == null ? null : Timestamp.from(i);
@@ -109,27 +114,41 @@ public class RawWriter {
                 .optional();
     }
 
+    /**
+     * Writes per-second samples as multi-row INSERTs ({@value #STREAM_ROWS_PER_STATEMENT} rows per
+     * statement). One round trip per chunk is ~10x faster than a JDBC batch of single-row inserts,
+     * and unlike the driver's reWriteBatchedInserts it still returns an exact inserted count.
+     */
     public void stream(Ctx ctx, long activityId, List<StreamPoint> points) {
-        for (int from = 0; from < points.size(); from += STREAM_BATCH) {
-            var chunk = points.subList(from, Math.min(points.size(), from + STREAM_BATCH));
-            int[][] results = template.batchUpdate("""
-                    INSERT INTO activity_stream (activity_id, ts, hr, speed_mps, cadence, power, altitude_m, distance_m)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT DO NOTHING""", chunk, chunk.size(), (ps, p) -> {
-                ps.setLong(1, activityId);
-                ps.setTimestamp(2, ts(p.ts()));
-                ps.setObject(3, p.hr());
-                ps.setObject(4, p.speedMps());
-                ps.setObject(5, p.cadence());
-                ps.setObject(6, p.power());
-                ps.setObject(7, p.altitudeM());
-                ps.setObject(8, p.distanceM());
+        for (int from = 0; from < points.size(); from += STREAM_ROWS_PER_STATEMENT) {
+            var chunk = points.subList(from, Math.min(points.size(), from + STREAM_ROWS_PER_STATEMENT));
+            int inserted = template.update(streamInsertSql(chunk.size()), ps -> {
+                int i = 1;
+                for (StreamPoint p : chunk) {
+                    ps.setLong(i++, activityId);
+                    ps.setTimestamp(i++, ts(p.ts()));
+                    ps.setObject(i++, p.hr(), java.sql.Types.SMALLINT);
+                    ps.setObject(i++, p.speedMps(), java.sql.Types.REAL);
+                    ps.setObject(i++, p.cadence(), java.sql.Types.SMALLINT);
+                    ps.setObject(i++, p.power(), java.sql.Types.SMALLINT);
+                    ps.setObject(i++, p.altitudeM(), java.sql.Types.REAL);
+                    ps.setObject(i++, p.distanceM(), java.sql.Types.REAL);
+                }
             });
-            long inserted = 0;
-            for (int[] batch : results) for (int r : batch) inserted += Math.max(r, 0);
             ctx.stats().inserted("activity_stream", inserted);
             ctx.stats().duplicates("activity_stream", chunk.size() - inserted);
         }
+    }
+
+    private final java.util.Map<Integer, String> streamSqlCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private String streamInsertSql(int rows) {
+        return streamSqlCache.computeIfAbsent(rows, n -> {
+            var sb = new StringBuilder(
+                    "INSERT INTO activity_stream (activity_id, ts, hr, speed_mps, cadence, power, altitude_m, distance_m) VALUES ");
+            for (int r = 0; r < n; r++) sb.append(r == 0 ? "" : ",").append("(?,?,?,?,?,?,?,?)");
+            return sb.append(" ON CONFLICT DO NOTHING").toString();
+        });
     }
 
     public void whoopCycle(Ctx ctx, WhoopCycle c) {

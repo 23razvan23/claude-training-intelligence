@@ -63,6 +63,7 @@ public class WhoopCsvImporter {
         // Cycles first, then sleeps, workouts, journal: order matters only for readable stats.
         tables.sort(Comparator.comparing(Named::type));
         for (var n : tables) {
+            ctx.progress().phase("whoop", (long) n.table().records().size());
             switch (n.type()) {
                 case CYCLES -> cycles(ctx, n.table(), athleteZone);
                 case SLEEPS -> sleeps(ctx, n.table(), athleteZone);
@@ -105,6 +106,7 @@ public class WhoopCsvImporter {
 
     private void cycles(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
         for (CSVRecord r : t.records()) {
+            ctx.progress().step();
             try {
                 ZoneId z = zone(t, r, fallback);
                 Instant start = cycleStart(t, r, z);
@@ -137,6 +139,7 @@ public class WhoopCsvImporter {
 
     private void sleeps(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
         for (CSVRecord r : t.records()) {
+            ctx.progress().step();
             try {
                 ZoneId z = zone(t, r, fallback);
                 Instant onset = TimeParsing.instant(t.text(r, SLEEP_ONSET), z);
@@ -170,6 +173,7 @@ public class WhoopCsvImporter {
 
     private void workouts(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
         for (CSVRecord r : t.records()) {
+            ctx.progress().step();
             try {
                 ZoneId z = zone(t, r, fallback);
                 Instant start = TimeParsing.instant(t.text(r, WORKOUT_START), z);
@@ -208,6 +212,7 @@ public class WhoopCsvImporter {
 
     private void journal(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
         for (CSVRecord r : t.records()) {
+            ctx.progress().step();
             try {
                 ZoneId z = zone(t, r, fallback);
                 Instant start = cycleStart(t, r, z);

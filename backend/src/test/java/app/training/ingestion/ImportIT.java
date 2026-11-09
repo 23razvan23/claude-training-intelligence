@@ -124,6 +124,10 @@ class ImportIT extends IntegrationTest {
         // The 5 monitoring FIT files are skipped, never turned into activities.
         assertThat(first.stats().path("fit_file").path("skipped").asLong()).isEqualTo(5);
         assertThat(first.warnings()).isEmpty();
+        // Progress ends in the FIT phase: 5 activity files + 5 monitoring files.
+        assertThat(first.startedAt()).isNotNull();
+        assertThat(first.progress().path("phase").asText()).isEqualTo("fit");
+        assertThat(first.progress().path("done").asLong()).isEqualTo(10);
         assertThat(second.stats().path("fit_file").path("inserted").asLong()).isZero();
 
         // Unit conversions from the summarized-activities JSON (ms, cm).
@@ -180,6 +184,26 @@ class ImportIT extends IntegrationTest {
         assertThat(d).isEqualTo(LocalDate.of(2024, 3, 1));
     }
 
+    @Autowired org.springframework.transaction.support.TransactionTemplate tx;
+
+    @Test
+    void progressIsVisibleWhileTheImportTransactionIsOpen() {
+        long athlete = newAthlete("Progress athlete");
+        long batchId = batches.create(athlete, ImportKind.GARMIN_EXPORT, "p", null, createCoach());
+        // Report progress inside a transaction that then rolls back, as a failing import would.
+        tx.executeWithoutResult(status -> {
+            var progress = runner.progressFor(batchId);
+            progress.phase("fit", null);
+            for (int i = 0; i < 7; i++) progress.step();
+            progress.flush();
+            // Another connection already sees it, before the outer transaction ends.
+            String seen = jdbc.sql("SELECT progress ->> 'done' FROM import_batch WHERE id = ?").param(batchId).query(String.class).single();
+            assertThat(seen).isEqualTo("7");
+            status.setRollbackOnly();
+        });
+        assertThat(batches.find(batchId).orElseThrow().progress().path("done").asLong()).isEqualTo(7);
+    }
+
     @Test
     void whoopSleepRespirationIsStored() throws Exception {
         long athlete = newAthlete("Whoop sleeper");
@@ -203,6 +227,8 @@ class ImportIT extends IntegrationTest {
 
         var batch = run(athlete, ImportKind.FIT_UPLOAD, List.of(sameRun, newRun, junk));
         assertThat(batch.status()).isEqualTo("SUCCEEDED");
+        assertThat(batch.progress().path("done").asLong()).isEqualTo(3);
+        assertThat(batch.progress().path("total").asLong()).isEqualTo(3);
         assertThat(rawCounts(athlete)).containsEntry("activity", 2L).containsEntry("activity_stream", 180L);
         assertThat(batch.warnings().toString()).contains("junk");
     }

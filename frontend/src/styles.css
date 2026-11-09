@@ -143,6 +143,12 @@ td { padding: 0.2rem 0.6rem 0.2rem 0; vertical-align: middle; }
 .cell.whoop { background: var(--cell-whoop); }
 .cell.blank { background: transparent; }
 
+.progress-track { display: block; height: 6px; border-radius: 3px; background: var(--cell-none); overflow: hidden; }
+.progress-bar { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
+.progress-bar.indeterminate { width: 30%; animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .progress-bar.indeterminate { animation: none; width: 100%; opacity: 0.4; } }
+
 .fields { width: 100%; }
 .fields .num { text-align: right; font-variant-numeric: tabular-nums; width: 3.5rem; }
 .bar-cell { width: 40%; }

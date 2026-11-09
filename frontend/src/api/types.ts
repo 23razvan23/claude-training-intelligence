@@ -50,7 +50,9 @@ export interface ImportBatch {
   warnings: string[];
   error?: string;
   createdAt: string;
+  startedAt?: string;
   finishedAt?: string;
+  progress?: { phase: 'wellness' | 'activities' | 'fit' | 'whoop'; done: number; total?: number };
 }
 
 export interface CoverageDay {

@@ -32,6 +32,15 @@
     "status": { "PENDING": "Queued", "RUNNING": "Running", "SUCCEEDED": "Done", "FAILED": "Failed" },
     "kind": { "WHOOP_EXPORT": "Whoop", "GARMIN_EXPORT": "Garmin export", "GARMIN_SYNC": "Garmin sync", "FIT_UPLOAD": "FIT" },
     "summary": "{{inserted}} new, {{duplicates}} already present, {{skipped}} skipped",
+    "progress": {
+      "wellness": "Reading daily summaries and sleep… {{done}} records",
+      "activities": "Reading activity summaries… {{done}}",
+      "fit": "Reading FIT files… {{done}} so far",
+      "fit_total": "Reading FIT files… {{done}} of {{total}}",
+      "whoop": "Reading Whoop rows… {{done}}",
+      "whoop_total": "Reading Whoop rows… {{done}} of {{total}}",
+      "elapsed": "running for {{minutes}} min"
+    },
     "warnings_one": "{{count}} warning", "warnings_other": "{{count}} warnings", "coachOnly": "Only the coach can import data."
   },
   "coverage": {

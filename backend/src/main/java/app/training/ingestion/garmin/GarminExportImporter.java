@@ -54,6 +54,8 @@ public class GarminExportImporter {
         try (var zf = new ZipFile(zip.toFile())) {
             var entries = Collections.list(zf.entries()).stream().filter(e -> !e.isDirectory()).toList();
             int recognised = 0;
+            var progress = ctx.progress();
+            progress.phase("wellness", null);
             for (ZipEntry e : entries) {
                 String n = e.getName();
                 if (SLEEP.matcher(n).matches()) {
@@ -67,16 +69,21 @@ public class GarminExportImporter {
                     eachObject(ctx, zf, e, o -> healthStatus(ctx, o));
                 }
             }
+            progress.phase("activities", null);
             for (ZipEntry e : entries) {
                 if (SUMMARIZED_ACTIVITIES.matcher(e.getName()).matches()) {
                     recognised++;
                     eachObject(ctx, zf, e, o -> {
                         JsonNode list = o.get(ACTIVITIES_WRAPPER);
-                        if (list != null && list.isArray()) list.forEach(a -> activitySummary(ctx, a, zone));
+                        if (list != null && list.isArray()) list.forEach(a -> {
+                            activitySummary(ctx, a, zone);
+                            progress.step();
+                        });
                         else if (o.has(ACT_ID)) activitySummary(ctx, o, zone);
                     });
                 }
             }
+            progress.phase("fit", null);
             for (ZipEntry e : entries) {
                 String n = e.getName();
                 if (FIT.matcher(n).matches()) {
@@ -84,6 +91,7 @@ public class GarminExportImporter {
                     try (InputStream in = zf.getInputStream(e)) {
                         fit(ctx, n, in.readAllBytes(), zone);
                     }
+                    progress.step();
                 } else if (NESTED_ZIP.matcher(n).matches()) {
                     try (var nested = new ZipInputStream(zf.getInputStream(e))) {
                         ZipEntry ne;
@@ -91,6 +99,7 @@ public class GarminExportImporter {
                             if (!ne.isDirectory() && FIT.matcher(ne.getName()).matches()) {
                                 recognised++;
                                 fit(ctx, ne.getName(), nested.readAllBytes(), zone);
+                                progress.step();
                             }
                         }
                     }
@@ -175,6 +184,7 @@ public class GarminExportImporter {
         if (root != null && root.isArray()) root.forEach(objects::add);
         else if (root != null && root.isObject()) objects.add(root);
         for (JsonNode o : objects) {
+            ctx.progress().step();
             try {
                 handler.accept(o);
             } catch (RuntimeException ex) {

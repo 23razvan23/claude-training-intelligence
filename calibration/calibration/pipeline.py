@@ -1,0 +1,157 @@
+"""The calibration run as a pure function of the day-features table (no database)."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date
+
+import numpy as np
+import pandas as pd
+
+from . import metrics, recovery, sleep, strain
+from .config import Settings
+
+
+@dataclass
+class Result:
+    coefficients: dict
+    metrics: dict
+    passed: bool
+    train_from: date | None
+    train_to: date | None
+    test_from: date
+    test_to: date | None
+    exclusions: dict
+    test_days: pd.DataFrame
+    notes: list[str] = field(default_factory=list)
+
+
+def _daily(features: pd.DataFrame) -> pd.DataFrame:
+    """Reindexes to consecutive calendar days so 'yesterday' and rolling windows are exact."""
+    df = features.copy()
+    df["cycle_date"] = pd.to_datetime(df["cycle_date"])
+    df = df.set_index("cycle_date").sort_index()
+    full = pd.date_range(df.index.min(), df.index.max(), freq="D")
+    return df.reindex(full)
+
+
+def default_test_from(daily: pd.DataFrame, share: float) -> pd.Timestamp:
+    paired = daily[daily["has_garmin_core"].fillna(False).astype(bool) & daily["whoop_recovery"].notna()]
+    if len(paired) < 20:
+        raise ValueError(f"Only {len(paired)} paired Garmin + Whoop days; need at least 20 to calibrate")
+    return paired.index[int(len(paired) * (1 - share))]
+
+
+def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_from: date | None = None) -> Result:
+    daily = _daily(features)
+    split = pd.Timestamp(test_from) if test_from else default_test_from(daily, settings.test_share)
+    is_train = daily.index < split
+    notes: list[str] = []
+
+    # --- strain -------------------------------------------------------------
+    strain_model = strain.choose_and_fit(daily[is_train])
+    load_col = strain_model["load"]
+    daily["strain_pred"] = np.where(daily[load_col].notna(), strain.predict(strain_model, daily[load_col].fillna(0)), np.nan)
+    daily["prev_strain"] = daily["strain_pred"].shift(1)
+
+    # --- sleep --------------------------------------------------------------
+    reference = float(daily.loc[is_train, "whoop_sleep_need_min"].median())
+    daily["shortfall"] = sleep.add_shortfall(daily, reference, settings.sleep_shortfall_days)
+    sleep_model = sleep.fit(daily[is_train])
+    sleep_model.update({"shortfall_reference_min": reference, "shortfall_days": settings.sleep_shortfall_days})
+    daily["sleep_need_pred"] = sleep.need(sleep_model, daily["prev_strain"].fillna(0), daily["shortfall"])
+    daily["sleep_perf"] = sleep.performance(daily["sleep_minutes"], daily["sleep_need_pred"])
+
+    # --- recovery -----------------------------------------------------------
+    core_cols = [f for f, _ in recovery.CORE]
+    eligible = daily["whoop_recovery"].notna() & daily["has_garmin_core"].fillna(False).astype(bool)
+    exclusions = {
+        "paired_days": int(eligible.sum()),
+        "no_baseline_yet": int((eligible & daily["ln_rmssd_z"].isna()).sum()),
+        "no_overnight_respiration": int((eligible & daily["resp_dev"].isna() & daily["ln_rmssd_z"].notna()).sum()),
+        "no_load_yesterday": int((eligible & daily["prev_strain"].isna()).sum()),
+    }
+    rec_rows = daily[eligible].dropna(subset=core_cols)
+    exclusions["used_for_recovery"] = len(rec_rows)
+    rec_train = rec_rows[rec_rows.index < split]
+    rec_test = rec_rows[rec_rows.index >= split]
+    if len(rec_train) < 30 or len(rec_test) < 10:
+        raise ValueError(f"Too few complete recovery days (train {len(rec_train)}, test {len(rec_test)})")
+
+    chosen, selection_log = recovery.select_features(rec_train, settings.recovery_ridge_alpha, settings.optional_feature_min_coverage, settings.optional_feature_min_gain)
+    chosen_cols = [f for f, _ in chosen]
+    rec_train = rec_train.dropna(subset=chosen_cols)
+    rec_test = rec_test.dropna(subset=chosen_cols)
+    rec_model = recovery.fit(rec_train, chosen, settings.recovery_ridge_alpha)
+    rec_pred = recovery.predict(rec_model, rec_test)
+
+    challenger = recovery.fit_challenger(rec_train, chosen)
+    chal_pred = np.clip(challenger.predict(rec_test[chosen_cols].to_numpy(dtype=float)), 0, 100)
+
+    y = rec_test["whoop_recovery"].to_numpy(dtype=float)
+    linear_m = {**metrics.summarize(y, rec_pred), **metrics.band_agreement(y, rec_pred, settings.green_min, settings.red_max)}
+    chal_m = {**metrics.summarize(y, chal_pred), **metrics.band_agreement(y, chal_pred, settings.green_min, settings.red_max)}
+    challenger_wins = chal_m["mae"] < linear_m["mae"] * (1 - settings.challenger_mae_gain) and chal_m["agreement"] > linear_m["agreement"] + settings.challenger_band_gain
+    if challenger_wins:
+        notes.append(
+            "The gradient-boosted challenger clearly beat the linear model on the test window. "
+            "It is reported here, but the shipped coefficients stay linear and explainable; "
+            "consider it for a later version."
+        )
+
+    # --- test-window metrics --------------------------------------------------
+    test = daily[~is_train]
+    st = test[["whoop_strain", "strain_pred"]].dropna()
+    sl = test[["whoop_sleep_need_min", "sleep_need_pred"]].dropna()
+    sp = test[["whoop_sleep_perf", "sleep_perf"]].dropna()
+    strain_m = metrics.summarize(st["whoop_strain"], st["strain_pred"])
+    result_metrics = {
+        "strain": {**strain_m, "load": load_col, "candidates": {k: v["cv_mae"] for k, v in strain_model["candidates"].items()}},
+        "sleep_need": metrics.summarize(sl["whoop_sleep_need_min"], sl["sleep_need_pred"]),
+        "sleep_performance": metrics.summarize(sp["whoop_sleep_perf"], sp["sleep_perf"]),
+        "recovery": {**linear_m, "feature_selection": selection_log},
+        "recovery_challenger": {**chal_m, "clearly_better": bool(challenger_wins)},
+        "targets": {
+            "strain_mae_max": settings.strain_mae_max,
+            "recovery_band_agreement_min": settings.recovery_band_agreement_min,
+            "recovery_green_red_max": settings.recovery_green_red_max,
+        },
+    }
+    checks = {
+        "strain_mae": strain_m.get("mae", float("inf")) <= settings.strain_mae_max,
+        "recovery_band_agreement": linear_m["agreement"] >= settings.recovery_band_agreement_min,
+        "recovery_green_red": linear_m["green_red_rate"] <= settings.recovery_green_red_max,
+    }
+    result_metrics["checks"] = checks
+
+    coefficients = {
+        "feature_version": feature_version,
+        "strain": {k: strain_model[k] for k in ("load", "a", "b", "c")},
+        "sleep": {k: sleep_model[k] for k in ("base_min", "per_strain_min", "per_shortfall", "shortfall_reference_min", "shortfall_days")},
+        "recovery": {k: rec_model[k] for k in ("intercept", "terms", "clip")},
+        "bands": {"green_min": settings.green_min, "red_max": settings.red_max},
+    }
+
+    test_days = pd.DataFrame(
+        {
+            "whoop_recovery": y,
+            "recovery": rec_pred,
+            "challenger": chal_pred,
+        },
+        index=rec_test.index,
+    ).join(recovery.contributions(rec_model, rec_test))
+    test_days = test_days.join(test[["whoop_strain", "strain_pred", "whoop_sleep_need_min", "sleep_need_pred"]], how="left")
+
+    train_idx = daily.index[is_train & (daily["whoop_strain"].notna() | daily["whoop_recovery"].notna())]
+    return Result(
+        coefficients=coefficients,
+        metrics=result_metrics,
+        passed=all(checks.values()),
+        train_from=train_idx.min().date() if len(train_idx) else None,
+        train_to=train_idx.max().date() if len(train_idx) else None,
+        test_from=split.date(),
+        test_to=rec_test.index.max().date() if len(rec_test) else None,
+        exclusions=exclusions,
+        test_days=test_days,
+        notes=notes,
+    )

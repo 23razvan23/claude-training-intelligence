@@ -31,8 +31,15 @@ The export covered 2024-11 → 2026-11, with 1,360 activities, ~720 nights and 2
 - **FIT files:** about 94% are non-activity (monitoring) files. The parser stops after `file_id` for those.
 - **`calories`:** units are not verified (mean 1,364 per activity looks high for kcal). The value is stored as-is and is not used by any model.
 
-### Still to confirm with `inspect_exports.py --files`
-The element keys of `allDayStress.aggregatorList[]`, `bodyBattery.bodyBatteryStatList[]` and HRV `metrics[]`, and the file names in `DI-Connect-Metrics`.
+### List contents (verified with the second inspector run)
+- `allDayStress.aggregatorList[]`: `type` is TOTAL, AWAKE or ASLEEP; `averageStressLevel` uses −2 for "no reading". The importer reads TOTAL and drops negatives.
+- `bodyBattery.bodyBatteryStatList[]`: `bodyBatteryStatType` includes HIGHEST and LOWEST (also SLEEPSTART, SLEEPEND and others); the value is in `statsValue`.
+- `healthStatusData.metrics[]`: `type` is HRV, HR, RESPIRATION, SPO2 or SKIN_TEMP_C, each with `value`, `status` and baseline limits. Only HRV is imported, and values ≤ 0 are treated as placeholders.
+- `averageSpo2Value` exists in UDSFile.
+- Not imported yet, but available: skin temperature (`SKIN_TEMP_C`), naps (`sleepData.napList[]`) and per-activity `workoutRpe` / `workoutFeel` (143 activities). These are candidates for Phase 1 and 2.
+
+### Still open
+The file names in `DI-Connect-Metrics` (89 files), which might hold HRV from before 2025-09-17. Check with `inspect_exports.py --files`.
 
 ### Original assumptions
 | Entry (path pattern) | Fields read | Units assumed |

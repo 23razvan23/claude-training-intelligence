@@ -241,7 +241,9 @@ public class GarminExportImporter {
         LocalDate date = date(o.get(HEALTH_DATE));
         if (date == null) return;
         for (JsonNode m : iter(o.get(HEALTH_METRICS))) {
-            if (HEALTH_HRV_TYPE.equalsIgnoreCase(m.path("type").asText()) && m.hasNonNull("value")) {
+            // Garmin writes placeholders (0, -1) for "no reading"; real overnight RMSSD is > 0.
+            if (HEALTH_HRV_TYPE.equalsIgnoreCase(m.path("type").asText()) && m.path("value").isNumber()
+                    && m.get("value").asDouble() > 0) {
                 writer.wellness(ctx, new RawRows.Wellness(
                         RawRows.GARMIN, "healthStatus", date, null,
                         BigDecimal.valueOf(m.get("value").asDouble()).setScale(1, RoundingMode.HALF_UP),

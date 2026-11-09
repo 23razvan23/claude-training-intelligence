@@ -156,7 +156,11 @@ public class WhoopCsvImporter {
                         minutesToSeconds(t.integer(r, LIGHT_MIN)),
                         minutesToSeconds(t.integer(r, REM_MIN)),
                         minutesToSeconds(t.integer(r, AWAKE_MIN)),
-                        t.integer(r, SLEEP_PERFORMANCE)));
+                        t.integer(r, SLEEP_PERFORMANCE),
+                        t.decimal(r, RESPIRATORY_RATE),
+                        null,
+                        null,
+                        null));
             } catch (RuntimeException e) {
                 ctx.stats().skipped("sleep_session", 1);
                 ctx.stats().warn("sleeps.csv line " + r.getRecordNumber() + ": " + e.getMessage());

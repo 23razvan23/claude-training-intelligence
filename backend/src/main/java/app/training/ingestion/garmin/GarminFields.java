@@ -24,6 +24,8 @@ final class GarminFields {
     static final String ACT_ID = "activityId";
     static final List<String> ACT_TYPE = List.of("activityType", "sportType");
     static final String ACT_START_GMT_MS = "startTimeGmt";        // epoch milliseconds
+    // Local wall-clock time written as if it were UTC epoch ms: its UTC date is the local date.
+    static final String ACT_START_LOCAL_MS = "startTimeLocal";
     static final String ACT_DURATION = "duration";                // milliseconds
     static final double ACT_DURATION_TO_SECONDS = 1 / 1000.0;
     static final String ACT_DISTANCE = "distance";                // centimetres
@@ -45,11 +47,17 @@ final class GarminFields {
     static final String SLEEP_LIGHT_S = "lightSleepSeconds";
     static final String SLEEP_REM_S = "remSleepSeconds";
     static final String SLEEP_AWAKE_S = "awakeSleepSeconds";
+    static final String SLEEP_AVG_RESPIRATION = "averageRespiration";
+    static final String SLEEP_AVG_STRESS = "avgSleepStress";
+    static final String SLEEP_AVG_SPO2 = "spo2SleepSummary/averageSPO2";
+    static final String SLEEP_LOWEST_SPO2 = "spo2SleepSummary/lowestSPO2";
     static final List<String> SLEEP_SCORE_PATHS = List.of("sleepScores/overallScore", "sleepScores/overall/value", "overallSleepScore/value");
 
     // --- UDSFile_*.json: [ {...per calendar day...} ] ---
     static final String DAY_DATE = "calendarDate";                 // "2024-01-15" or {"date": "2024-01-15"}
-    static final String DAY_RESTING_HR = "restingHeartRate";
+    // Verified on the real export: restingHeartRate is a smoothed (7-day) value;
+    // currentDayRestingHeartRate is that day's own value, which recovery needs.
+    static final List<String> DAY_RESTING_HR = List.of("currentDayRestingHeartRate", "restingHeartRate");
     static final List<String> DAY_RESPIRATION = List.of("respiration/avgSleepRespirationValue", "respiration/avgWakingRespirationValue", "avgWakingRespirationValue");
     static final List<String> DAY_SPO2 = List.of("averageSpo2Value", "averageSpo2", "spo2/averageSPO2");
     static final String DAY_STRESS_LIST = "allDayStress/aggregatorList";  // [{"type":"TOTAL","averageStressLevel":31}]

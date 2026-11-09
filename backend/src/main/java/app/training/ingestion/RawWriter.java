@@ -59,11 +59,13 @@ public class RawWriter {
     public void sleep(Ctx ctx, Sleep s) {
         int n = jdbc.sql("""
                 INSERT INTO sleep_session (athlete_id, source, source_id, start_at, end_at, cycle_date, is_nap,
-                    deep_s, light_s, rem_s, awake_s, sleep_score, import_batch_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    deep_s, light_s, rem_s, awake_s, sleep_score, avg_respiration, avg_sleep_stress,
+                    avg_spo2_pct, lowest_spo2_pct, import_batch_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT DO NOTHING""")
                 .params(ctx.athleteId(), s.source(), s.sourceId(), ts(s.startAt()), ts(s.endAt()), s.cycleDate(),
-                        s.nap(), s.deepS(), s.lightS(), s.remS(), s.awakeS(), s.sleepScore(), ctx.batchId())
+                        s.nap(), s.deepS(), s.lightS(), s.remS(), s.awakeS(), s.sleepScore(), s.avgRespiration(),
+                        s.avgSleepStress(), s.avgSpo2Pct(), s.lowestSpo2Pct(), ctx.batchId())
                 .update();
         count(ctx, "sleep_session", n);
     }

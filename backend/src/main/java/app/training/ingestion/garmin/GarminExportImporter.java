@@ -113,6 +113,7 @@ public class GarminExportImporter {
             return;
         }
         if (!parsed.activity()) {
+            // Monitoring, sleep, settings... files: most of a bulk export. Skipped quietly.
             ctx.stats().skipped("fit_file", 1);
             return;
         }
@@ -201,7 +202,11 @@ public class GarminExportImporter {
                 integer(o, SLEEP_LIGHT_S),
                 integer(o, SLEEP_REM_S),
                 integer(o, SLEEP_AWAKE_S),
-                firstInt(o, SLEEP_SCORE_PATHS)));
+                firstInt(o, SLEEP_SCORE_PATHS),
+                positiveDec(o, SLEEP_AVG_RESPIRATION, 1),
+                positiveDec(o, SLEEP_AVG_STRESS, 2),
+                positiveDec(o, SLEEP_AVG_SPO2, 1),
+                positiveDec(o, SLEEP_LOWEST_SPO2, 1)));
     }
 
     private void dailySummary(RawWriter.Ctx ctx, JsonNode o) {
@@ -225,7 +230,7 @@ public class GarminExportImporter {
         if (stress != null && stress < 0) stress = null;
         writer.wellness(ctx, new RawRows.Wellness(
                 RawRows.GARMIN, "uds", date,
-                positive(integer(o, DAY_RESTING_HR)),
+                positive(firstInt(o, DAY_RESTING_HR)),
                 null, null,
                 firstDec(o, DAY_RESPIRATION),
                 firstDec(o, DAY_SPO2),
@@ -252,6 +257,9 @@ public class GarminExportImporter {
             return;
         }
         Instant start = TimeParsing.epochMillis(a.get(ACT_START_GMT_MS).asDouble());
+        LocalDate localDate = a.hasNonNull(ACT_START_LOCAL_MS)
+                ? LocalDate.ofInstant(TimeParsing.epochMillis(a.get(ACT_START_LOCAL_MS).asDouble()), ZoneOffset.UTC)
+                : LocalDate.ofInstant(start, zone);
         String sourceId = a.get(ACT_ID).asText();
         String type = null;
         for (String k : ACT_TYPE) if (type == null && a.hasNonNull(k)) type = a.get(k).asText();
@@ -277,7 +285,7 @@ public class GarminExportImporter {
                 sport,
                 type,
                 start,
-                LocalDate.ofInstant(start, zone),
+                localDate,
                 durationS,
                 distanceM,
                 a.hasNonNull(ACT_ELEVATION_GAIN)
@@ -344,6 +352,13 @@ public class GarminExportImporter {
             if (v != null && v.signum() > 0) return v;
         }
         return null;
+    }
+
+    private static BigDecimal positiveDec(JsonNode o, String path, int scale) {
+        JsonNode n = at(o, path);
+        if (n == null || n.isNull() || !n.isNumber()) return null;
+        double v = n.asDouble();
+        return v > 0 ? BigDecimal.valueOf(v).setScale(scale, RoundingMode.HALF_UP) : null;
     }
 
     private static BigDecimal dec(Float f, int scale) {

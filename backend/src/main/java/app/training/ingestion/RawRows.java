@@ -18,7 +18,8 @@ public final class RawRows {
 
     public record Sleep(
             String source, String sourceId, Instant startAt, Instant endAt, LocalDate cycleDate, boolean nap,
-            Integer deepS, Integer lightS, Integer remS, Integer awakeS, Integer sleepScore) {}
+            Integer deepS, Integer lightS, Integer remS, Integer awakeS, Integer sleepScore,
+            BigDecimal avgRespiration, BigDecimal avgSleepStress, BigDecimal avgSpo2Pct, BigDecimal lowestSpo2Pct) {}
 
     public record Activity(
             String source, String sourceId, String sport, String sourceSport, Instant startAt, LocalDate calendarDate,

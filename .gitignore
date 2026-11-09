@@ -1,0 +1,29 @@
+# Secrets and personal data: never commit
+.env
+*.env
+!.env.example
+data/
+backups/
+*.fit
+*.FIT
+*.zip
+!backend/src/test/resources/**/*.zip
+
+# Build output
+backend/build/
+backend/.gradle/
+.gradle/
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store

@@ -58,6 +58,23 @@ app:
     # for them to be treated as the same activity. [configurable]
     activity-match-tolerance-seconds: 120
 
+  # Module 1 feature engineering. Every number below is a starting value, not
+  # settled science: [configurable], with the reason next to it.
+  metrics:
+    feature-version: f1
+    # Banister TRIMP weighting k1*e^(k2*HRr): Banister (1991) / Morton (1990) sex constants.
+    banister-male-k1: 0.64
+    banister-male-k2: 1.92
+    banister-female-k1: 0.86
+    banister-female-k2: 1.67
+    # Edwards zone TRIMP: zone lower bounds as % of HRmax, weights 1..5 (Edwards 1993).
+    edwards-zone-floors: [0.50, 0.60, 0.70, 0.80, 0.90]
+    # Gaps longer than this between HR samples are not integrated (watch paused / dropout).
+    max-sample-gap-seconds: 10
+    # Personal baseline: trailing window, minimum valid days before z-scores are produced.
+    baseline-window-days: 30
+    baseline-min-days: 14
+
 logging:
   level:
     root: INFO

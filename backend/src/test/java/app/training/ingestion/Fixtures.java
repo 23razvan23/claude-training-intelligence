@@ -137,8 +137,13 @@ public final class Fixtures {
                          "bodyBattery":{"bodyBatteryStatList":[{"bodyBatteryStatType":"HIGHEST","statsValue":90},{"bodyBatteryStatType":"LOWEST","statsValue":20}]},
                          "respiration":{"avgSleepRespirationValue":14.5},"averageSpo2Value":95.0}""".formatted(d, 47 + i % 3));
                 health.append(sep).append("""
-                        {"calendarDate":"%s","metrics":[{"type":"HRV","value":%s,"status":"IN_RANGE"},{"type":"HR","value":47}]}"""
+                        {"calendarDate":"%s","metrics":[{"type":"HRV","value":%s,"status":"IN_RANGE"},{"type":"HR","value":47},
+                         {"type":"SKIN_TEMP_C","value":-1.1,"status":"IN_RANGE"}]}"""
                         .formatted(d, 60.0 + i % 5));
+                // One day with a placeholder HRV reading, as real exports contain.
+                if (i == 1) health.append(",").append("""
+                        {"calendarDate":"%s","metrics":[{"type":"HRV","value":-1.0,"status":"UNKNOWN"}]}"""
+                        .formatted(d.minusYears(1)));
                 Instant sleepStart = d.minusDays(1).atTime(23, 0).atZone(ZONE).toInstant();
                 Instant sleepEnd = d.atTime(7, 0).atZone(ZONE).toInstant();
                 sleep.append(sep).append("""

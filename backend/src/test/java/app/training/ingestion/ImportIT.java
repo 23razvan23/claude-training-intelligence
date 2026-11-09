@@ -145,6 +145,9 @@ class ImportIT extends IntegrationTest {
         assertThat(w.get("body_battery_high")).isEqualTo(90);
         assertThat(w.get("body_battery_low")).isEqualTo(20);
 
+        // Placeholder HRV (-1) is never stored as a reading.
+        assertThat(count("SELECT count(*) FROM daily_wellness WHERE athlete_id = ? AND hrv_rmssd_ms <= 0", athlete)).isZero();
+
         // Overnight metrics from sleepData.json.
         var sl = jdbc.sql("SELECT avg_respiration, avg_sleep_stress, avg_spo2_pct, lowest_spo2_pct FROM sleep_session WHERE athlete_id = ? AND cycle_date = ?")
                 .params(athlete, FIRST).query().singleRow();

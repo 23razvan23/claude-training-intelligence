@@ -6,6 +6,8 @@ date coverage, missing days and numeric ranges. It never prints free-text
 values (journal notes, names), only counts, so the output is safe to paste
 into an issue or a phase review.
 
+Works with Python 3.9+ (the python3 that ships with macOS).
+
 Usage:
     python3 -I tools/inspect_exports.py my_whoop_data.zip garmin_export.zip
     python3 -I tools/inspect_exports.py physiological_cycles.csv sleeps.csv
@@ -24,7 +26,7 @@ import sys
 import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 GARMIN_PATTERNS = {
@@ -140,9 +142,9 @@ def inspect_csv(name: str, text: str) -> list[str]:
             stats[i].add(cell)
     out = [f"== {name}: {rows} rows, {len(headers)} columns"]
     width = max((len(h) for h in headers), default=0)
-    for h, s in zip(headers, stats, strict=True):
+    for h, s in zip(headers, stats):
         out.append(f"  {h:<{width}}  {s.non_empty:>6} filled  {s.describe()}")
-    first = next((s for h, s in zip(headers, stats, strict=True) if "cycle start" in h.lower()), None)
+    first = next((s for h, s in zip(headers, stats) if "cycle start" in h.lower()), None)
     if first is None and stats:
         first = stats[0]
     if first is not None:
@@ -185,8 +187,8 @@ def _record_day(r: dict) -> date | None:
     if isinstance(cd, str):
         return _date(cd)
     ms = r.get("startTimeGmt") or r.get("beginTimestamp")
-    if isinstance(ms, int | float):
-        return datetime.fromtimestamp(ms / 1000, tz=UTC).date()
+    if isinstance(ms, (int, float)):
+        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).date()
     return None
 
 

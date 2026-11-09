@@ -53,6 +53,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <nav className="tabs">
         <NavLink to="/coverage">{t('nav.coverage')}</NavLink>
         <NavLink to="/imports">{t('nav.imports')}</NavLink>
+        {me?.role === 'COACH' && <NavLink to="/calibration">{t('nav.calibration')}</NavLink>}
         {me?.role === 'COACH' && <NavLink to="/athletes">{t('nav.athletes')}</NavLink>}
       </nav>
       <main className="content">{children}</main>

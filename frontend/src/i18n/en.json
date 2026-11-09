@@ -1,6 +1,6 @@
 {
   "app": { "name": "Training Intelligence", "short": "TI" },
-  "nav": { "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "logout": "Log out" },
+  "nav": { "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "logout": "Log out" },
   "theme": { "toggle": "Switch theme", "light": "Light", "dark": "Dark", "system": "System" },
   "common": {
     "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "loading": "Loading…",
@@ -42,6 +42,31 @@
       "elapsed": "running for {{minutes}} min"
     },
     "warnings_one": "{{count}} warning", "warnings_other": "{{count}} warnings", "coachOnly": "Only the coach can import data."
+  },
+  "calibration": {
+    "title": "Calibration",
+    "intro": "Garmin-derived Recovery, Strain and Sleep, calibrated against Whoop and checked on days the model never saw. This report is the go/no-go evidence for cancelling Whoop.",
+    "features": "Day features",
+    "featuresHint": "Recompute after importing data or changing HR max, resting HR or sex in Athletes.",
+    "recompute": "Recompute features",
+    "recomputing": "Recomputing…",
+    "recomputed": "Recomputed {{days}} days ({{paired}} paired). Activity loads: {{fromStream}} from per-second HR, {{fromAverage}} from average HR, {{withoutLoad}} without.",
+    "noHrMax": "Set HR max in Athletes: without it there is no training load, and strain cannot be calibrated.",
+    "sexAssumed": "Sex is not set: male TRIMP constants were used.",
+    "empty": "No features yet: press Recompute features.",
+    "stat": {
+      "days": "Days", "paired": "Paired with Whoop", "garmin": "Complete Garmin days", "whoop": "Whoop days",
+      "noBaseline": "Garmin days still building a baseline", "noLoad": "Days without a computable load"
+    },
+    "pairedRange": "Paired {{from}} → {{to}}",
+    "run": "Run a calibration",
+    "runHint": "On the machine running the app, in the repository folder:",
+    "models": "Model versions",
+    "noModels": "No calibration run yet.",
+    "pass": "PASS", "fail": "FAIL",
+    "strainMae": "Strain MAE {{v}}", "band": "Bands {{v}}", "greenRed": "Green↔red {{v}}",
+    "window": "train {{trainFrom}} → {{trainTo}} · test {{testFrom}} → {{testTo}}",
+    "view": "View report", "hide": "Hide report"
   },
   "coverage": {
     "title": "Data coverage",

@@ -19,7 +19,8 @@ CSS = """
 body{font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#111827;background:#fff;margin:0;padding:16px;max-width:980px}
 h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:28px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
 .muted{color:#6b7280}.pass{color:#047857;font-weight:600}.fail{color:#b91c1c;font-weight:600}
-table{border-collapse:collapse;margin:8px 0}td,th{border:1px solid #e5e7eb;padding:4px 8px;text-align:right}th{background:#f9fafb}
+table{border-collapse:collapse;margin:8px 0;display:block;max-width:100%;overflow-x:auto}
+td,th{border:1px solid #e5e7eb;padding:4px 8px;text-align:right}th{background:#f9fafb}
 td:first-child,th:first-child{text-align:left}.verdict{font-size:1.2rem;padding:10px 12px;border-radius:8px;margin:12px 0}
 .ok{background:#ecfdf5}.no{background:#fef2f2}img{max-width:100%;height:auto}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:640px){.grid{grid-template-columns:1fr}}

@@ -121,6 +121,9 @@ class ImportIT extends IntegrationTest {
         assertThat(second.status()).isEqualTo("SUCCEEDED");
         assertThat(rawCounts(athlete)).isEqualTo(afterFirst);
         assertThat(second.stats().path("fit_file").path("duplicates").asLong()).isEqualTo(5);
+        // The 5 monitoring FIT files are skipped, never turned into activities.
+        assertThat(first.stats().path("fit_file").path("skipped").asLong()).isEqualTo(5);
+        assertThat(first.warnings()).isEmpty();
         assertThat(second.stats().path("fit_file").path("inserted").asLong()).isZero();
 
         // Unit conversions from the summarized-activities JSON (ms, cm).
@@ -135,15 +138,51 @@ class ImportIT extends IntegrationTest {
         // Wellness from two files merges into one row per day.
         var w = jdbc.sql("SELECT resting_hr, hrv_rmssd_ms, stress_avg, body_battery_high, body_battery_low, respiration_rate FROM daily_wellness_merged WHERE athlete_id = ? AND calendar_date = ?")
                 .params(athlete, FIRST).query().singleRow();
+        // currentDayRestingHeartRate (47) wins over the smoothed restingHeartRate (48).
         assertThat(w.get("resting_hr")).isEqualTo(47);
         assertThat(w.get("hrv_rmssd_ms").toString()).isEqualTo("60.0");
         assertThat(w.get("stress_avg")).isEqualTo(28);
         assertThat(w.get("body_battery_high")).isEqualTo(90);
         assertThat(w.get("body_battery_low")).isEqualTo(20);
 
+        // Overnight metrics from sleepData.json.
+        var sl = jdbc.sql("SELECT avg_respiration, avg_sleep_stress, avg_spo2_pct, lowest_spo2_pct FROM sleep_session WHERE athlete_id = ? AND cycle_date = ?")
+                .params(athlete, FIRST).query().singleRow();
+        assertThat(sl.get("avg_respiration").toString()).isEqualTo("12.5");
+        assertThat(sl.get("avg_sleep_stress").toString()).isEqualTo("17.25");
+        assertThat(sl.get("avg_spo2_pct").toString()).isEqualTo("96.2");
+        assertThat(sl.get("lowest_spo2_pct").toString()).isEqualTo("86.0");
+
         // Sleep ending 07:00 local opens that day's cycle; the evening run belongs to it.
         assertThat(count("SELECT count(*) FROM sleep_session WHERE athlete_id = ? AND cycle_date = ?", athlete, FIRST)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM activity_with_cycle WHERE athlete_id = ? AND cycle_date = ? AND NOT cycle_from_calendar", athlete, FIRST)).isEqualTo(1);
+    }
+
+    @Test
+    void activityLocalDateComesFromStartTimeLocal() throws Exception {
+        // Athlete profile says Bucharest, but the run was logged in New York at 22:30 local
+        // (03:30 UTC next day): the activity belongs to the local date.
+        long athlete = newAthlete("Traveller");
+        java.time.Instant start = java.time.Instant.parse("2024-03-02T03:30:00Z");
+        long local = java.time.LocalDateTime.of(2024, 3, 1, 22, 30).toInstant(java.time.ZoneOffset.UTC).toEpochMilli();
+        Path zip = dir.resolve("travel.zip");
+        try (var z = new java.util.zip.ZipOutputStream(Files.newOutputStream(zip))) {
+            z.putNextEntry(new java.util.zip.ZipEntry("DI_CONNECT/DI-Connect-Fitness/u_summarizedActivities.json"));
+            z.write(("[{\"summarizedActivitiesExport\":[{\"activityId\":42,\"activityType\":\"running\",\"startTimeGmt\":"
+                    + start.toEpochMilli() + ".0,\"startTimeLocal\":" + local + ".0,\"duration\":1800000.0}]}]").getBytes());
+            z.closeEntry();
+        }
+        assertThat(run(athlete, ImportKind.GARMIN_EXPORT, List.of(zip)).status()).isEqualTo("SUCCEEDED");
+        var d = jdbc.sql("SELECT calendar_date FROM activity WHERE athlete_id = ?").param(athlete).query(LocalDate.class).single();
+        assertThat(d).isEqualTo(LocalDate.of(2024, 3, 1));
+    }
+
+    @Test
+    void whoopSleepRespirationIsStored() throws Exception {
+        long athlete = newAthlete("Whoop sleeper");
+        Fixtures.whoopCsvs(dir, FIRST, 2);
+        run(athlete, ImportKind.WHOOP_EXPORT, List.of(dir.resolve("sleeps.csv")));
+        assertThat(count("SELECT count(*) FROM sleep_session WHERE athlete_id = ? AND avg_respiration = 14.8", athlete)).isEqualTo(2);
     }
 
     @Test

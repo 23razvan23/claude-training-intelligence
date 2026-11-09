@@ -6,9 +6,16 @@ date coverage, missing days and numeric ranges. It never prints free-text
 values (journal notes, names), only counts, so the output is safe to paste
 into an issue or a phase review.
 
+Works with Python 3.9+ (the python3 that ships with macOS).
+
 Usage:
     python3 -I tools/inspect_exports.py my_whoop_data.zip garmin_export.zip
     python3 -I tools/inspect_exports.py physiological_cycles.csv sleeps.csv
+    python3 -I tools/inspect_exports.py --files garmin_export.zip   # also list file names
+
+Short upper-case codes (e.g. TOTAL, HIGHEST, HRV) and true/false flags are
+printed as values; all other text is reduced to a count of distinct values.
+--files lists entry names with every digit run masked as "#".
 
 Compare the output with docs/adr/0004-export-format-assumptions.md and fix
 WhoopColumns.java / GarminFields.java where they differ.
@@ -24,7 +31,7 @@ import sys
 import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 GARMIN_PATTERNS = {
@@ -33,7 +40,9 @@ GARMIN_PATTERNS = {
     "UDSFile (daily summary)": re.compile(r"(?i)UDSFile.*\.json$"),
     "healthStatusData (HRV)": re.compile(r"(?i)(healthStatusData|hrvStatus).*\.json$"),
 }
-MAX_KEYS = 60
+MAX_KEYS = 200
+ENUM_RE = re.compile(r"^(?:[A-Z][A-Z0-9_]{0,31}|true|false|True|False)$")
+MAX_ENUM_VALUES = 10
 
 
 @dataclass
@@ -75,6 +84,8 @@ class ColumnStats:
         if self.dates and len(self.dates) >= self.non_empty * 0.5:
             return f"dates    {min(self.dates)} .. {max(self.dates)} ({len(self.dates)} distinct days)"
         n = len(self.distinct)
+        if 0 < n <= MAX_ENUM_VALUES and all(ENUM_RE.match(v) for v in self.distinct):
+            return "values   " + ", ".join(sorted(self.distinct))
         return f"text     {n}{'+' if n >= 1000 else ''} distinct values"
 
 
@@ -140,9 +151,9 @@ def inspect_csv(name: str, text: str) -> list[str]:
             stats[i].add(cell)
     out = [f"== {name}: {rows} rows, {len(headers)} columns"]
     width = max((len(h) for h in headers), default=0)
-    for h, s in zip(headers, stats, strict=True):
+    for h, s in zip(headers, stats):
         out.append(f"  {h:<{width}}  {s.non_empty:>6} filled  {s.describe()}")
-    first = next((s for h, s in zip(headers, stats, strict=True) if "cycle start" in h.lower()), None)
+    first = next((s for h, s in zip(headers, stats) if "cycle start" in h.lower()), None)
     if first is None and stats:
         first = stats[0]
     if first is not None:
@@ -167,14 +178,19 @@ def _records(root) -> list[dict]:
     return []
 
 
-def _flatten(d: dict, prefix: str = "") -> dict[str, object]:
-    out: dict[str, object] = {}
+def _flatten(d: dict, prefix: str = "") -> list[tuple[str, object]]:
+    """(path, value) pairs. Objects nest as a/b; lists of objects as a[]/b (one pair per element)."""
+    out: list[tuple[str, object]] = []
     for k, v in d.items():
         key = f"{prefix}{k}"
         if isinstance(v, dict):
-            out.update(_flatten(v, key + "/"))
+            out.extend(_flatten(v, key + "/"))
+        elif isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+            out.append((key + "[]", v))
+            for item in v:
+                out.extend(_flatten(item, key + "[]/"))
         else:
-            out[key] = v
+            out.append((key, v))
     return out
 
 
@@ -185,8 +201,8 @@ def _record_day(r: dict) -> date | None:
     if isinstance(cd, str):
         return _date(cd)
     ms = r.get("startTimeGmt") or r.get("beginTimestamp")
-    if isinstance(ms, int | float):
-        return datetime.fromtimestamp(ms / 1000, tz=UTC).date()
+    if isinstance(ms, (int, float)):
+        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).date()
     return None
 
 
@@ -206,9 +222,9 @@ def inspect_json_group(label: str, blobs: list[tuple[str, bytes]]) -> list[str]:
         d = _record_day(r)
         if d:
             days.add(d)
-        for k, v in _flatten(r).items():
+        for k, v in _flatten(r):
             if isinstance(v, list):
-                presence[k + "[]"] += 1
+                presence[k if k.endswith("[]") else k + "[]"] += 1
                 continue
             presence[k] += 1
             stats.setdefault(k, ColumnStats()).add(None if v is None else str(v))
@@ -229,7 +245,20 @@ def _is_fit(name: str) -> bool:
     return name.lower().endswith(".fit")
 
 
-def inspect_zip(path: str) -> list[str]:
+def list_files(names: list[str]) -> list[str]:
+    """Entry names per folder, digit runs masked, so dates and ids are not shown."""
+    masked = Counter()
+    for n in names:
+        if "Uploaded-Files" in n or _is_fit(n):
+            continue
+        masked[re.sub(r"\d+", "#", n)] += 1
+    out = [f"== File names ({len(masked)} distinct patterns, digits masked)"]
+    for name, c in sorted(masked.items()):
+        out.append(f"  {c:>5}  {name}")
+    return out
+
+
+def inspect_zip(path: str, show_files: bool = False) -> list[str]:
     out = [f"#### {path}"]
     with zipfile.ZipFile(path) as zf:
         names = [n for n in zf.namelist() if not n.endswith("/")]
@@ -261,17 +290,21 @@ def inspect_zip(path: str) -> list[str]:
             for label, blobs in groups.items():
                 if not blobs:
                     out.append(f"  WARNING: no {label} files matched; the importer will not read this data")
+        if show_files:
+            out.extend(list_files(names))
     return out
 
 
 def main(argv: list[str]) -> int:
-    if not argv:
+    show_files = "--files" in argv
+    paths = [a for a in argv if a != "--files"]
+    if not paths:
         print(__doc__)
         return 2
-    for path in argv:
+    for path in paths:
         try:
             if zipfile.is_zipfile(path):
-                lines = inspect_zip(path)
+                lines = inspect_zip(path, show_files)
             elif path.lower().endswith(".csv"):
                 with open(path, encoding="utf-8", errors="replace") as f:
                     lines = inspect_csv(path, f.read())

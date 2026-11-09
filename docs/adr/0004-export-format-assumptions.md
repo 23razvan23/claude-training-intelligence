@@ -1,6 +1,6 @@
 # ADR 0004: Export formats assumed without real files
 
-- Status: **provisional — verify against the real exports before Phase 1**
+- Status: **Garmin: verified against the coach's real export on 2026-11-09** (list contents pending one more inspector run, see below). **Whoop: provisional until the real export is inspected.**
 - Decided with the coach: no real export files were available in Phase 0, so the parsers follow the publicly documented layouts.
 
 ## How to verify
@@ -20,6 +20,21 @@ Headers match case-insensitively, ignoring punctuation. Times are local, as `yyy
 | journal_entries.csv | Cycle start/end/timezone, Question text, Answered yes, Notes |
 
 ## Garmin Connect account export (one ZIP)
+
+### Verified on the real export (2026-11-09)
+The export covered 2024-11 → 2026-11, with 1,360 activities, ~720 nights and 21,451 FIT files.
+- **Units:** activity `duration` is in ms (mean ≈ 37 min); `distance` and `elevationGain` are in cm (mean ≈ 4.4 km); `startTimeGmt` is epoch ms. All file patterns matched.
+- **Resting HR:** `restingHeartRate` in UDSFile is smoothed (range 44–57). `currentDayRestingHeartRate` (41–63) is the day's own value. The importer reads `currentDayRestingHeartRate`, falling back to `restingHeartRate`.
+- **Activity dates:** `startTimeLocal` holds local wall-clock time encoded as epoch ms. The activity's `calendar_date` is taken from it, so travel is handled correctly.
+- **Overnight metrics:** sleep records carry `averageRespiration`, `avgSleepStress` and `spo2SleepSummary.averageSPO2/lowestSPO2`. These are stored on `sleep_session` (migration V4). 8 of 727 sleep records have no timestamps and are skipped.
+- **HRV:** `healthStatusData` exists only from **2025-09-17**. Earlier days have no overnight HRV in these files. The 89 files in `DI-Connect-Metrics` are still to be checked for older HRV.
+- **FIT files:** about 94% are non-activity (monitoring) files. The parser stops after `file_id` for those.
+- **`calories`:** units are not verified (mean 1,364 per activity looks high for kcal). The value is stored as-is and is not used by any model.
+
+### Still to confirm with `inspect_exports.py --files`
+The element keys of `allDayStress.aggregatorList[]`, `bodyBattery.bodyBatteryStatList[]` and HRV `metrics[]`, and the file names in `DI-Connect-Metrics`.
+
+### Original assumptions
 | Entry (path pattern) | Fields read | Units assumed |
 |---|---|---|
 | `*summarizedActivities*.json`: `[{"summarizedActivitiesExport":[…]}]` | activityId, activityType/sportType, startTimeGmt, duration, distance, elevationGain, avgHr, maxHr, calories, activityTrainingLoad, aerobicTrainingEffect, anaerobicTrainingEffect | startTimeGmt epoch **ms**; duration **ms**; distance and elevationGain **cm** |

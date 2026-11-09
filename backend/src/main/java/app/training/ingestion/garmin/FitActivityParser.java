@@ -38,7 +38,11 @@ public final class FitActivityParser {
         var fileId = new FileIdMesg[1];
 
         broadcaster.addListener((FileIdMesgListener) m -> {
-            if (fileId[0] == null) fileId[0] = m;
+            if (fileId[0] != null) return;
+            fileId[0] = m;
+            // file_id is the first message: stop right away for non-activity files
+            // (bulk exports hold ~15x more monitoring files than activities).
+            if (m.getType() != com.garmin.fit.File.ACTIVITY) throw new NotAnActivity();
         });
         broadcaster.addListener((SessionMesgListener) m -> sessions.add(session(m)));
         broadcaster.addListener((RecordMesgListener) m -> {
@@ -55,7 +59,13 @@ public final class FitActivityParser {
 
         try {
             decode.read(new ByteArrayInputStream(bytes), broadcaster, broadcaster);
+        } catch (NotAnActivity e) {
+            FileIdMesg id = fileId[0];
+            return new Parsed(false, id.getSerialNumber(), null, List.of(), List.of());
         } catch (FitRuntimeException e) {
+            if (e.getCause() instanceof NotAnActivity || hasCause(e, NotAnActivity.class)) {
+                return new Parsed(false, fileId[0] == null ? null : fileId[0].getSerialNumber(), null, List.of(), List.of());
+            }
             throw new IllegalArgumentException("Not a readable FIT file: " + e.getMessage(), e);
         }
 
@@ -67,6 +77,22 @@ public final class FitActivityParser {
                 id == null || id.getTimeCreated() == null ? null : id.getTimeCreated().getDate().toInstant(),
                 sessions,
                 stream);
+    }
+
+    /** Thrown from the file_id listener to abort decoding a non-activity file. */
+    private static final class NotAnActivity extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        NotAnActivity() {
+            super(null, null, false, false);
+        }
+    }
+
+    private static boolean hasCause(Throwable t, Class<? extends Throwable> type) {
+        for (Throwable c = t; c != null && c.getCause() != c; c = c.getCause()) {
+            if (type.isInstance(c)) return true;
+        }
+        return false;
     }
 
     private static Session session(SessionMesg m) {

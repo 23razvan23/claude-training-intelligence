@@ -132,7 +132,7 @@ public final class Fixtures {
                 LocalDate d = first.plusDays(i);
                 String sep = i == 0 ? "" : ",";
                 uds.append(sep).append("""
-                        {"calendarDate":"%s","restingHeartRate":%d,
+                        {"calendarDate":"%s","restingHeartRate":48,"currentDayRestingHeartRate":%d,
                          "allDayStress":{"aggregatorList":[{"type":"TOTAL","averageStressLevel":28},{"type":"AWAKE","averageStressLevel":35}]},
                          "bodyBattery":{"bodyBatteryStatList":[{"bodyBatteryStatType":"HIGHEST","statsValue":90},{"bodyBatteryStatType":"LOWEST","statsValue":20}]},
                          "respiration":{"avgSleepRespirationValue":14.5},"averageSpo2Value":95.0}""".formatted(d, 47 + i % 3));
@@ -144,17 +144,22 @@ public final class Fixtures {
                 sleep.append(sep).append("""
                         {"calendarDate":"%s","sleepStartTimestampGMT":"%s","sleepEndTimestampGMT":"%s",
                          "deepSleepSeconds":6000,"lightSleepSeconds":12000,"remSleepSeconds":7200,"awakeSleepSeconds":3600,
-                         "sleepScores":{"overallScore":81}}""".formatted(d, gmt(sleepStart), gmt(sleepEnd)));
+                         "sleepScores":{"overallScore":81},"averageRespiration":12.5,"avgSleepStress":17.25,
+                         "spo2SleepSummary":{"averageSPO2":96.2,"lowestSPO2":86.0},"retro":false}""".formatted(d, gmt(sleepStart), gmt(sleepEnd)));
                 Instant run = runStart(d);
                 acts.append(sep).append("""
                         {"activityId":%d,"name":"Easy run","activityType":"running","sportType":"RUNNING",
-                         "startTimeGmt":%d.0,"duration":3600000.0,"distance":1000000.0,"elevationGain":8000.0,
+                         "startTimeGmt":%d.0,"startTimeLocal":%d.0,"duration":3600000.0,"distance":1000000.0,"elevationGain":8000.0,
                          "avgHr":145,"maxHr":160,"calories":700,"activityTrainingLoad":95.4,
                          "aerobicTrainingEffect":3.1,"anaerobicTrainingEffect":0.4}"""
-                        .formatted(1_000_000L + i, run.toEpochMilli()));
+                        .formatted(1_000_000L + i, run.toEpochMilli(), localMillis(run)));
                 // FIT start is 3 s off the summary, as real devices often are.
                 nz.putNextEntry(new ZipEntry("athlete_" + (1_000_000L + i) + ".fit"));
                 nz.write(fitRun(run.plusSeconds(3), 120, 4242));
+                nz.closeEntry();
+                // Bulk exports are mostly all-day monitoring files; they must be skipped.
+                nz.putNextEntry(new ZipEntry("athlete_monitor_" + i + ".fit"));
+                nz.write(fitMonitoring(run.minusSeconds(3600), 9000 + i));
                 nz.closeEntry();
             }
         }
@@ -175,6 +180,36 @@ public final class Fixtures {
             put(z, "DI_CONNECT/DI-Connect-User/user_profile.json", "{\"note\":\"ignored\"}");
         }
         return zip;
+    }
+
+    /** Garmin's startTimeLocal: local wall-clock time encoded as if it were UTC epoch ms. */
+    public static long localMillis(Instant i) {
+        return LocalDateTime.ofInstant(i, ZONE).toInstant(java.time.ZoneOffset.UTC).toEpochMilli();
+    }
+
+    /** A non-activity (monitoring) FIT file, like the thousands in a bulk export. */
+    public static byte[] fitMonitoring(Instant created, long serial) throws IOException {
+        Path tmp = Files.createTempFile("monitor", ".fit");
+        try {
+            var enc = new FileEncoder(tmp.toFile(), Fit.ProtocolVersion.V2_0);
+            var fileId = new FileIdMesg();
+            fileId.setType(com.garmin.fit.File.MONITORING_B);
+            fileId.setManufacturer(Manufacturer.GARMIN);
+            fileId.setProduct(1);
+            fileId.setSerialNumber(serial);
+            fileId.setTimeCreated(new DateTime(Date.from(created)));
+            enc.write(fileId);
+            for (int m = 0; m < 30; m++) {
+                var mon = new com.garmin.fit.MonitoringMesg();
+                mon.setTimestamp(new DateTime(Date.from(created.plusSeconds(60L * m))));
+                mon.setHeartRate((short) 60);
+                enc.write(mon);
+            }
+            enc.close();
+            return Files.readAllBytes(tmp);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
     }
 
     private static String gmt(Instant i) {

@@ -52,3 +52,38 @@ def test_garmin_zip_summary(tmp_path):
 def test_main_without_args_prints_usage(capsys):
     assert inspect_exports.main([]) == 2
     assert "Usage" in capsys.readouterr().out
+
+
+def test_lists_of_objects_are_described_with_enum_values_but_no_free_text():
+    blob = json.dumps(
+        [
+            {
+                "calendarDate": "2024-03-01",
+                "allDayStress": {
+                    "aggregatorList": [
+                        {"type": "TOTAL", "averageStressLevel": 30},
+                        {"type": "AWAKE", "averageStressLevel": 40},
+                    ]
+                },
+                "metrics": [{"type": "HRV", "value": 55.0, "status": "IN_RANGE"}],
+                "feedback": "You slept like a baby after the party at Ana's",
+            }
+        ]
+    ).encode()
+    out = "\n".join(inspect_exports.inspect_json_group("x", [("x.json", blob)]))
+    assert "allDayStress/aggregatorList[]/type" in out
+    assert "values   AWAKE, TOTAL" in out
+    assert "metrics[]/value" in out
+    assert "values   HRV" in out
+    assert "values   IN_RANGE" in out
+    assert "party" not in out and "Ana" not in out
+
+
+def test_file_listing_masks_digits(tmp_path):
+    path = tmp_path / "g.zip"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("DI_CONNECT/DI-Connect-Metrics/TrainingReadinessDTO_20240101_20240410_127236701.json", "[]")
+        z.writestr("DI_CONNECT/DI-Connect-Metrics/TrainingReadinessDTO_20240411_20240720_127236701.json", "[]")
+    out = "\n".join(inspect_exports.inspect_zip(str(path), show_files=True))
+    assert "2  DI_CONNECT/DI-Connect-Metrics/TrainingReadinessDTO_#_#_#.json" in out
+    assert "127236701" not in out

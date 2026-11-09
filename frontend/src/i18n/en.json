@@ -1,0 +1,53 @@
+{
+  "app": { "name": "Training Intelligence", "short": "TI" },
+  "nav": { "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "logout": "Log out" },
+  "theme": { "toggle": "Switch theme", "light": "Light", "dark": "Dark", "system": "System" },
+  "common": {
+    "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "loading": "Loading…",
+    "error": "Something went wrong: {{message}}", "none": "—", "athlete": "Athlete", "selectAthlete": "Select an athlete"
+  },
+  "login": {
+    "title": "Sign in", "username": "Username", "password": "Password", "submit": "Sign in",
+    "failed": "Wrong username or password."
+  },
+  "athletes": {
+    "title": "Athletes", "new": "New athlete", "empty": "No athletes yet.",
+    "name": "Name", "sex": "Sex (for TRIMP)", "sexM": "Male", "sexF": "Female", "birthYear": "Birth year",
+    "hrMax": "HR max (bpm)", "restingHr": "Resting HR (bpm)", "lthr": "LTHR (bpm)",
+    "thresholdPace": "Threshold pace (min:ss /km)", "timezone": "Timezone", "injuryNotes": "Injury notes",
+    "hrZones": "HR zones", "zone": "Zone", "zoneMin": "From (bpm)", "zoneMax": "To (bpm)", "addZone": "Add zone",
+    "confirmDelete": "Delete {{name}} and ALL their data? This cannot be undone.",
+    "login": "Athlete login", "loginExists": "Has login: {{username}}", "createLogin": "Create login",
+    "loginHint": "Lets the athlete see their own data. Password at least 10 characters.",
+    "loginCreated": "Login created."
+  },
+  "imports": {
+    "title": "Imports",
+    "whoop": { "title": "Whoop export", "hint": "The export ZIP, or its CSV files (physiological_cycles, sleeps, workouts, journal_entries). One-time: ground truth for calibration." },
+    "garmin": { "title": "Garmin account export", "hint": "The ZIP from Garmin Connect → Account → Export your data. Backfills history with FIT files." },
+    "fit": { "title": "FIT files", "hint": "Drag in activity .fit files. Fallback when sync breaks." },
+    "choose": "Choose files", "drop": "or drop them here", "uploading": "Uploading…",
+    "history": "Import history", "empty": "No imports yet.",
+    "col": { "when": "When", "kind": "Type", "file": "File", "status": "Status", "result": "Result" },
+    "status": { "PENDING": "Queued", "RUNNING": "Running", "SUCCEEDED": "Done", "FAILED": "Failed" },
+    "kind": { "WHOOP_EXPORT": "Whoop", "GARMIN_EXPORT": "Garmin export", "GARMIN_SYNC": "Garmin sync", "FIT_UPLOAD": "FIT" },
+    "summary": "{{inserted}} new, {{duplicates}} already present, {{skipped}} skipped",
+    "warnings_one": "{{count}} warning", "warnings_other": "{{count}} warnings", "coachOnly": "Only the coach can import data."
+  },
+  "coverage": {
+    "title": "Data coverage",
+    "intro": "Days with complete Garmin and Whoop data are the ones Phase 1 can calibrate on.",
+    "empty": "No data imported yet.",
+    "range": "{{from}} to {{to}} · {{days}} days",
+    "paired": "Paired days", "garmin": "Garmin complete", "whoop": "Whoop complete",
+    "definition": "Garmin complete = resting HR + overnight HRV + main sleep. Whoop complete = recovery + day strain.",
+    "fields": "Days with each input",
+    "field": {
+      "garminRestingHr": "Garmin resting HR", "garminHrv": "Garmin overnight HRV", "garminSleep": "Garmin sleep",
+      "garminActivityDays": "Days with Garmin activities", "whoopRecovery": "Whoop recovery", "whoopStrain": "Whoop strain",
+      "whoopSleep": "Whoop sleep performance"
+    },
+    "calendar": "Calendar", "legendPaired": "Paired", "legendGarmin": "Garmin only", "legendWhoop": "Whoop only", "legendNone": "Neither",
+    "gaps": "Gaps in paired data", "noGaps": "No gaps.", "gapRow": "{{from}} – {{to}} ({{days}} days)"
+  }
+}

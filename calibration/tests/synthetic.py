@@ -5,14 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-TRUE_STRAIN = {"a": 3.5, "b": 0.03, "c": 6.0}
+TRUE_STRAIN = {"a": 3.5, "b": 0.03, "c": 6.0, "k": 0.5}
 
 
 def make(days: int = 300, seed: int = 7) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     dates = pd.date_range("2026-01-01", periods=days, freq="D")
     load = np.where(rng.random(days) < 0.25, 0.0, rng.gamma(2.0, 40.0, days))
-    strain = TRUE_STRAIN["c"] + TRUE_STRAIN["a"] * np.log1p(TRUE_STRAIN["b"] * load) + rng.normal(0, 0.6, days)
+    background = rng.gamma(3.0, 10.0, days)  # daily-life load from all-day HR
+    total = load + TRUE_STRAIN["k"] * background
+    strain = TRUE_STRAIN["c"] + TRUE_STRAIN["a"] * np.log1p(TRUE_STRAIN["b"] * total) + rng.normal(0, 0.6, days)
     z = rng.normal(0, 1, days)
     rhr_dev = rng.normal(0, 2, days)
     resp_dev = rng.normal(0, 0.5, days)
@@ -35,6 +37,8 @@ def make(days: int = 300, seed: int = 7) -> pd.DataFrame:
             "sleep_minutes": sleep_min,
             "day_load_banister": load,
             "day_load_edwards": load * 0.9 + rng.normal(0, 15, days),
+            "background_load": background,
+            "monitored_minutes": np.full(days, 1300),
             "has_garmin_core": True,
             "whoop_recovery": np.round(recovery),
             "whoop_strain": np.round(strain, 1),

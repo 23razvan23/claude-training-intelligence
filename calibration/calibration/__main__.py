@@ -15,7 +15,7 @@ from datetime import date
 
 from . import config, data, pipeline, report
 
-FEATURE_VERSION = "f1"
+FEATURE_VERSION = "f2"
 
 
 def main(argv: list[str] | None = None) -> int:

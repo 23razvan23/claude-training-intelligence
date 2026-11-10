@@ -21,6 +21,7 @@ class Settings:
     challenger_mae_gain: float
     challenger_band_gain: float
     sleep_shortfall_days: int
+    strain_min_monitored_minutes: int
 
 
 def load(path: str | None = None) -> Settings:
@@ -42,4 +43,5 @@ def load(path: str | None = None) -> Settings:
         challenger_mae_gain=raw["challenger_mae_gain"],
         challenger_band_gain=raw["challenger_band_gain"],
         sleep_shortfall_days=raw["sleep_shortfall_days"],
+        strain_min_monitored_minutes=raw.get("strain_min_monitored_minutes", 600),
     )

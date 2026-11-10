@@ -52,6 +52,8 @@ Drag single activity `.fit` files under **FIT files**. A file that matches an al
 > ```
 > It prints only counts, ranges and dates, never notes or names.
 
+> **All-day heart rate** comes from the monitoring files inside the Garmin export. If you imported the export before this feature existed, upload the same ZIP once more. Only the missing data is added.
+
 ### 5. Calibrate (Phase 1)
 1. In **Athletes**, set HR max, resting HR and sex. Strain needs them.
 2. In **Calibration**, press **Recompute features**. Do this again after any import or profile change.

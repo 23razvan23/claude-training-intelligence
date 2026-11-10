@@ -50,6 +50,20 @@ services:
     expose:
       - "8090"
 
+  # Module 1 calibration job, run on demand (not started by `docker compose up`):
+  #   docker compose run --rm calibration --athlete 1
+  calibration:
+    build: ./calibration
+    profiles: [tools]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-training}
+      PGUSER: ${POSTGRES_USER:-training}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+
   backup:
     build: ./deploy/backup
     restart: unless-stopped

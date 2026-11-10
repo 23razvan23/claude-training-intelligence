@@ -28,3 +28,4 @@ __pycache__/
 *.iml
 .DS_Store
 uv.lock
+*.tsbuildinfo

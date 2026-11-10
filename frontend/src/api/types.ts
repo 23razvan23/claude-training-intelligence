@@ -80,3 +80,50 @@ export interface CoverageReport {
   pairedGaps: { from: string; to: string; days: number }[];
   days: CoverageDay[];
 }
+
+export interface FeatureSummary {
+  featureVersion: string;
+  days: number;
+  withGarminCore: number;
+  withWhoop: number;
+  paired: number;
+  from?: string;
+  to?: string;
+  pairedFrom?: string;
+  pairedTo?: string;
+  withoutBaseline: number;
+  withoutLoad: number;
+  activityLoadMethods: Record<string, number>;
+}
+
+export interface RecomputeResult {
+  load: { computed: number; fromStream: number; fromAverage: number; withoutLoad: number; hrRest?: number; sexAssumed: boolean };
+  features: { days: number; withGarminCore: number; withWhoop: number; paired: number; from?: string; to?: string };
+}
+
+interface ScoreMetrics {
+  n: number;
+  mae?: number;
+  spearman?: number;
+  bias?: number;
+}
+
+export interface ModelVersion {
+  id: number;
+  athleteId: number;
+  version: string;
+  status: 'CANDIDATE' | 'ACTIVE' | 'FROZEN' | 'RETIRED';
+  featureVersion: string;
+  trainFrom?: string;
+  trainTo?: string;
+  testFrom?: string;
+  testTo?: string;
+  passed: boolean;
+  createdAt: string;
+  metrics: {
+    strain?: ScoreMetrics;
+    recovery?: ScoreMetrics & { agreement?: number; green_red_rate?: number };
+    targets?: { strain_mae_max: number; recovery_band_agreement_min: number; recovery_green_red_max: number };
+    checks?: { strain_mae: boolean; recovery_band_agreement: boolean; recovery_green_red: boolean };
+  };
+}

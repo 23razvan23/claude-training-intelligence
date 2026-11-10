@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { Athlete, AthleteInput, CoverageReport, ImportBatch, Me, UserView } from './types';
+import type {
+  Athlete,
+  AthleteInput,
+  CoverageReport,
+  FeatureSummary,
+  ImportBatch,
+  Me,
+  ModelVersion,
+  RecomputeResult,
+  UserView,
+} from './types';
 
 export function useMe() {
   return useQuery<Me | null>({
@@ -105,5 +115,42 @@ export function useCoverage(athleteId?: number) {
     queryKey: ['coverage', athleteId],
     queryFn: () => api<CoverageReport>(`/api/athletes/${athleteId}/coverage`),
     enabled: athleteId != null,
+  });
+}
+
+export function useFeatureSummary(athleteId?: number) {
+  return useQuery({
+    queryKey: ['features', athleteId],
+    queryFn: () => api<FeatureSummary>(`/api/athletes/${athleteId}/features/summary`),
+    enabled: athleteId != null,
+  });
+}
+
+export function useRecomputeFeatures(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<RecomputeResult>(`/api/athletes/${athleteId}/features/recompute`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['features', athleteId] }),
+  });
+}
+
+export function useModels(athleteId?: number) {
+  return useQuery({
+    queryKey: ['models', athleteId],
+    queryFn: () => api<ModelVersion[]>(`/api/athletes/${athleteId}/models`),
+    enabled: athleteId != null,
+  });
+}
+
+export function useModelReport(modelId?: number) {
+  return useQuery({
+    queryKey: ['model-report', modelId],
+    queryFn: async () => {
+      const res = await fetch(`/api/models/${modelId}/report`, { credentials: 'same-origin' });
+      if (!res.ok) throw new ApiError(res.status, res.statusText);
+      return res.text();
+    },
+    enabled: modelId != null,
+    staleTime: Infinity,
   });
 }

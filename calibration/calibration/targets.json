@@ -1,0 +1,14 @@
+{
+  "_comment": "Acceptance targets and model settings for Module 1 calibration. All [configurable]; starting values from SPEC.md, revisit after the first real run.",
+  "strain_mae_max": 1.5,
+  "recovery_band_agreement_min": 0.70,
+  "recovery_green_red_max": 0.03,
+  "bands": {"green_min": 67, "red_max": 33},
+  "test_share": 0.20,
+  "recovery_ridge_alpha": 1.0,
+  "optional_feature_min_coverage": 0.90,
+  "optional_feature_min_gain": 0.02,
+  "challenger_mae_gain": 0.10,
+  "challenger_band_gain": 0.05,
+  "sleep_shortfall_days": 7
+}

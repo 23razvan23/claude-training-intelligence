@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AthletesPage } from './pages/AthletesPage';
 import { ImportsPage } from './pages/ImportsPage';
 import { CoveragePage } from './pages/CoveragePage';
+import { CalibrationPage } from './pages/CalibrationPage';
 
 export function App() {
   const { t } = useTranslation();
@@ -23,6 +24,7 @@ export function App() {
           <Route path="/athletes" element={<AthletesPage />} />
           <Route path="/imports" element={<ImportsPage />} />
           <Route path="/coverage" element={<CoveragePage />} />
+          <Route path="/calibration" element={<CalibrationPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

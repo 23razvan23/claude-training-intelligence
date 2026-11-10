@@ -52,6 +52,18 @@ Drag single activity `.fit` files under **FIT files**. A file that matches an al
 > ```
 > It prints only counts, ranges and dates, never notes or names.
 
+### 5. Calibrate (Phase 1)
+1. In **Athletes**, set HR max, resting HR and sex. Strain needs them.
+2. In **Calibration**, press **Recompute features**. Do this again after any import or profile change.
+3. Run the calibration job. It isn't started by `docker compose up`:
+   ```bash
+   docker compose run --rm calibration --athlete 1
+   ```
+   Use your athlete id, shown on the Calibration screen.
+4. The new model version appears under **Calibration**, with PASS/FAIL against the targets and its full report.
+
+How it works: [ADR 0007](docs/adr/0007-module1-calibration.md). The targets are in `calibration/targets.json`.
+
 Personal exports never belong in git: `.gitignore` excludes `data/`, `*.zip`, `*.fit` and `.env`.
 
 ## Development
@@ -133,4 +145,4 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 ## Architecture decisions
 
-See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006).
+See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007).

@@ -100,6 +100,19 @@ public class WhoopCsvImporter {
         return TimeParsing.instant(t.text(r, CYCLE_START), z);
     }
 
+    /**
+     * The day a Whoop cycle belongs to: the local date you woke up (ADR 0002). Whoop's export
+     * starts a cycle at sleep onset, usually the evening before, so the start date alone is one
+     * day early. Uses the wake onset when the row has one; otherwise start + 12 h, which lands
+     * on the wake date whether the cycle starts at sleep onset or at waking.
+     */
+    static LocalDate cycleDate(Instant cycleStart, Instant wakeOnset, ZoneId z) {
+        if (wakeOnset != null && !wakeOnset.isBefore(cycleStart) && Duration.between(cycleStart, wakeOnset).toHours() < 20) {
+            return LocalDate.ofInstant(wakeOnset, z);
+        }
+        return LocalDate.ofInstant(cycleStart.plus(Duration.ofHours(12)), z);
+    }
+
     private static Integer minutesToSeconds(Integer min) {
         return min == null ? null : min * 60;
     }
@@ -117,7 +130,7 @@ public class WhoopCsvImporter {
                 writer.whoopCycle(ctx, new RawRows.WhoopCycle(
                         start,
                         TimeParsing.instant(t.text(r, CYCLE_END), z),
-                        LocalDate.ofInstant(start, z),
+                        cycleDate(start, TimeParsing.instant(t.text(r, WAKE_ONSET), z), z),
                         t.integer(r, RECOVERY),
                         t.decimal(r, DAY_STRAIN),
                         t.decimal(r, HRV),
@@ -222,7 +235,7 @@ public class WhoopCsvImporter {
                     continue;
                 }
                 writer.journal(ctx, new RawRows.JournalEntry(
-                        start, LocalDate.ofInstant(start, z), q, t.bool(r, ANSWERED_YES), t.text(r, NOTES)));
+                        start, cycleDate(start, null, z), q, t.bool(r, ANSWERED_YES), t.text(r, NOTES)));
             } catch (RuntimeException e) {
                 ctx.stats().skipped("whoop_journal_entry", 1);
                 ctx.stats().warn("journal_entries.csv line " + r.getRecordNumber() + ": " + e.getMessage());

@@ -99,6 +99,12 @@ class MetricsIT extends IntegrationTest {
         assertThat(count("SELECT count(*) FROM day_features WHERE athlete_id = ? AND ln_rmssd_z IS NOT NULL", a)).isEqualTo(DAYS - 14);
         assertThat(count("SELECT count(*) FROM day_features WHERE athlete_id = ? AND baseline_days >= 14 AND rhr_dev IS NOT NULL", a)).isEqualTo(DAYS - 14);
 
+        // Background load from all-day HR: HR 60 for 60 min before the run counts; the 29 min
+        // inside the run's window do not (the run has its own load) but do count as coverage.
+        double w = (60 - 48) / 142.0 * 0.64 * Math.exp(1.92 * (60 - 48) / 142.0);
+        assertThat(((Number) first.get("background_load")).doubleValue()).isCloseTo(60 * w, org.assertj.core.api.Assertions.within(0.01));
+        assertThat(((Number) first.get("monitored_minutes")).intValue()).isEqualTo(89);
+
         // Idempotent.
         mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf())).andExpect(status().isOk());
         assertThat(count("SELECT count(*) FROM day_features WHERE athlete_id = ?", a)).isEqualTo(DAYS);

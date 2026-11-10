@@ -121,8 +121,12 @@ public class GarminExportImporter {
             ctx.stats().warn(name + ": " + e.getMessage());
             return;
         }
+        if (parsed.monitoring()) {
+            monitoring(ctx, name, bytes);
+            return;
+        }
         if (!parsed.activity()) {
-            // Monitoring, sleep, settings... files: most of a bulk export. Skipped quietly.
+            // Sleep, settings, courses... files. Skipped quietly.
             ctx.stats().skipped("fit_file", 1);
             return;
         }
@@ -168,6 +172,23 @@ public class GarminExportImporter {
         } else {
             ctx.stats().duplicates("fit_file", 1);
         }
+    }
+
+    /** All-day HR from a monitoring file. Counted per file as new or duplicate, like activities. */
+    private void monitoring(RawWriter.Ctx ctx, String name, byte[] bytes) {
+        List<FitMonitoringParser.Sample> samples;
+        try {
+            samples = FitMonitoringParser.parse(bytes);
+        } catch (IllegalArgumentException e) {
+            ctx.stats().skipped("monitoring_file", 1);
+            ctx.stats().warn(name + ": " + e.getMessage());
+            return;
+        }
+        long before = ctx.stats().inserted("monitoring_hr");
+        writer.monitoringHr(ctx, samples);
+        if (ctx.stats().inserted("monitoring_hr") > before) ctx.stats().inserted("monitoring_file", 1);
+        else if (samples.isEmpty()) ctx.stats().skipped("monitoring_file", 1);
+        else ctx.stats().duplicates("monitoring_file", 1);
     }
 
     // ---------------------------------------------------------------- JSON entries

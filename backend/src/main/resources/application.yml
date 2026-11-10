@@ -61,7 +61,7 @@ app:
   # Module 1 feature engineering. Every number below is a starting value, not
   # settled science: [configurable], with the reason next to it.
   metrics:
-    feature-version: f1
+    feature-version: f2   # f2: adds all-day HR background load
     # Banister TRIMP weighting k1*e^(k2*HRr): Banister (1991) / Morton (1990) sex constants.
     banister-male-k1: 0.64
     banister-male-k2: 1.92
@@ -71,6 +71,8 @@ app:
     edwards-zone-floors: [0.50, 0.60, 0.70, 0.80, 0.90]
     # Gaps longer than this between HR samples are not integrated (watch paused / dropout).
     max-sample-gap-seconds: 10
+    # All-day monitoring HR is sparse (~1-2 min); longer gaps mean the watch was off.
+    monitoring-max-gap-seconds: 300
     # Personal baseline: trailing window, minimum valid days before z-scores are produced.
     baseline-window-days: 30
     baseline-min-days: 14

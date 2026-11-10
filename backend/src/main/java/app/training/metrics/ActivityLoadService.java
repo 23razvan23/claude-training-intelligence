@@ -28,7 +28,7 @@ public class ActivityLoadService {
     public record Outcome(int computed, int fromStream, int fromAverage, int withoutLoad, Integer hrRest, boolean sexAssumed) {}
 
     /** HRrest: the profile value, else the median of Garmin daily resting HR. */
-    Integer restingHr(Athlete a) {
+    public Integer restingHr(Athlete a) {
         if (a.restingHr() != null) return a.restingHr();
         return jdbc.sql("""
                 SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY resting_hr))::int
@@ -39,7 +39,7 @@ public class ActivityLoadService {
                 .orElse(null);
     }
 
-    Trimp.Params params(Athlete a, Integer hrRest) {
+    public Trimp.Params params(Athlete a, Integer hrRest) {
         if (a.hrMax() == null || hrRest == null || a.hrMax() <= hrRest) return null;
         boolean female = "F".equals(a.sex());
         return new Trimp.Params(

@@ -121,8 +121,18 @@ class ImportIT extends IntegrationTest {
         assertThat(second.status()).isEqualTo("SUCCEEDED");
         assertThat(rawCounts(athlete)).isEqualTo(afterFirst);
         assertThat(second.stats().path("fit_file").path("duplicates").asLong()).isEqualTo(5);
-        // The 5 monitoring FIT files are skipped, never turned into activities.
-        assertThat(first.stats().path("fit_file").path("skipped").asLong()).isEqualTo(5);
+        // The 5 monitoring files become all-day HR (90 samples each), never activities.
+        assertThat(first.stats().path("fit_file").path("skipped").asLong()).isZero();
+        assertThat(first.stats().path("monitoring_file").path("inserted").asLong()).isEqualTo(5);
+        assertThat(count("SELECT count(*) FROM monitoring_hr WHERE athlete_id = ?", athlete)).isEqualTo(5L * Fixtures.MONITORING_SAMPLES);
+        assertThat(second.stats().path("monitoring_file").path("duplicates").asLong()).isEqualTo(5);
+        assertThat(second.stats().path("monitoring_hr").path("inserted").asLong()).isZero();
+        // timestamp_16 expanded correctly: one minute apart, starting an hour before the run.
+        var span = jdbc.sql("SELECT min(ts) AS lo, max(ts) AS hi FROM monitoring_hr WHERE athlete_id = ? AND ts < ?")
+                .params(athlete, java.sql.Timestamp.from(Fixtures.runStart(FIRST).plusSeconds(3 * 3600))).query().singleRow();
+        assertThat(((java.sql.Timestamp) span.get("lo")).toInstant()).isEqualTo(Fixtures.runStart(FIRST).minusSeconds(3600));
+        assertThat(((java.sql.Timestamp) span.get("hi")).toInstant())
+                .isEqualTo(Fixtures.runStart(FIRST).minusSeconds(3600).plusSeconds(60L * (Fixtures.MONITORING_SAMPLES - 1)));
         assertThat(first.warnings()).isEmpty();
         // Progress ends in the FIT phase: 5 activity files + 5 monitoring files.
         assertThat(first.startedAt()).isNotNull();

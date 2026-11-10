@@ -13,5 +13,6 @@ public record MetricsProperties(
         double banisterFemaleK2,
         List<Double> edwardsZoneFloors,
         int maxSampleGapSeconds,
+        int monitoringMaxGapSeconds,
         int baselineWindowDays,
         int baselineMinDays) {}

@@ -42,6 +42,20 @@ def default_test_from(daily: pd.DataFrame, share: float) -> pd.Timestamp:
     return paired.index[int(len(paired) * (1 - share))]
 
 
+def day_alignment(daily: pd.DataFrame, load_col: str, margin: float = 0.2) -> dict:
+    """Spearman correlation of Whoop strain with our load on the previous, same and next day.
+    A clear winner other than the same day means the two sources' days are misaligned."""
+    load = np.log1p(daily[load_col])
+    out = {
+        "previous_day": float(daily["whoop_strain"].corr(load.shift(1), method="spearman")),
+        "same_day": float(daily["whoop_strain"].corr(load, method="spearman")),
+        "next_day": float(daily["whoop_strain"].corr(load.shift(-1), method="spearman")),
+    }
+    other = max(("previous_day", "next_day"), key=lambda k: np.nan_to_num(out[k], nan=-1))
+    out["best"] = other if np.nan_to_num(out[other], nan=-1) > np.nan_to_num(out["same_day"], nan=-1) + margin else "same_day"
+    return out
+
+
 def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_from: date | None = None) -> Result:
     daily = _daily(features)
     split = pd.Timestamp(test_from) if test_from else default_test_from(daily, settings.test_share)
@@ -51,6 +65,16 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     # --- strain -------------------------------------------------------------
     strain_model = strain.choose_and_fit(daily[is_train])
     load_col = strain_model["load"]
+    alignment = day_alignment(daily, load_col)
+    if alignment["best"] != "same_day":
+        notes.append(
+            f"Whoop and Garmin days look shifted by one day: Whoop strain matches the {alignment['best'].replace('_', ' ')}'s "
+            f"load best (Spearman {alignment[alignment['best']]:.2f} vs {alignment['same_day']:.2f} on the same day). "
+            "Check how cycle dates are assigned before trusting any result."
+        )
+    effect = strain_model["a"] * np.log1p(strain_model["b"] * float(daily.loc[is_train, load_col].quantile(0.9)))
+    if effect < 1.0:
+        notes.append(f"The strain model is nearly flat (a hard day adds only {effect:.1f} strain): training load does not explain " "Whoop strain in this data.")
     daily["strain_pred"] = np.where(daily[load_col].notna(), strain.predict(strain_model, daily[load_col].fillna(0)), np.nan)
     daily["prev_strain"] = daily["strain_pred"].shift(1)
 
@@ -106,7 +130,12 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     sp = test[["whoop_sleep_perf", "sleep_perf"]].dropna()
     strain_m = metrics.summarize(st["whoop_strain"], st["strain_pred"])
     result_metrics = {
-        "strain": {**strain_m, "load": load_col, "candidates": {k: v["cv_mae"] for k, v in strain_model["candidates"].items()}},
+        "strain": {
+            **strain_m,
+            "load": load_col,
+            "candidates": {k: v["cv_mae"] for k, v in strain_model["candidates"].items()},
+            "alignment": alignment,
+        },
         "sleep_need": metrics.summarize(sl["whoop_sleep_need_min"], sl["sleep_need_pred"]),
         "sleep_performance": metrics.summarize(sp["whoop_sleep_perf"], sp["sleep_perf"]),
         "recovery": {**linear_m, "feature_selection": selection_log},

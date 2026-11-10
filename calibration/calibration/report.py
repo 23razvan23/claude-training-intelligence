@@ -107,6 +107,8 @@ def render(result: Result, athlete_name: str, version: str) -> str:
     verdict = "All acceptance targets met." if result.passed else "Not all acceptance targets are met — see below."
     parts.append(f"<div class='verdict {'ok' if result.passed else 'no'}'>{verdict}</div>")
 
+    if result.notes:
+        parts.append("<div class='verdict no'>" + "<br>".join(e(n) for n in result.notes) + "</div>")
     parts.append("<h2>Acceptance targets (test window)</h2><table><tr><th>Check</th><th>Ours</th><th>Target</th><th></th></tr>")
     parts.append(check_row("Strain MAE", _f(st.get("mae")), f"≤ {t['strain_mae_max']}", checks["strain_mae"]))
     parts.append(check_row("Recovery band agreement", _pct(rec["agreement"]), f"≥ {_pct(t['recovery_band_agreement_min'])}", checks["recovery_band_agreement"]))
@@ -151,6 +153,16 @@ def render(result: Result, athlete_name: str, version: str) -> str:
             + _scatter(sd["whoop_strain"], sd["strain_pred"], "strain", (0, 21))
             + _bland_altman(sd["whoop_strain"], sd["strain_pred"], "strain")
             + "</div>"
+        )
+
+    al = st.get("alignment")
+    if al:
+        ok = al["best"] == "same_day"
+        parts.append(
+            "<h2>Day alignment check</h2><p>Spearman correlation of Whoop strain with our training load. The same day should win clearly.</p>"
+            "<table><tr><th>Our load on</th><th>Previous day</th><th>Same day</th><th>Next day</th></tr>"
+            f"<tr><td>Correlation</td><td>{_f(al['previous_day'])}</td><td>{_f(al['same_day'])}</td><td>{_f(al['next_day'])}</td></tr></table>"
+            f"<p class='{'pass' if ok else 'fail'}'>{'Days are aligned.' if ok else 'Days look shifted: see the warning at the top.'}</p>"
         )
 
     c = result.coefficients

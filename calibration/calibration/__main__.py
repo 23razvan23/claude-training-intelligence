@@ -55,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
         f"Recovery band agreement {100 * m['recovery']['agreement']:.0f}% (target ≥ {100 * settings.recovery_band_agreement_min:.0f}%), "
         f"green-vs-red {100 * m['recovery']['green_red_rate']:.1f}% (target ≤ {100 * settings.recovery_green_red_max:.0f}%)"
     )
+    for note in result.notes:
+        print("WARNING:", note)
     print("RESULT:", "PASS" if result.passed else "FAIL")
     return 0
 

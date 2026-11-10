@@ -86,3 +86,20 @@ def test_nan_is_stored_as_null_json():
     from calibration import data
 
     assert data._clean({"a": float("nan"), "b": [1.0, float("nan")], "c": {"d": 2}}) == {"a": None, "b": [1.0, None], "c": {"d": 2}}
+
+
+def test_aligned_data_passes_the_alignment_check():
+    r = pipeline.run(make(300), SETTINGS, "f1")
+    assert r.metrics["strain"]["alignment"]["best"] == "same_day"
+    assert not any("shifted" in n for n in r.notes)
+
+
+def test_one_day_shift_is_detected_and_reported():
+    df = make(300)
+    # Whoop's scores dated one day early, as with the original cycle-date bug.
+    for col in ("whoop_strain", "whoop_recovery", "whoop_sleep_need_min", "whoop_sleep_perf"):
+        df[col] = df[col].shift(-1)
+    r = pipeline.run(df, SETTINGS, "f1")
+    assert r.metrics["strain"]["alignment"]["best"] == "next_day"
+    assert any("shifted by one day" in n for n in r.notes)
+    assert "Days look shifted" in report.render(r, "x", "m")

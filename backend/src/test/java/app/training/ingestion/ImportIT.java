@@ -69,7 +69,7 @@ class ImportIT extends IntegrationTest {
         assertThat(second.stats().path("whoop_reference").path("duplicates").asLong()).isEqualTo(10);
         assertThat(second.stats().path("whoop_reference").path("inserted").asLong()).isZero();
 
-        // Values and cycle dates: a cycle starting 07:00 UTC+02:00 belongs to that local date.
+        // A cycle starting at sleep onset on Feb 29 23:00 belongs to Mar 1, the day of waking.
         var row = jdbc.sql("SELECT cycle_date, recovery_pct, day_strain, hrv_rmssd_ms FROM whoop_reference WHERE athlete_id = ? ORDER BY cycle_start LIMIT 1")
                 .param(athlete).query().singleRow();
         assertThat(row.get("cycle_date").toString()).isEqualTo("2024-03-01");

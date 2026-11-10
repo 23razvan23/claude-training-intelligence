@@ -10,6 +10,8 @@ python3 -I tools/inspect_exports.py path/to/my_whoop_data.zip path/to/garmin_exp
 The tool prints columns / JSON keys, value ranges and date coverage, but never free-text values. Compare its output with the tables below. Any difference is fixed in one place: `WhoopColumns.java` (header aliases) or `GarminFields.java` (file patterns, JSON paths and units).
 
 ## Whoop export (ZIP or loose CSVs, recognised by headers)
+**Verified on the real export (2026-11-10):** 302 cycles from 2026-01-12 to 2026-11-08, with recovery 9–98 and strain 1.2–20.6. The headers matched. **`Cycle start time` is sleep onset, the evening before**, not waking; the cycle's day is the wake date (ADR 0002, migration V7).
+
 Headers match case-insensitively, ignoring punctuation. Times are local, as `yyyy-MM-dd HH:mm:ss`, with `Cycle timezone` like `UTC+02:00`.
 
 | File | Columns read |

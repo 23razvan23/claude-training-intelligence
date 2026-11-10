@@ -51,14 +51,15 @@ public final class Fixtures {
         for (int i = 0; i < days; i++) {
             LocalDate d = first.plusDays(i);
             LocalDateTime wake = d.atTime(7, 0);
-            LocalDateTime nextWake = d.plusDays(1).atTime(7, 0);
             LocalDateTime onset = d.minusDays(1).atTime(23, 0);
-            String cs = LOCAL.format(wake);
-            String ce = LOCAL.format(nextWake);
+            // As in the real export: a cycle runs from sleep onset (the evening before) to the
+            // next sleep onset, so its start date is one day before the day it belongs to.
+            String cs = LOCAL.format(onset);
+            String ce = LOCAL.format(d.atTime(23, 0));
             cycles.append(String.join(",", cs, ce, "UTC+02:00", String.valueOf(40 + i % 50), "48", "65.5", "33.4",
-                    "96.1", "12.3", "2500", "170", "70", LOCAL.format(onset), cs, "88", "14.8", "420", "470", "200",
+                    "96.1", "12.3", "2500", "170", "70", LOCAL.format(onset), LOCAL.format(wake), "88", "14.8", "420", "470", "200",
                     "100", "120", "50", "480", "30", "90", "80")).append('\n');
-            sleeps.append(String.join(",", cs, ce, "UTC+02:00", LOCAL.format(onset), cs, "88", "14.8", "420", "470",
+            sleeps.append(String.join(",", cs, ce, "UTC+02:00", LOCAL.format(onset), LOCAL.format(wake), "88", "14.8", "420", "470",
                     "200", "100", "120", "50", "480", "30", "90", "80", "false")).append('\n');
             workouts.append(String.join(",", cs, ce, "UTC+02:00", LOCAL.format(d.atTime(18, 0)),
                     LOCAL.format(d.atTime(19, 0)), "60", "Running", "11.2", "700", "175", "150", "10", "true",

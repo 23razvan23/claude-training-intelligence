@@ -65,16 +65,16 @@ jobs:
       - run: python -m pytest -q
 
   # The inspector runs on users' own machines; stock macOS ships Python 3.9.
+  # setup-python has no 3.9 build for the current ubuntu-latest image, so use the
+  # official 3.9 container instead.
   tools-py39:
     runs-on: ubuntu-latest
+    container: python:3.9-slim
     defaults:
       run:
         working-directory: tools
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
       - run: pip install pytest==8.3.3
       - run: python -m pytest -q
 

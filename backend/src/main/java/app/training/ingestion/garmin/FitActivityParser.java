@@ -28,7 +28,12 @@ public final class FitActivityParser {
      * @param sessions   one per sport in the file; multisport files have several
      */
     public record Parsed(boolean activity, Long serialNumber, Instant timeCreated, List<Session> sessions,
-                         List<StreamPoint> stream) {}
+                         List<StreamPoint> stream, String fileType) {
+        /** All-day monitoring files carry the background heart rate (see FitMonitoringParser). */
+        public boolean monitoring() {
+            return fileType != null && fileType.startsWith("MONITORING");
+        }
+    }
 
     public static Parsed parse(byte[] bytes) {
         var decode = new Decode();
@@ -61,10 +66,11 @@ public final class FitActivityParser {
             decode.read(new ByteArrayInputStream(bytes), broadcaster, broadcaster);
         } catch (NotAnActivity e) {
             FileIdMesg id = fileId[0];
-            return new Parsed(false, id.getSerialNumber(), null, List.of(), List.of());
+            return new Parsed(false, id.getSerialNumber(), null, List.of(), List.of(), typeName(id));
         } catch (FitRuntimeException e) {
             if (e.getCause() instanceof NotAnActivity || hasCause(e, NotAnActivity.class)) {
-                return new Parsed(false, fileId[0] == null ? null : fileId[0].getSerialNumber(), null, List.of(), List.of());
+                return new Parsed(false, fileId[0] == null ? null : fileId[0].getSerialNumber(), null, List.of(), List.of(),
+                        fileId[0] == null ? null : typeName(fileId[0]));
             }
             throw new IllegalArgumentException("Not a readable FIT file: " + e.getMessage(), e);
         }
@@ -76,7 +82,12 @@ public final class FitActivityParser {
                 id == null ? null : id.getSerialNumber(),
                 id == null || id.getTimeCreated() == null ? null : id.getTimeCreated().getDate().toInstant(),
                 sessions,
-                stream);
+                stream,
+                id == null ? null : typeName(id));
+    }
+
+    private static String typeName(FileIdMesg id) {
+        return id.getType() == null ? null : id.getType().name();
     }
 
     /** Thrown from the file_id listener to abort decoding a non-activity file. */

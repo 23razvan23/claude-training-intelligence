@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -46,11 +47,13 @@ def day_alignment(daily: pd.DataFrame, load_col: str, margin: float = 0.2) -> di
     """Spearman correlation of Whoop strain with our load on the previous, same and next day.
     A clear winner other than the same day means the two sources' days are misaligned."""
     load = np.log1p(daily[load_col])
-    out = {
-        "previous_day": float(daily["whoop_strain"].corr(load.shift(1), method="spearman")),
-        "same_day": float(daily["whoop_strain"].corr(load, method="spearman")),
-        "next_day": float(daily["whoop_strain"].corr(load.shift(-1), method="spearman")),
-    }
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # constant input -> NaN, handled below
+        out = {
+            "previous_day": float(daily["whoop_strain"].corr(load.shift(1), method="spearman")),
+            "same_day": float(daily["whoop_strain"].corr(load, method="spearman")),
+            "next_day": float(daily["whoop_strain"].corr(load.shift(-1), method="spearman")),
+        }
     other = max(("previous_day", "next_day"), key=lambda k: np.nan_to_num(out[k], nan=-1))
     out["best"] = other if np.nan_to_num(out[other], nan=-1) > np.nan_to_num(out["same_day"], nan=-1) + margin else "same_day"
     return out
@@ -63,7 +66,7 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     notes: list[str] = []
 
     # --- strain -------------------------------------------------------------
-    strain_model = strain.choose_and_fit(daily[is_train])
+    strain_model = strain.choose_and_fit(daily[is_train], settings.strain_min_monitored_minutes)
     load_col = strain_model["load"]
     alignment = day_alignment(daily, load_col)
     if alignment["best"] != "same_day":
@@ -75,7 +78,13 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     effect = strain_model["a"] * np.log1p(strain_model["b"] * float(daily.loc[is_train, load_col].quantile(0.9)))
     if effect < 1.0:
         notes.append(f"The strain model is nearly flat (a hard day adds only {effect:.1f} strain): training load does not explain " "Whoop strain in this data.")
-    daily["strain_pred"] = np.where(daily[load_col].notna(), strain.predict(strain_model, daily[load_col].fillna(0)), np.nan)
+    if strain_model["background"]:
+        usable = daily[load_col].notna() & strain.background_ok(daily, settings.strain_min_monitored_minutes)
+        pred = strain.predict(strain_model, daily[load_col].fillna(0), daily[strain.BACKGROUND].fillna(0))
+    else:
+        usable = daily[load_col].notna()
+        pred = strain.predict(strain_model, daily[load_col].fillna(0))
+    daily["strain_pred"] = np.where(usable, pred, np.nan)
     daily["prev_strain"] = daily["strain_pred"].shift(1)
 
     # --- sleep --------------------------------------------------------------
@@ -134,6 +143,7 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
             **strain_m,
             "load": load_col,
             "candidates": {k: v["cv_mae"] for k, v in strain_model["candidates"].items()},
+            "background_coverage": strain_model["background_coverage"],
             "alignment": alignment,
         },
         "sleep_need": metrics.summarize(sl["whoop_sleep_need_min"], sl["sleep_need_pred"]),
@@ -155,7 +165,12 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
 
     coefficients = {
         "feature_version": feature_version,
-        "strain": {k: strain_model[k] for k in ("load", "a", "b", "c")},
+        "strain": {
+            **{k: strain_model[k] for k in ("load", "a", "b", "c")},
+            "background_weight": strain_model["k"] if strain_model["background"] else 0.0,
+            "uses_background": strain_model["background"],
+            "min_monitored_minutes": strain_model["min_monitored_minutes"],
+        },
         "sleep": {k: sleep_model[k] for k in ("base_min", "per_strain_min", "per_shortfall", "shortfall_reference_min", "shortfall_days")},
         "recovery": {k: rec_model[k] for k in ("intercept", "terms", "clip")},
         "bands": {"green_min": settings.green_min, "red_max": settings.red_max},

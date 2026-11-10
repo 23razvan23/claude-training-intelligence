@@ -163,9 +163,10 @@ public final class Fixtures {
                 nz.putNextEntry(new ZipEntry("athlete_" + (1_000_000L + i) + ".fit"));
                 nz.write(fitRun(run.plusSeconds(3), 120, 4242));
                 nz.closeEntry();
-                // Bulk exports are mostly all-day monitoring files; they must be skipped.
+                // Bulk exports are mostly all-day monitoring files: HR every minute from an hour
+                // before the run until 30 min into it (the in-run part must not count twice).
                 nz.putNextEntry(new ZipEntry("athlete_monitor_" + i + ".fit"));
-                nz.write(fitMonitoring(run.minusSeconds(3600), 9000 + i));
+                nz.write(fitMonitoring(run.minusSeconds(3600), 9000 + i, MONITORING_SAMPLES, MONITORING_HR));
                 nz.closeEntry();
             }
         }
@@ -193,8 +194,15 @@ public final class Fixtures {
         return LocalDateTime.ofInstant(i, ZONE).toInstant(java.time.ZoneOffset.UTC).toEpochMilli();
     }
 
-    /** A non-activity (monitoring) FIT file, like the thousands in a bulk export. */
-    public static byte[] fitMonitoring(Instant created, long serial) throws IOException {
+    public static final int MONITORING_SAMPLES = 90;
+    public static final int MONITORING_HR = 60;
+
+    /**
+     * A monitoring FIT file, like the thousands in a bulk export: one sample per minute. As
+     * on real devices, only the first message has a full timestamp; the rest carry
+     * timestamp_16 (low 16 bits), which the parser must expand.
+     */
+    public static byte[] fitMonitoring(Instant created, long serial, int samples, int hr) throws IOException {
         Path tmp = Files.createTempFile("monitor", ".fit");
         try {
             var enc = new FileEncoder(tmp.toFile(), Fit.ProtocolVersion.V2_0);
@@ -205,10 +213,12 @@ public final class Fixtures {
             fileId.setSerialNumber(serial);
             fileId.setTimeCreated(new DateTime(Date.from(created)));
             enc.write(fileId);
-            for (int m = 0; m < 30; m++) {
+            for (int m = 0; m < samples; m++) {
                 var mon = new com.garmin.fit.MonitoringMesg();
-                mon.setTimestamp(new DateTime(Date.from(created.plusSeconds(60L * m))));
-                mon.setHeartRate((short) 60);
+                var at = new DateTime(Date.from(created.plusSeconds(60L * m)));
+                if (m == 0) mon.setTimestamp(at);
+                else mon.setTimestamp16((int) (at.getTimestamp() & 0xFFFF));
+                mon.setHeartRate((short) hr);
                 enc.write(mon);
             }
             enc.close();

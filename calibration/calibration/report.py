@@ -175,9 +175,14 @@ def render(result: Result, athlete_name: str, version: str) -> str:
         parts.append(f"<tr><td>{e(term['feature'])}</td><td>{'+' if term['sign'] > 0 else '−'}</td><td>{_f(term['weight'], 2)}</td></tr>")
     parts.append("</table>")
     s = c["strain"]
+    bgtext = (
+        f" + {s['background_weight']:.2f} · background load (all-day HR outside workouts; days with ≥ {s['min_monitored_minutes']} min of HR)"
+        if s.get("uses_background")
+        else ""
+    )
     parts.append(
-        f"<h3>Strain</h3><p>strain = {_f(s['c'])} + {_f(s['a'])} · ln(1 + {s['b']:.5f} · load), "
-        f"load = <code>{e(s['load'])}</code> (time-series CV MAE: " + ", ".join(f"{e(k)} {_f(v)}" for k, v in st["candidates"].items()) + ").</p>"
+        f"<h3>Strain</h3><p>strain = {_f(s['c'])} + {_f(s['a'])} · ln(1 + {s['b']:.5f} · (<code>{e(s['load'])}</code>{bgtext})).</p>"
+        "<p>Time-series CV MAE per candidate: " + ", ".join(f"{e(k)} {_f(v)}" for k, v in st["candidates"].items()) + ".</p>"
     )
     sl = c["sleep"]
     parts.append(

@@ -140,6 +140,27 @@ public class RawWriter {
         }
     }
 
+    /** All-day HR samples, multi-row inserts like the activity stream. */
+    public void monitoringHr(Ctx ctx, List<app.training.ingestion.garmin.FitMonitoringParser.Sample> samples) {
+        for (int from = 0; from < samples.size(); from += STREAM_ROWS_PER_STATEMENT) {
+            var chunk = samples.subList(from, Math.min(samples.size(), from + STREAM_ROWS_PER_STATEMENT));
+            var sb = new StringBuilder("INSERT INTO monitoring_hr (athlete_id, ts, hr, import_batch_id) VALUES ");
+            for (int r = 0; r < chunk.size(); r++) sb.append(r == 0 ? "" : ",").append("(?,?,?,?)");
+            sb.append(" ON CONFLICT DO NOTHING");
+            int inserted = template.update(sb.toString(), ps -> {
+                int i = 1;
+                for (var s : chunk) {
+                    ps.setLong(i++, ctx.athleteId());
+                    ps.setTimestamp(i++, ts(s.ts()));
+                    ps.setInt(i++, s.hr());
+                    ps.setLong(i++, ctx.batchId());
+                }
+            });
+            ctx.stats().inserted("monitoring_hr", inserted);
+            ctx.stats().duplicates("monitoring_hr", chunk.size() - inserted);
+        }
+    }
+
     private final java.util.Map<Integer, String> streamSqlCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     private String streamInsertSql(int rows) {

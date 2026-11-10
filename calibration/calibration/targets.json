@@ -10,5 +10,6 @@
   "optional_feature_min_gain": 0.02,
   "challenger_mae_gain": 0.10,
   "challenger_band_gain": 0.05,
-  "sleep_shortfall_days": 7
+  "sleep_shortfall_days": 7,
+  "strain_min_monitored_minutes": 600
 }

@@ -8,14 +8,34 @@ from calibration import config, metrics, pipeline, recovery, report, strain
 SETTINGS = config.load()
 
 
-def test_strain_fit_recovers_known_parameters():
+def test_strain_fit_recovers_known_parameters_including_background_weight():
     df = make(600)
-    p = strain.fit(df["day_load_banister"], df["whoop_strain"])
-    assert p["a"] == pytest.approx(TRUE_STRAIN["a"], rel=0.15)
-    assert p["c"] == pytest.approx(TRUE_STRAIN["c"], abs=0.5)
-    pred = strain.predict(p, df["day_load_banister"])
+    p = strain.fit(df["day_load_banister"], df["whoop_strain"], df["background_load"])
+    assert p["a"] == pytest.approx(TRUE_STRAIN["a"], rel=0.2)
+    assert p["k"] == pytest.approx(TRUE_STRAIN["k"], rel=0.3)
+    pred = strain.predict(p, df["day_load_banister"], df["background_load"])
     assert np.abs(pred - df["whoop_strain"]).mean() < 0.7
     assert pred.min() >= 0 and pred.max() <= 21
+
+
+def test_background_candidate_wins_when_daily_life_matters():
+    m = strain.choose_and_fit(make(300))
+    assert m["background"] is True
+    assert m["candidates"]["day_load_banister + background"]["cv_mae"] < m["candidates"]["day_load_banister"]["cv_mae"]
+
+
+def test_without_all_day_hr_strain_falls_back_to_workout_load():
+    df = make(300).assign(background_load=np.nan, monitored_minutes=np.nan)
+    m = strain.choose_and_fit(df)
+    assert m["background"] is False and m["k"] == 0.0
+    r = pipeline.run(df, SETTINGS, "f2")
+    assert r.coefficients["strain"]["uses_background"] is False
+
+
+def test_low_coverage_days_are_not_used_for_the_background_model():
+    df = make(300)
+    df.loc[df.index % 3 == 0, "monitored_minutes"] = 300  # watch off most of those days
+    assert strain.background_ok(df, 600).sum() == (df.index % 3 != 0).sum()
 
 
 def test_band_metrics_on_a_hand_made_case():
@@ -52,7 +72,7 @@ def test_recovery_weights_are_non_negative_and_monotonic():
 
 def test_pipeline_split_is_chronological_and_targets_are_met_on_clean_data():
     df = make(300)
-    r = pipeline.run(df, SETTINGS, "f1")
+    r = pipeline.run(df, SETTINGS, "f2")
     assert r.train_to < r.test_from
     assert r.test_days.index.min() >= pd.Timestamp(r.test_from)
     paired = df.dropna(subset=["whoop_recovery"])
@@ -65,14 +85,14 @@ def test_pipeline_split_is_chronological_and_targets_are_met_on_clean_data():
 
 def test_explicit_test_from_and_too_little_data():
     df = make(300)
-    r = pipeline.run(df, SETTINGS, "f1", test_from=pd.Timestamp("2026-09-01").date())
+    r = pipeline.run(df, SETTINGS, "f2", test_from=pd.Timestamp("2026-09-01").date())
     assert str(r.test_from) == "2026-09-01"
     with pytest.raises(ValueError, match="paired"):
-        pipeline.run(make(300).assign(whoop_recovery=np.nan).iloc[:15], SETTINGS, "f1")
+        pipeline.run(make(300).assign(whoop_recovery=np.nan).iloc[:15], SETTINGS, "f2")
 
 
 def test_report_is_self_contained_and_script_free():
-    r = pipeline.run(make(300), SETTINGS, "f1")
+    r = pipeline.run(make(300), SETTINGS, "f2")
     html = report.render(r, "Test <athlete>", "m1-20261109")
     assert html.startswith("<!doctype html>")
     assert "<script" not in html.lower()
@@ -89,7 +109,7 @@ def test_nan_is_stored_as_null_json():
 
 
 def test_aligned_data_passes_the_alignment_check():
-    r = pipeline.run(make(300), SETTINGS, "f1")
+    r = pipeline.run(make(300), SETTINGS, "f2")
     assert r.metrics["strain"]["alignment"]["best"] == "same_day"
     assert not any("shifted" in n for n in r.notes)
 
@@ -99,7 +119,7 @@ def test_one_day_shift_is_detected_and_reported():
     # Whoop's scores dated one day early, as with the original cycle-date bug.
     for col in ("whoop_strain", "whoop_recovery", "whoop_sleep_need_min", "whoop_sleep_perf"):
         df[col] = df[col].shift(-1)
-    r = pipeline.run(df, SETTINGS, "f1")
+    r = pipeline.run(df, SETTINGS, "f2")
     assert r.metrics["strain"]["alignment"]["best"] == "next_day"
     assert any("shifted by one day" in n for n in r.notes)
     assert "Days look shifted" in report.render(r, "x", "m")

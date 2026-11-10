@@ -45,7 +45,10 @@ public class MetricsController {
     public RecomputeResult recompute(@PathVariable long athleteId) {
         var athlete = athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
         var load = loads.recompute(athlete);
-        var days = features.recompute(athleteId);
+        var p = loads.params(athlete, loads.restingHr(athlete));
+        var bgParams = p == null ? null
+                : new Trimp.Params(p.hrMax(), p.hrRest(), p.k1(), p.k2(), p.edwardsFloors(), props.monitoringMaxGapSeconds());
+        var days = features.recompute(athleteId, bgParams, java.time.ZoneId.of(athlete.timezone()));
         return new RecomputeResult(load, days);
     }
 

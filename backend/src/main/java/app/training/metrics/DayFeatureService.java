@@ -6,7 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -50,8 +52,71 @@ public class DayFeatureService {
         return o == null ? null : ((Number) o).doubleValue();
     }
 
+    private record Background(double load, long coveredSeconds) {}
+
+    /**
+     * Background load per cycle day from all-day monitoring HR: Banister-weighted minutes
+     * outside Garmin activity windows (activities already carry their own load). Samples
+     * belong to the cycle opened by the last main sleep that ended before them, like
+     * activities (ADR 0002). Returns load and covered seconds (including activity time).
+     */
+    Map<LocalDate, Background> backgroundLoad(long athleteId, Trimp.Params params, ZoneId zone) {
+        var windows = new ArrayList<long[]>();
+        template.query("""
+                SELECT extract(epoch FROM start_at)::bigint AS s, duration_s FROM activity
+                WHERE athlete_id = ? AND source = 'GARMIN' AND duration_s > 0 ORDER BY start_at""",
+                rs -> {
+                    long st = rs.getLong("s");
+                    long en = st + rs.getLong("duration_s");
+                    if (!windows.isEmpty() && st <= windows.getLast()[1]) windows.getLast()[1] = Math.max(windows.getLast()[1], en);
+                    else windows.add(new long[] {st, en});
+                }, athleteId);
+        var sleepEnds = new ArrayList<Object[]>();
+        template.query("""
+                SELECT extract(epoch FROM end_at)::bigint AS e, cycle_date FROM sleep_session
+                WHERE athlete_id = ? AND source = 'GARMIN' AND NOT is_nap ORDER BY end_at""",
+                rs -> {
+                    sleepEnds.add(new Object[] {rs.getLong("e"), rs.getObject("cycle_date", LocalDate.class)});
+                }, athleteId);
+
+        var acc = new HashMap<LocalDate, double[]>();
+        var streaming = new JdbcTemplate(java.util.Objects.requireNonNull(template.getDataSource()));
+        streaming.setFetchSize(20_000); // stream inside the recompute transaction instead of loading millions of rows
+        long maxGap = props.monitoringMaxGapSeconds();
+        long[] prevT = {Long.MIN_VALUE};
+        int[] prevHr = {0};
+        int[] w = {0};
+        int[] sl = {0};
+        streaming.query("SELECT extract(epoch FROM ts)::bigint AS t, hr FROM monitoring_hr WHERE athlete_id = ? ORDER BY ts", rs -> {
+            long t = rs.getLong("t");
+            int hr = rs.getInt("hr");
+            long p = prevT[0];
+            if (p != Long.MIN_VALUE && t - p > 0 && t - p <= maxGap) {
+                // cycle of the interval start: last main sleep ending at or before it, within 36 h
+                while (sl[0] + 1 < sleepEnds.size() && (long) sleepEnds.get(sl[0] + 1)[0] <= p) sl[0]++;
+                LocalDate day = null;
+                if (!sleepEnds.isEmpty()) {
+                    long end = (long) sleepEnds.get(sl[0])[0];
+                    if (end <= p && p - end < 36 * 3600) day = (LocalDate) sleepEnds.get(sl[0])[1];
+                }
+                if (day == null) day = LocalDate.ofInstant(java.time.Instant.ofEpochSecond(p), zone);
+                while (w[0] < windows.size() && windows.get(w[0])[1] <= p) w[0]++;
+                boolean inActivity = w[0] < windows.size() && windows.get(w[0])[0] <= p;
+                double[] a = acc.computeIfAbsent(day, k -> new double[2]);
+                a[1] += t - p;
+                if (!inActivity && params != null) a[0] += (t - p) / 60.0 * Trimp.banisterWeight(prevHr[0], params);
+            }
+            prevT[0] = t;
+            prevHr[0] = hr;
+        }, athleteId);
+
+        var out = new HashMap<LocalDate, Background>();
+        acc.forEach((day, a) -> out.put(day, new Background(params == null ? Double.NaN : a[0], (long) a[1])));
+        return out;
+    }
+
     /** Recomputes every day with any Garmin or Whoop data for the athlete. Idempotent. */
-    public Outcome recompute(long athleteId) {
+    public Outcome recompute(long athleteId, Trimp.Params params, ZoneId zone) {
         var wellness = new HashMap<LocalDate, Wellness>();
         template.query("""
                 SELECT calendar_date, resting_hr, hrv_rmssd_ms, body_battery_high FROM daily_wellness_merged
@@ -97,7 +162,10 @@ public class DayFeatureService {
                     i(rs, "sleep_performance_pct"), i(rs, "asleep_min"), i(rs, "sleep_debt_min")));
         }, athleteId);
 
+        var background = backgroundLoad(athleteId, params, zone);
+
         var days = new TreeSet<LocalDate>();
+        days.addAll(background.keySet());
         days.addAll(wellness.keySet());
         days.addAll(sleep.keySet());
         days.addAll(load.keySet());
@@ -125,6 +193,7 @@ public class DayFeatureService {
             Sleep s = sleep.get(day);
             Load l = load.get(day);
             Whoop wh = whoop.get(day);
+            Background bg = background.get(day);
 
             Double ln = lnRmssd.get(day);
             var hrvBase = Baseline.of(lnRmssd, day, window, min);
@@ -157,7 +226,9 @@ public class DayFeatureService {
                 hasCore,
                 wh == null ? null : wh.recovery(), wh == null ? null : dec(wh.strain(), 1),
                 wh == null ? null : wh.need(), wh == null ? null : wh.perf(),
-                wh == null ? null : wh.asleep(), wh == null ? null : wh.debt()});
+                wh == null ? null : wh.asleep(), wh == null ? null : wh.debt(),
+                bg == null || Double.isNaN(bg.load()) ? null : dec(bg.load(), 2),
+                bg == null ? null : (int) (bg.coveredSeconds() / 60)});
         }
 
         jdbc.sql("DELETE FROM day_features WHERE athlete_id = ? AND feature_version = ?")
@@ -169,8 +240,9 @@ public class DayFeatureService {
                     sleep_minutes, deep_minutes, rem_minutes, light_minutes, garmin_sleep_score,
                     day_load_banister, day_load_edwards, run_km, activity_count, load_missing_activities,
                     baseline_days, ln_rmssd_z, rhr_dev, resp_dev, has_garmin_core,
-                    whoop_recovery, whoop_strain, whoop_sleep_need_min, whoop_sleep_perf, whoop_asleep_min, whoop_sleep_debt_min)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", rows);
+                    whoop_recovery, whoop_strain, whoop_sleep_need_min, whoop_sleep_perf, whoop_asleep_min, whoop_sleep_debt_min,
+                    background_load, monitored_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", rows);
 
         return new Outcome(days.size(), core, withWhoop, paired,
                 days.isEmpty() ? null : days.first(), days.isEmpty() ? null : days.last());

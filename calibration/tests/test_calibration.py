@@ -157,8 +157,37 @@ def test_pipeline_with_zones_scores_low_coverage_days_and_reports_misses():
     assert r.metrics["strain"]["full_coverage"]["n"] > 0
     html = report.render(r, "x", "m")
     assert "Weight per minute" in html and "Largest strain misses" in html and "lower confidence" in html
+    assert "Strain rank correlation" in html and "Selected:" in html
 
 
 def test_without_zone_minutes_the_load_form_is_used():
     r = pipeline.run(make(300), SETTINGS, "f3")
     assert r.coefficients["strain"]["form"] == "load"
+
+
+def test_parsimony_rule_needs_a_clear_gain_for_the_complex_form():
+    cands = {
+        "edwards + background": {"cv_mae": 1.86},
+        "banister + background": {"cv_mae": 1.90},
+        strain.ZONES_NAME: {"cv_mae": 1.77},  # 4.8% better: not enough
+    }
+    name, why = strain.select(cands, ["edwards + background", "banister + background"], [strain.ZONES_NAME], 0.10)
+    assert name == "edwards + background" and "only 5% better" in why
+    cands[strain.ZONES_NAME]["cv_mae"] = 1.60  # 14% better: switch
+    name, _ = strain.select(cands, ["edwards + background", "banister + background"], [strain.ZONES_NAME], 0.10)
+    assert name == strain.ZONES_NAME
+
+
+def test_background_is_part_of_the_base_form_when_all_day_hr_exists():
+    m = strain.choose_and_fit(make(300))
+    assert m["form"] == "load" and m["background"] is True  # spec: workout load + daily HR load
+    assert "day_load_banister" in m["candidates"]  # workout-only fits are still reported
+
+
+def test_acceptance_uses_full_coverage_days_and_checks_rank_correlation():
+    df = make(300)
+    df.loc[df.index[-15:], "monitored_minutes"] = 200
+    r = pipeline.run(df, SETTINGS, "f3")
+    assert r.metrics["strain"]["n"] == r.metrics["strain"]["full_coverage"]["n"]
+    assert r.metrics["strain"]["low_coverage"]["n"] == 15
+    assert "strain_spearman" in r.metrics["checks"]

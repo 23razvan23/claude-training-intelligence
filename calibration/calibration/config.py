@@ -10,6 +10,8 @@ from importlib import resources
 @dataclass(frozen=True)
 class Settings:
     strain_mae_max: float
+    strain_spearman_min: float
+    strain_complexity_min_gain: float
     recovery_band_agreement_min: float
     recovery_green_red_max: float
     green_min: int
@@ -32,6 +34,8 @@ def load(path: str | None = None) -> Settings:
         raw = json.loads(resources.files("calibration").joinpath("targets.json").read_text(encoding="utf-8"))
     return Settings(
         strain_mae_max=raw["strain_mae_max"],
+        strain_spearman_min=raw.get("strain_spearman_min", 0.0),
+        strain_complexity_min_gain=raw.get("strain_complexity_min_gain", 0.10),
         recovery_band_agreement_min=raw["recovery_band_agreement_min"],
         recovery_green_red_max=raw["recovery_green_red_max"],
         green_min=raw["bands"]["green_min"],

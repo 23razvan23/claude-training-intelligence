@@ -1,6 +1,9 @@
 {
   "_comment": "Acceptance targets and model settings for Module 1 calibration. All [configurable]; starting values from SPEC.md, revisit after the first real run.",
-  "strain_mae_max": 1.5,
+  "_strain_targets": "Revised 2026-11-13 by the coach after 1a iterations (spec: revisit after the first run). Strain is evaluated on days with >= strain_min_monitored_minutes of all-day HR.",
+  "strain_mae_max": 2.0,
+  "strain_spearman_min": 0.80,
+  "strain_complexity_min_gain": 0.10,
   "recovery_band_agreement_min": 0.70,
   "recovery_green_red_max": 0.03,
   "bands": {"green_min": 67, "red_max": 33},

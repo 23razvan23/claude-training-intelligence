@@ -105,6 +105,14 @@ class MetricsIT extends IntegrationTest {
         assertThat(((Number) first.get("background_load")).doubleValue()).isCloseTo(60 * w, org.assertj.core.api.Assertions.within(0.01));
         assertThat(((Number) first.get("monitored_minutes")).intValue()).isEqualTo(89);
 
+        // Whole-day HR zones: 60 min below zone 1 from all-day HR (60 bpm), plus the run's
+        // 119 s of per-second HR 130-159 = 16 s in zone 1, 56 s in zone 2, 47 s in zone 3.
+        assertThat(((Number) first.get("zone_min_0")).doubleValue()).isEqualTo(60.0);
+        assertThat(((Number) first.get("zone_min_1")).doubleValue()).isEqualTo(0.3);
+        assertThat(((Number) first.get("zone_min_2")).doubleValue()).isEqualTo(0.9);
+        assertThat(((Number) first.get("zone_min_3")).doubleValue()).isEqualTo(0.8);
+        assertThat(((Number) first.get("zone_min_5")).doubleValue()).isZero();
+
         // Idempotent.
         mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf())).andExpect(status().isOk());
         assertThat(count("SELECT count(*) FROM day_features WHERE athlete_id = ?", a)).isEqualTo(DAYS);
@@ -113,6 +121,22 @@ class MetricsIT extends IntegrationTest {
         mvc.perform(get("/api/athletes/" + a + "/features/summary").with(user(coach)))
                 .andExpect(jsonPath("$.paired").value(DAYS))
                 .andExpect(jsonPath("$.activityLoadMethods.stream").value(DAYS));
+    }
+
+    @Test
+    void whoopOnlyWorkoutsAreCountedAsADiagnostic() throws Exception {
+        long a = athlete(190);
+        importAll(a);
+        // A Whoop workout at 10:00 local with no Garmin activity nearby, and one matching the 18:00 run.
+        for (String at : List.of("10:00", "18:05")) {
+            var start = FIRST.atTime(java.time.LocalTime.parse(at)).atZone(Fixtures.ZONE).toInstant();
+            jdbc.sql("""
+                    INSERT INTO activity (athlete_id, source, source_id, sport, start_at, calendar_date, duration_s)
+                    VALUES (?, 'WHOOP', ?, 'strength', ?, ?, 2700)""")
+                    .params(a, start.toString(), java.sql.Timestamp.from(start), FIRST).update();
+        }
+        mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf())).andExpect(status().isOk());
+        assertThat(count("SELECT diag_whoop_only_workouts FROM day_features WHERE athlete_id = ? AND cycle_date = ?", a, FIRST)).isEqualTo(1);
     }
 
     @Test

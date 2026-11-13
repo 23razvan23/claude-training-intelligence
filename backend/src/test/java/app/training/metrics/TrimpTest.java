@@ -74,6 +74,18 @@ class TrimpTest {
     }
 
     @Test
+    void hrrZoneMinutes() {
+        // HRmax 190, HRrest 50: 155 bpm = 75% HRR -> zone 3; 60 min there, nothing elsewhere.
+        var r = Trimp.fromStream(constant(155, 3600), MALE);
+        assertThat(r.zoneMinutes()[3]).isCloseTo(60, within(1e-9));
+        assertThat(r.zoneMinutes()[0] + r.zoneMinutes()[1] + r.zoneMinutes()[2] + r.zoneMinutes()[4] + r.zoneMinutes()[5]).isZero();
+        assertThat(Trimp.hrrZone(110, MALE)).isZero();     // 42.9% HRR
+        assertThat(Trimp.hrrZone(120, MALE)).isEqualTo(1); // 50%
+        assertThat(Trimp.hrrZone(176, MALE)).isEqualTo(5); // 90%
+        assertThat(Trimp.fromAverage(155, 1800, MALE).zoneMinutes()[3]).isEqualTo(30);
+    }
+
+    @Test
     void invalidProfileIsRejected() {
         assertThatThrownBy(() -> new Trimp.Params(50, 50, 0.64, 1.92, FLOORS, 10)).isInstanceOf(IllegalArgumentException.class);
     }

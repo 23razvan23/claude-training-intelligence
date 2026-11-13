@@ -47,7 +47,8 @@ public class ActivityLoadService {
                 female ? props.banisterFemaleK1() : props.banisterMaleK1(),
                 female ? props.banisterFemaleK2() : props.banisterMaleK2(),
                 props.edwardsZoneFloors(),
-                props.maxSampleGapSeconds());
+                props.maxSampleGapSeconds(),
+                props.hrrZoneFloors());
     }
 
     public Outcome recompute(Athlete athlete) {
@@ -103,13 +104,21 @@ public class ActivityLoadService {
                 act.id(), athlete.id(),
                 r == null ? null : dec(r.banister(), 2), r == null ? null : dec(r.edwards(), 2),
                 r == null ? null : r.samples(), coverage == null ? null : dec(coverage, 3),
-                method, athlete.hrMax(), hrRest, sexAssumed, props.featureVersion()});
+                method, athlete.hrMax(), hrRest, sexAssumed, props.featureVersion(),
+                r == null ? null : zoneArray(r.zoneMinutes())});
         }
         template.batchUpdate("""
                 INSERT INTO activity_load (activity_id, athlete_id, trimp_banister, trimp_edwards, hr_samples, hr_coverage,
-                    method, hr_max, hr_rest, sex_assumed, feature_version)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", rows);
+                    method, hr_max, hr_rest, sex_assumed, feature_version, hrr_zone_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS numeric[]))""", rows);
         return new Outcome(acts.size(), stream, average, none, hrRest, sexAssumed);
+    }
+
+    /** PostgreSQL array literal, e.g. {12.50,3.00,...}. */
+    private static String zoneArray(double[] minutes) {
+        var sb = new StringBuilder("{");
+        for (int i = 0; i < minutes.length; i++) sb.append(i == 0 ? "" : ",").append(dec(minutes[i], 2).toPlainString());
+        return sb.append('}').toString();
     }
 
     private static BigDecimal dec(double v, int scale) {

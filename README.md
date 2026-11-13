@@ -147,4 +147,6 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 ## Architecture decisions
 
+**Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions.
+
 See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007).

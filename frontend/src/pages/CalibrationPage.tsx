@@ -80,7 +80,7 @@ export function CalibrationPage() {
       <div className="card stack">
         <h2>{t('calibration.run')}</h2>
         <p className="muted small">{t('calibration.runHint')}</p>
-        <pre className="code">docker compose run --rm calibration --athlete {athleteId}</pre>
+        <pre className="code">docker compose run --build --rm calibration --athlete {athleteId}</pre>
       </div>
 
       <h2>{t('calibration.models')}</h2>

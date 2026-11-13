@@ -32,7 +32,13 @@ public class ImportBatchRepository {
         jdbc.sql("UPDATE import_batch SET status = 'RUNNING', started_at = now() WHERE id = ?").param(id).update();
     }
 
+    /**
+     * Writes progress. Callers run this in its own short transaction while the import's
+     * transaction is open, so it must never wait on locks the import holds: lock_timeout
+     * makes it fail fast instead (see ImportRunner.progressFor).
+     */
     public void updateProgress(long id, ImportProgress p) {
+        jdbc.sql("SET LOCAL lock_timeout = '1s'").update();
         var node = json.createObjectNode().put("phase", p.phase()).put("done", p.done());
         if (p.total() != null) node.put("total", p.total());
         jdbc.sql("UPDATE import_batch SET progress = CAST(? AS jsonb) WHERE id = ?").params(write(node), id).update();
@@ -60,6 +66,13 @@ public class ImportBatchRepository {
                 UPDATE import_batch SET status = 'FAILED', error = 'Interrupted by an application restart; re-run the import',
                        finished_at = now() WHERE status IN ('PENDING', 'RUNNING')""")
                 .update();
+    }
+
+    public boolean hasActive(long athleteId) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM import_batch WHERE athlete_id = ? AND status IN ('PENDING', 'RUNNING'))")
+                .param(athleteId)
+                .query(Boolean.class)
+                .single();
     }
 
     public Optional<ImportBatch> find(long id) {

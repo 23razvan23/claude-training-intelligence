@@ -57,7 +57,12 @@ public class ImportRunner {
         var lastLog = new long[] {0};
         var lastPhase = new String[] {null};
         return new ImportProgress(p -> {
-            progressTx.executeWithoutResult(s -> batches.updateProgress(batchId, p));
+            try {
+                progressTx.executeWithoutResult(s -> batches.updateProgress(batchId, p));
+            } catch (org.springframework.dao.DataAccessException e) {
+                // Progress is best effort: never let it stall or fail the import itself.
+                log.debug("Import batch {}: progress update skipped ({})", batchId, e.getMostSpecificCause().getMessage());
+            }
             long now = System.nanoTime();
             if (!java.util.Objects.equals(p.phase(), lastPhase[0]) || now - lastLog[0] >= PROGRESS_LOG_INTERVAL_NANOS) {
                 lastPhase[0] = p.phase();

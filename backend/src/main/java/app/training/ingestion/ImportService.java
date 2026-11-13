@@ -43,6 +43,11 @@ public class ImportService {
     /** Stores the uploads, records a PENDING batch and starts it in the background. */
     public ImportBatch start(long athleteId, ImportKind kind, List<MultipartFile> files, long userId) {
         athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
+        if (batches.hasActive(athleteId)) {
+            // Two imports of the same data would block each other on the same rows.
+            throw new ApiException(org.springframework.http.HttpStatus.CONFLICT,
+                    "An import is already running for this athlete. Wait for it to finish, then try again.");
+        }
         if (files == null || files.isEmpty() || files.stream().allMatch(MultipartFile::isEmpty)) {
             throw ApiException.badRequest("No file uploaded");
         }

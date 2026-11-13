@@ -62,7 +62,7 @@ Drag single activity `.fit` files under **FIT files**. A file that matches an al
    docker compose run --build --rm calibration --athlete 1
    ```
    Use your athlete id, shown on the Calibration screen. Keep `--build`: `docker compose up --build` doesn't rebuild this on-demand job, so without it an old version keeps running after you update.
-4. The new model version appears under **Calibration**, with PASS/FAIL against the targets and its full report.
+4. The new model version appears under **Calibration**, with PASS/FAIL against the targets and its full report. When a version passes and you're happy with its report, press **Activate**: daily scores and the live comparison with Whoop will use it.
 
 How it works: [ADR 0007](docs/adr/0007-module1-calibration.md). The targets are in `calibration/targets.json`.
 

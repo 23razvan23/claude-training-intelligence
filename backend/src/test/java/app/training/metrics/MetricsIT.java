@@ -139,6 +139,36 @@ class MetricsIT extends IntegrationTest {
         assertThat(count("SELECT diag_whoop_only_workouts FROM day_features WHERE athlete_id = ? AND cycle_date = ?", a, FIRST)).isEqualTo(1);
     }
 
+    private long model(long athlete, String version, boolean passed) {
+        return jdbc.sql("""
+                INSERT INTO model_version (athlete_id, version, feature_version, coefficients, metrics, passed, report_html)
+                VALUES (?, ?, 'f3', '{}', '{}', ?, '') RETURNING id""").params(athlete, version, passed).query(Long.class).single();
+    }
+
+    @Test
+    void activatingAModelRetiresThePreviousActiveOne() throws Exception {
+        long a = athlete(190);
+        long first = model(a, "m-a", true);
+        long second = model(a, "m-b", true);
+        long failed = model(a, "m-c", false);
+
+        mvc.perform(post("/api/models/" + first + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
+        mvc.perform(post("/api/models/" + second + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk());
+        assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(first).query(String.class).single()).isEqualTo("RETIRED");
+        assertThat(count("SELECT count(*) FROM model_version WHERE athlete_id = ? AND status = 'ACTIVE'", a)).isEqualTo(1);
+
+        // A version that failed its targets, or a retired one, cannot be activated.
+        mvc.perform(post("/api/models/" + failed + "/activate").with(user(coach)).with(csrf())).andExpect(status().isConflict());
+        mvc.perform(post("/api/models/" + first + "/activate").with(user(coach)).with(csrf())).andExpect(status().isConflict());
+
+        // Athletes cannot activate models.
+        long uid = users.insert("ath-act" + System.nanoTime(), "x", Role.ATHLETE, a);
+        mvc.perform(post("/api/models/" + second + "/activate").with(user(users.findById(uid).orElseThrow())).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void withoutHrMaxLoadIsUnknownNotZero() throws Exception {
         long a = athlete(null);

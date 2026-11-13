@@ -115,10 +115,34 @@ def has_zones(df: pd.DataFrame) -> pd.Series:
     return df[list(ZONE_COLUMNS)].notna().all(axis=1)
 
 
-def choose_and_fit(train: pd.DataFrame, min_monitored_minutes: int = 600, min_background_share: float = 0.8) -> dict:
-    """Fits every candidate on the same training days and keeps the lowest time-series CV MAE.
-    Candidates needing all-day HR are fitted only on days with enough watch coverage, and
-    only when most days have it."""
+def select(candidates: dict, base: list[str], complex_: list[str], min_gain: float) -> tuple[str, str]:
+    """Parsimony rule: take the best base candidate; switch to a more complex form only if its
+    time-series CV MAE is at least min_gain (relative) lower. Returns (name, explanation).
+
+    Adopted 2026-11-13 after the zone model (8 parameters) won training CV by 4.8% but was
+    clearly worse on the held-out days (MAE 2.38 vs 1.91): a small CV gain does not justify a
+    much more flexible model. The recovery challenger already followed this rule (ADR 0007)."""
+    best_base = min(base, key=lambda k: candidates[k]["cv_mae"])
+    if not complex_:
+        return best_base, f"{best_base}: lowest CV MAE among the base candidates."
+    best_complex = min(complex_, key=lambda k: candidates[k]["cv_mae"])
+    b, c = candidates[best_base]["cv_mae"], candidates[best_complex]["cv_mae"]
+    gain = (b - c) / b if b > 0 else 0.0
+    if gain >= min_gain:
+        return best_complex, f"{best_complex}: CV MAE {c:.2f} beats {best_base} ({b:.2f}) by {100 * gain:.0f}% (≥ {100 * min_gain:.0f}% required)."
+    return best_base, (
+        f"{best_base}: the more flexible {best_complex} is only {100 * gain:.0f}% better in CV ({c:.2f} vs {b:.2f}); "
+        f"≥ {100 * min_gain:.0f}% is required to prefer it."
+    )
+
+
+def choose_and_fit(train: pd.DataFrame, min_monitored_minutes: int = 600, min_background_share: float = 0.8, complexity_min_gain: float = 0.10) -> dict:
+    """Fits every candidate on the same training days and selects with the parsimony rule.
+
+    Base form: the spec's daily strain, i.e. workout load plus low-level daily HR load when
+    Garmin provides all-day HR (so the background term is part of the base whenever most
+    days have enough watch coverage). More complex form: whole-day HR zones. Workout-load-only
+    fits are still reported when all-day HR exists."""
     base = train.dropna(subset=["whoop_strain", *LOAD_COLUMNS])
     if len(base) < 30:
         raise ValueError("Not enough days with both a training load and a Whoop strain to fit strain")
@@ -146,12 +170,16 @@ def choose_and_fit(train: pd.DataFrame, min_monitored_minutes: int = 600, min_ba
         z = rows[list(ZONE_COLUMNS)].to_numpy(dtype=float)
         candidates[ZONES_NAME] = {"form": "zones", "cv_mae": cv_mae_zones(z, y), "params": fit_zones(z, y), "n": len(rows)}
 
-    best = min(candidates, key=lambda k: candidates[k]["cv_mae"])
+    base = [k for k, v in candidates.items() if v["form"] == "load" and v["background"] == use_all_day]
+    complex_ = [ZONES_NAME] if ZONES_NAME in candidates else []
+    best, why = select(candidates, base, complex_, complexity_min_gain)
     chosen = candidates[best]
     model = {
         "form": chosen["form"],
         **chosen["params"],
         "candidates": candidates,
+        "selected": best,
+        "selection": why,
         "background_coverage": float(ok.mean()),
         "min_monitored_minutes": min_monitored_minutes,
     }
@@ -167,7 +195,9 @@ def predict_model(model: dict, df: pd.DataFrame, min_monitored_minutes: int) -> 
         usable = has_zones(df)
         pred = predict_zones(model, df[list(ZONE_COLUMNS)].fillna(0).to_numpy(dtype=float))
     elif model.get("background"):
-        usable = df[model["load"]].notna() & background_ok(df, min_monitored_minutes)
+        # Days with little all-day HR are scored too (their background is partial) and flagged
+        # as low confidence by the caller; acceptance metrics use full-coverage days only.
+        usable = df[model["load"]].notna() & df[BACKGROUND].notna()
         pred = predict(model, df[model["load"]].fillna(0), df[BACKGROUND].fillna(0))
     else:
         usable = df[model["load"]].notna()

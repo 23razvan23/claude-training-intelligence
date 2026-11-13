@@ -4,7 +4,7 @@ Written so a new session (human or agent) can continue without the original conv
 Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions). Keep this
 file current: update the status, results log and next steps in every PR that changes them.
 
-_Last updated: 2026-11-13, with the whole-day HR zone strain model (PR after #11)._
+_Last updated: 2026-11-13, with the strain parsimony rule, revised strain targets and model activation (PR after #12)._
 
 ---
 
@@ -13,7 +13,7 @@ _Last updated: 2026-11-13, with the whole-day HR zone strain model (PR after #11
 | Phase (SPEC.md) | Status |
 |---|---|
 | 0 Foundation | **Done** (#1–#5): schema, auth, athletes, idempotent Whoop/Garmin/FIT import, coverage report, compose, CI, backups. |
-| 1a Recovery & Strain calibration | **In progress.** Recovery passes. Strain is the open item (§3). |
+| 1a Recovery & Strain calibration | **Nearly done.** Recovery passes. Strain targets revised by the coach (≤ 2.0 MAE, Spearman ≥ 0.80). Remaining: rerun, then the coach activates a passing version (§5.1). |
 | 1b Daily scoring, Today/Trends, Garmin sync | Not started (§5.2). |
 | 2 Adaptive engine | Not started. Highest product priority after Module 1 (SPEC.md). |
 | 3 Plan builder | Not started. |
@@ -36,7 +36,7 @@ The spec's working agreement still applies. For each phase, restate the plan in 
 ## 3. Calibration results log (athlete 1)
 
 Train 2026-01-19 → 2026-09-09; test 2026-09-10 → 2026-11-09 (the last ~20% of paired days).
-Targets (`calibration/targets.json`): strain MAE ≤ 1.5; recovery band agreement ≥ 70%; green-vs-red ≤ 3%.
+Targets (`calibration/targets.json`): recovery band agreement ≥ 70%, green-vs-red ≤ 3%. Strain: originally MAE ≤ 1.5; **since 2026-11-13, MAE ≤ 2.0 and Spearman ≥ 0.80, on days with ≥ 10 h of all-day HR** (the coach's decision, ADR 0007 item 6).
 
 | Model | Strain MAE | Recovery bands | Green↔red | What happened / fix |
 |---|---|---|---|---|
@@ -44,9 +44,10 @@ Targets (`calibration/targets.json`): strain MAE ≤ 1.5; recovery band agreemen
 | m2 | 2.34 | 88% | 0% | Aligned. Strain sees only workouts. |
 | m5 | 2.34 | 88% | 0% | Identical result: a stale calibration image and no f2 features. Fixed in #11 (`--build`, version line). |
 | m9 | 1.91 | 89% | 0% | All-day HR background load (f2). Background weight only 0.11, and the CV gain was tiny (1.865 → 1.862). Most of the test gain came from dropping 4 low-coverage days (n 59 → 55). Spearman 0.82, bias +0.64, LoA −4.3…+5.6. |
-| next | ? | ? | ? | Whole-day HR zone model (f3), this PR. Expected to help on the 66 Whoop-only workouts. |
+| m12 | 2.57 (full-coverage days 2.38, n=55; low-coverage 4.64, n=5) | 88% | 0% | Whole-day HR zone model (f3) won training CV by only 4.8% (1.772 vs 1.862), was worse on the test days, and its weights collapsed into a step: overfitting. |
+| next | ? | ? | ? | Parsimony rule (zones must win CV by ≥ 10%) reselects workout + background load (m9-style: 1.91, Spearman 0.82 on full-coverage days). Expected to pass the revised targets. |
 
-**Recovery is solid.** The remaining question is strain: either the zone model gets it to ≤ 1.5, or we revisit the target with the coach (§5.1).
+**Recovery is solid.** For strain, the coach chose to revise the target and move on to the live holdout rather than run another modelling round. Options left for later, if wanted: a smooth single-parameter intensity curve instead of 6 zone weights, or day-level steps and active kcal (not imported).
 
 ## 4. Facts learned from the real data
 
@@ -66,15 +67,11 @@ Targets (`calibration/targets.json`): strain MAE ≤ 1.5; recovery band agreemen
 
 ## 5. Next steps, in order
 
-### 5.1 Finish Phase 1a (strain)
-1. The coach merges the zone-model PR, updates, presses Recompute, and runs the calibration (§2).
-2. Read the report's strain section: which candidate won, the per-zone weights, the full- vs low-coverage error, and the "largest strain misses" table.
-3. If strain is ≤ 1.5, Phase 1a passes. If not, discuss with the coach before changing anything:
-   - **check HR max 184:** all zones and loads depend on it;
-   - **tune the zone floors** (`app.metrics.hrr-zone-floors`); this needs a feature-version bump;
-   - **add day-level activity features:** UDS steps and active kcal are not imported. Re-importing doesn't update existing raw rows (ON CONFLICT DO NOTHING), so this needs new source_ids or new tables;
-   - **revisit the target**, which SPEC.md explicitly allows after the first run. This is the coach's decision. Record it in `targets.json` and an ADR.
-4. **Freeze the chosen model.** Not built yet: add `POST /api/models/{id}/activate`, with one ACTIVE version per athlete, the old one becoming RETIRED, and a button on the Calibration screen. Then stop for the coach's review: Phase 1a is complete.
+### 5.1 Finish Phase 1a
+1. The coach merges this PR, updates, and reruns the calibration (no Recompute needed; features are still f3): `docker compose run --build --rm calibration --athlete 1`. The first line should say `calibration 0.5.0 · feature set f3`.
+2. Expected: the strain section says "Selected: … + background", strain passes the revised targets, and the result is PASS. If not, look at the report's strain section and "largest strain misses" table before changing anything.
+3. The coach reviews the report, then presses **Activate** on that version (Calibration tab). This is the frozen model for 1b and the live holdout.
+4. Stop for review: Phase 1a is complete. Write the phase summary (results, decisions, known gaps) in this file.
 
 ### 5.2 Phase 1b (restate the plan and get a go first)
 - **Daily scoring in Java:**

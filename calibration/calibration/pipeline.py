@@ -97,7 +97,7 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     notes: list[str] = []
 
     # --- strain -------------------------------------------------------------
-    strain_model = strain.choose_and_fit(daily[is_train], settings.strain_min_monitored_minutes)
+    strain_model = strain.choose_and_fit(daily[is_train], settings.strain_min_monitored_minutes, complexity_min_gain=settings.strain_complexity_min_gain)
     # Day alignment is a property of the data, not of the model: always check it on workout load.
     alignment = day_alignment(daily, "day_load_banister")
     if alignment["best"] != "same_day":
@@ -168,11 +168,16 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     st = test[["whoop_strain", "strain_pred", "low_coverage"]].dropna(subset=["whoop_strain", "strain_pred"])
     sl = test[["whoop_sleep_need_min", "sleep_need_pred"]].dropna()
     sp = test[["whoop_sleep_perf", "sleep_perf"]].dropna()
-    strain_m = metrics.summarize(st["whoop_strain"], st["strain_pred"])
+    # Acceptance is measured on days with enough all-day HR; low-coverage days are reported
+    # separately (the app flags them as low confidence).
+    full = st[~st["low_coverage"].astype(bool)]
+    strain_m = metrics.summarize(full["whoop_strain"], full["strain_pred"])
     result_metrics = {
         "strain": {
             **strain_m,
             "form": strain_model["form"],
+            "selected": strain_model["selected"],
+            "selection": strain_model["selection"],
             "load": strain_model.get("load"),
             "full_coverage": metrics.summarize(st.loc[~st["low_coverage"].astype(bool), "whoop_strain"], st.loc[~st["low_coverage"].astype(bool), "strain_pred"]),
             "low_coverage": metrics.summarize(st.loc[st["low_coverage"].astype(bool), "whoop_strain"], st.loc[st["low_coverage"].astype(bool), "strain_pred"]),
@@ -186,12 +191,14 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
         "recovery_challenger": {**chal_m, "clearly_better": bool(challenger_wins)},
         "targets": {
             "strain_mae_max": settings.strain_mae_max,
+            "strain_spearman_min": settings.strain_spearman_min,
             "recovery_band_agreement_min": settings.recovery_band_agreement_min,
             "recovery_green_red_max": settings.recovery_green_red_max,
         },
     }
     checks = {
         "strain_mae": strain_m.get("mae", float("inf")) <= settings.strain_mae_max,
+        "strain_spearman": np.nan_to_num(strain_m.get("spearman", float("nan")), nan=-1.0) >= settings.strain_spearman_min,
         "recovery_band_agreement": linear_m["agreement"] >= settings.recovery_band_agreement_min,
         "recovery_green_red": linear_m["green_red_rate"] <= settings.recovery_green_red_max,
     }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFeatureSummary, useModelReport, useModels, useRecomputeFeatures } from '../api/hooks';
+import { useActivateModel, useFeatureSummary, useModelReport, useModels, useRecomputeFeatures } from '../api/hooks';
 import type { ModelVersion } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
 
@@ -97,6 +97,8 @@ export function CalibrationPage() {
 function ModelRow({ model, open, onToggle }: { model: ModelVersion; open: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const report = useModelReport(open ? model.id : undefined);
+  const activate = useActivateModel(model.athleteId);
+  const canActivate = model.passed && model.status === 'CANDIDATE';
   const c = model.metrics.checks;
   const chip = (ok: boolean | undefined, text: string) => <span className={`badge ${ok ? 'succeeded' : 'failed'}`}>{text}</span>;
   return (
@@ -104,21 +106,35 @@ function ModelRow({ model, open, onToggle }: { model: ModelVersion; open: boolea
       <div className="row wrap">
         <span className={`badge ${model.passed ? 'succeeded' : 'failed'}`}>{model.passed ? t('calibration.pass') : t('calibration.fail')}</span>
         <strong>{model.version}</strong>
-        <span className="muted small">{model.status}</span>
+        {model.status === 'ACTIVE' ? (
+          <span className="badge succeeded">{t('calibration.active')}</span>
+        ) : (
+          <span className="muted small">{model.status}</span>
+        )}
         <span className="spacer" />
         <span className="muted small">{new Date(model.createdAt).toLocaleString()}</span>
       </div>
       <div className="row wrap small">
         {chip(c?.strain_mae, t('calibration.strainMae', { v: num(model.metrics.strain?.mae) }))}
+        {c?.strain_spearman != null && chip(c.strain_spearman, t('calibration.strainRho', { v: num(model.metrics.strain?.spearman) }))}
         {chip(c?.recovery_band_agreement, t('calibration.band', { v: pct(model.metrics.recovery?.agreement) }))}
         {chip(c?.recovery_green_red, t('calibration.greenRed', { v: pct(model.metrics.recovery?.green_red_rate) }))}
       </div>
       <div className="muted small">{t('calibration.window', { trainFrom: model.trainFrom, trainTo: model.trainTo, testFrom: model.testFrom, testTo: model.testTo })}</div>
-      <div>
+      <div className="row wrap">
         <button className="ghost" onClick={onToggle}>
           {open ? t('calibration.hide') : t('calibration.view')}
         </button>
+        {canActivate && (
+          <button
+            disabled={activate.isPending}
+            onClick={() => window.confirm(t('calibration.confirmActivate', { version: model.version })) && activate.mutate(model.id)}
+          >
+            {t('calibration.activate')}
+          </button>
+        )}
       </div>
+      {activate.isError && <p className="error small">{t('common.error', { message: activate.error.message })}</p>}
       {open && report.data && (
         // No allow-scripts: the report is static HTML; the server also sends a no-script CSP.
         <iframe className="report" title={model.version} sandbox="" srcDoc={report.data} />

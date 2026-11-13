@@ -63,7 +63,11 @@ def main(argv: list[str] | None = None) -> int:
 
     m = result.metrics
     print(f"Train {result.train_from} → {result.train_to}, test {result.test_from} → {result.test_to}")
-    print(f"Strain MAE {m['strain'].get('mae', float('nan')):.2f} (target ≤ {settings.strain_mae_max})")
+    print(
+        f"Strain MAE {m['strain'].get('mae', float('nan')):.2f} (target ≤ {settings.strain_mae_max}), "
+        f"rank correlation {m['strain'].get('spearman', float('nan')):.2f} (target ≥ {settings.strain_spearman_min}), "
+        f"on {m['strain'].get('n', 0)} days with enough all-day HR; selected: {m['strain'].get('selected')}"
+    )
     print(
         f"Recovery band agreement {100 * m['recovery']['agreement']:.0f}% (target ≥ {100 * settings.recovery_band_agreement_min:.0f}%), "
         f"green-vs-red {100 * m['recovery']['green_red_rate']:.1f}% (target ≤ {100 * settings.recovery_green_red_max:.0f}%)"

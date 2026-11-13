@@ -131,10 +131,14 @@ def render(result: Result, athlete_name: str, version: str) -> str:
         parts.append("<div class='verdict no'>" + "<br>".join(e(n) for n in result.notes) + "</div>")
     parts.append("<h2>Acceptance targets (test window)</h2><table><tr><th>Check</th><th>Ours</th><th>Target</th><th></th></tr>")
     parts.append(check_row("Strain MAE", _f(st.get("mae")), f"≤ {t['strain_mae_max']}", checks["strain_mae"]))
+    if "strain_spearman" in checks:
+        parts.append(check_row("Strain rank correlation", _f(st.get("spearman")), f"≥ {t['strain_spearman_min']}", checks["strain_spearman"]))
     parts.append(check_row("Recovery band agreement", _pct(rec["agreement"]), f"≥ {_pct(t['recovery_band_agreement_min'])}", checks["recovery_band_agreement"]))
     parts.append(check_row("Green-vs-red disagreement", _pct(rec["green_red_rate"]), f"≤ {_pct(t['recovery_green_red_max'])}", checks["recovery_green_red"]))
     parts.append(
-        "</table><p class='muted'>Targets are starting values from the spec ([configurable] in targets.json). " "The test window was never seen while fitting.</p>"
+        "</table><p class='muted'>Strain is evaluated on days with at least 10 h of all-day HR; days with less are shown separately below "
+        "as lower confidence. Targets are [configurable] in targets.json; the strain targets were revised by the coach on 2026-11-13. "
+        "The test window was never seen while fitting.</p>"
     )
 
     parts.append("<h2>Error metrics</h2><table><tr><th>Score</th><th>n</th><th>MAE</th><th>Spearman</th><th>Bias</th><th>95% limits</th></tr>")
@@ -203,7 +207,11 @@ def render(result: Result, athlete_name: str, version: str) -> str:
         parts.append(f"<tr><td>{e(term['feature'])}</td><td>{'+' if term['sign'] > 0 else '−'}</td><td>{_f(term['weight'], 2)}</td></tr>")
     parts.append("</table>")
     s = c["strain"]
-    cv_line = "<p>Time-series CV MAE per candidate (lowest wins): " + ", ".join(f"{e(k)} {_f(v)}" for k, v in st["candidates"].items()) + ".</p>"
+    cv_line = (
+        "<p>Time-series CV MAE per candidate: "
+        + ", ".join(f"{e(k)} {_f(v)}" for k, v in st["candidates"].items())
+        + f".</p><p><strong>Selected:</strong> {e(st.get('selection', ''))}</p>"
+    )
     if s.get("form") == "zones":
         labels = ["below 50% HRR", "50–60%", "60–70%", "70–80%", "80–90%", "90%+"]
         rows = "".join(f"<tr><td>{lab}</td><td>{w:.4f}</td><td>{_f(60 * w, 2)}</td></tr>" for lab, w in zip(labels, s["zone_weights"], strict=True))

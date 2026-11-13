@@ -56,7 +56,8 @@ coefficients JSON and edge cases. Results are quoted in R-01 and R-03.
 |---|---|---|
 | R-05, workouts moved to the previous day | 0 of 483 | The 36-hour rule has not misplaced any workout. |
 | R-05, days without a Garmin sleep | 2 of 301 | Too few to matter. |
-| R-05, workouts with long pauses | 103 of 482 | Confirmed: the pause double count exists. Size not yet measured; expected small because the fitted background weight is 0.11. |
+| R-05, workouts with long pauses | 103 of 482; 1,566 min in total, median 8.3 min, max 74 min | Confirmed and sized: an estimated 0.05 strain on a typical affected day and about 0.3 on the worst (estimate, not measured on the real model), against a strain error of 1.91. Fix at the next recalibration. It matters more if the zones form is ever selected, where those minutes would count in full. |
+| R-06, dates with two Whoop cycles | 0 | No Whoop day is silently dropped. |
 | R-05, HRV alignment | r = 0.92 same day (0.33 / 0.40 a day off) | Garmin and Whoop overnight HRV are on the same day. |
 | R-06, unfinished Whoop cycles | 1, dated 2026-11-09 | Confirmed: the last test day carries a partial Whoop strain. |
 | Active model | m13-20261113 (f3), ACTIVE | Activated on 2026-11-13. |
@@ -297,7 +298,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-05: Check and fix day assignment when no night's sleep was recorded
 - **Priority / Type / Size:** P0 for the query (minutes), P1 for the fix / bug / M
-- **Status:** rule CONFIRMED in code. On the coach's data (2026-11-13) the day-assignment effect is nil (0 of 483 workouts, 2 nights without sleep), so **no fix now**. The pause double count is CONFIRMED (103 of 482 workouts), size unmeasured.
+- **Status:** rule CONFIRMED in code. On the coach's data (2026-11-13) the day-assignment effect is nil (0 of 483 workouts, 2 nights without sleep), so **no fix now**. The pause double count is CONFIRMED (103 of 482 workouts, median 8.3 min) and estimated at well under 0.5 strain per affected day: fix at the next recalibration.
 - **Problem:** an activity or an all-day HR sample belongs to the day opened by the last main sleep that ended within the previous **36 hours**. When the watch records no sleep for a night, everything until 36 h after the previous wake-up stays on the previous day: a run at 10:00 the next morning is added to yesterday's load, and today gets nothing until the evening. Whoop, worn separately, splits those days normally. The rule is also implemented twice (SQL view and Java loop), which can drift.
 - **Evidence:**
   - `V2__raw.sql:169-170`: `ss.end_at <= a.start_at AND ss.end_at > a.start_at - INTERVAL '36 hours'`.

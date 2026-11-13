@@ -50,6 +50,22 @@ coefficients JSON and edge cases. Results are quoted in R-01 and R-03.
 - Whether the Whoop export leaves the current cycle's end time blank (no real export; R-06).
 - Behaviour of the Docker images end to end (`docker compose up`): images were not built here (image builds cannot download packages in this environment, PLAN §7).
 
+**Results of the coach's queries (added 2026-11-13, after the review was written):**
+
+| Query | Result | Meaning |
+|---|---|---|
+| R-05, workouts moved to the previous day | 0 of 483 | The 36-hour rule has not misplaced any workout. |
+| R-05, days without a Garmin sleep | 2 of 301 | Too few to matter. |
+| R-05, workouts with long pauses | 103 of 482 | Confirmed: the pause double count exists. Size not yet measured; expected small because the fitted background weight is 0.11. |
+| R-05, HRV alignment | r = 0.92 same day (0.33 / 0.40 a day off) | Garmin and Whoop overnight HRV are on the same day. |
+| R-06, unfinished Whoop cycles | 1, dated 2026-11-09 | Confirmed: the last test day carries a partial Whoop strain. |
+| Active model | m13-20261113 (f3), ACTIVE | Activated on 2026-11-13. |
+
+Consequences: **R-05 needs no feature change now** (no `f4`, no recalibration for this reason); the
+day-boundary rule and the pause double count are recorded as known limitations to fix at the next
+recalibration. **R-06 is confirmed** and keeps its priority. Model m13 stays active until the R-02
+re-run reproduces it with the new contract.
+
 **Reviewed and found sound (no work item):** Garmin unit handling (ms/cm conversions in
 `GarminFields`, with the 12 m/s guard); the wake-day rule for Whoop and its V7 migration; trailing
 baselines that exclude the current day (`Baseline.of`); train-only fitting of every model parameter,
@@ -65,7 +81,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-02 | Emit a versioned coefficients contract with training ranges and a profile snapshot | P0 | design | M | R-01 | 1b-1 |
 | R-03 | Generate a committed parity fixture and guard the feature version in CI | P0 | test-gap | S | R-02 | 1b-1 |
 | R-04 | Record when a model was activated and refuse unsafe activations | P0 | bug | S | R-02 | 1b-1, 1b-3 |
-| R-05 | Check and fix day assignment when no night's sleep was recorded | P0 (query), P1 (fix) | bug | M | – | Activate, 1b-3 |
+| R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
 | R-06 | Stop freezing unfinished Whoop cycles on import | P1 | bug | S | – | 1b-3 |
 | R-07 | Fix the live-holdout rules in writing before looking at holdout data | P1 | design | S | R-04 | 1b-3 |
 | R-08 | Make the nightly backup fail loudly and prove it restores | P1 | bug | S | – | – |
@@ -281,7 +297,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-05: Check and fix day assignment when no night's sleep was recorded
 - **Priority / Type / Size:** P0 for the query (minutes), P1 for the fix / bug / M
-- **Status:** rule CONFIRMED in code; size of the effect on real data SUSPECTED
+- **Status:** rule CONFIRMED in code. On the coach's data (2026-11-13) the day-assignment effect is nil (0 of 483 workouts, 2 nights without sleep), so **no fix now**. The pause double count is CONFIRMED (103 of 482 workouts), size unmeasured.
 - **Problem:** an activity or an all-day HR sample belongs to the day opened by the last main sleep that ended within the previous **36 hours**. When the watch records no sleep for a night, everything until 36 h after the previous wake-up stays on the previous day: a run at 10:00 the next morning is added to yesterday's load, and today gets nothing until the evening. Whoop, worn separately, splits those days normally. The rule is also implemented twice (SQL view and Java loop), which can drift.
 - **Evidence:**
   - `V2__raw.sql:169-170`: `ss.end_at <= a.start_at AND ss.end_at > a.start_at - INTERVAL '36 hours'`.
@@ -339,7 +355,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-06: Stop freezing unfinished Whoop cycles on import
 - **Priority / Type / Size:** P1 / bug / S
-- **Status:** mechanism CONFIRMED; presence in the real data SUSPECTED
+- **Status:** CONFIRMED, including on the coach's data (1 open cycle, dated 2026-11-09)
 - **Problem:** a Whoop export taken during the day contains the current, unfinished cycle (recovery is final, day strain is still growing). The importer stores it; every later import of the finished cycle hits the same key and is ignored. That day's Whoop strain stays too low forever. Stage 1b-3 asks the coach to re-import "every week or two", so each import would plant one wrong reference day in the holdout.
 - **Evidence:** `RawWriter.java:175-188` (`INSERT INTO whoop_reference … ON CONFLICT DO NOTHING`, unique on `(athlete_id, cycle_start)`, V2:121); `WhoopCsvImporter.java:120-151` imports rows without a cycle end. PLAN §3/§4: the export ends 2026-11-08 but the test window ends 2026-11-09, which is what a cycle that started on the evening of the 8th and was still open would look like.
 - **Why it matters:** biased strain comparison on exactly the days that decide whether Whoop can be cancelled; one such day is probably already in the 1a test window.

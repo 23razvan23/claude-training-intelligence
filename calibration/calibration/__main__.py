@@ -15,7 +15,7 @@ from datetime import date
 
 from . import config, data, pipeline, report
 
-FEATURE_VERSION = "f2"
+FEATURE_VERSION = "f3"
 
 
 def _version() -> str:

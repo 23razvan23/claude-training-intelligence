@@ -25,6 +25,7 @@ class Result:
     exclusions: dict
     test_days: pd.DataFrame
     notes: list[str] = field(default_factory=list)
+    strain_days: pd.DataFrame | None = None
 
 
 def _daily(features: pd.DataFrame) -> pd.DataFrame:
@@ -59,6 +60,36 @@ def day_alignment(daily: pd.DataFrame, load_col: str, margin: float = 0.2) -> di
     return out
 
 
+def _strain_coefficients(m: dict) -> dict:
+    """The strain part of the coefficients contract read by daily scoring (Phase 1b)."""
+    if m["form"] == "zones":
+        return {
+            "form": "zones",
+            "a": m["a"],
+            "c": m["c"],
+            "zone_columns": list(strain.ZONE_COLUMNS),
+            "zone_weights": m["zone_weights"],
+            "min_monitored_minutes": m["min_monitored_minutes"],
+        }
+    return {
+        "form": "load",
+        **{k: m[k] for k in ("load", "a", "b", "c")},
+        "background_weight": m["k"] if m["background"] else 0.0,
+        "uses_background": m["background"],
+        "min_monitored_minutes": m["min_monitored_minutes"],
+    }
+
+
+def _strain_days(test: pd.DataFrame) -> pd.DataFrame:
+    """Per test day: Whoop vs ours plus what might explain a miss (for the report)."""
+    cols = ["whoop_strain", "strain_pred", "low_coverage"]
+    extra = [c for c in ("monitored_minutes", "diag_whoop_only_workouts", "day_load_banister", *strain.ZONE_COLUMNS) if c in test]
+    out = test[cols + extra].dropna(subset=["whoop_strain", "strain_pred"]).copy()
+    if all(c in out for c in strain.ZONE_COLUMNS[3:]):
+        out["hard_minutes"] = out[list(strain.ZONE_COLUMNS[3:])].sum(axis=1)
+    return out
+
+
 def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_from: date | None = None) -> Result:
     daily = _daily(features)
     split = pd.Timestamp(test_from) if test_from else default_test_from(daily, settings.test_share)
@@ -67,24 +98,24 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
 
     # --- strain -------------------------------------------------------------
     strain_model = strain.choose_and_fit(daily[is_train], settings.strain_min_monitored_minutes)
-    load_col = strain_model["load"]
-    alignment = day_alignment(daily, load_col)
+    # Day alignment is a property of the data, not of the model: always check it on workout load.
+    alignment = day_alignment(daily, "day_load_banister")
     if alignment["best"] != "same_day":
         notes.append(
             f"Whoop and Garmin days look shifted by one day: Whoop strain matches the {alignment['best'].replace('_', ' ')}'s "
             f"load best (Spearman {alignment[alignment['best']]:.2f} vs {alignment['same_day']:.2f} on the same day). "
             "Check how cycle dates are assigned before trusting any result."
         )
-    effect = strain_model["a"] * np.log1p(strain_model["b"] * float(daily.loc[is_train, load_col].quantile(0.9)))
-    if effect < 1.0:
-        notes.append(f"The strain model is nearly flat (a hard day adds only {effect:.1f} strain): training load does not explain " "Whoop strain in this data.")
-    if strain_model["background"]:
-        usable = daily[load_col].notna() & strain.background_ok(daily, settings.strain_min_monitored_minutes)
-        pred = strain.predict(strain_model, daily[load_col].fillna(0), daily[strain.BACKGROUND].fillna(0))
+    daily["strain_pred"] = strain.predict_model(strain_model, daily, settings.strain_min_monitored_minutes)
+    spread = daily.loc[is_train, "strain_pred"].quantile(0.9) - daily.loc[is_train, "strain_pred"].quantile(0.1)
+    if not spread >= 1.0:
+        notes.append(
+            f"The strain model is nearly flat (hard and easy days differ by only {spread:.1f} strain): heart-rate load does not explain Whoop strain in this data."
+        )
+    if "monitored_minutes" in daily:
+        daily["low_coverage"] = daily["monitored_minutes"].fillna(0) < settings.strain_min_monitored_minutes
     else:
-        usable = daily[load_col].notna()
-        pred = strain.predict(strain_model, daily[load_col].fillna(0))
-    daily["strain_pred"] = np.where(usable, pred, np.nan)
+        daily["low_coverage"] = False
     daily["prev_strain"] = daily["strain_pred"].shift(1)
 
     # --- sleep --------------------------------------------------------------
@@ -134,14 +165,17 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
 
     # --- test-window metrics --------------------------------------------------
     test = daily[~is_train]
-    st = test[["whoop_strain", "strain_pred"]].dropna()
+    st = test[["whoop_strain", "strain_pred", "low_coverage"]].dropna(subset=["whoop_strain", "strain_pred"])
     sl = test[["whoop_sleep_need_min", "sleep_need_pred"]].dropna()
     sp = test[["whoop_sleep_perf", "sleep_perf"]].dropna()
     strain_m = metrics.summarize(st["whoop_strain"], st["strain_pred"])
     result_metrics = {
         "strain": {
             **strain_m,
-            "load": load_col,
+            "form": strain_model["form"],
+            "load": strain_model.get("load"),
+            "full_coverage": metrics.summarize(st.loc[~st["low_coverage"].astype(bool), "whoop_strain"], st.loc[~st["low_coverage"].astype(bool), "strain_pred"]),
+            "low_coverage": metrics.summarize(st.loc[st["low_coverage"].astype(bool), "whoop_strain"], st.loc[st["low_coverage"].astype(bool), "strain_pred"]),
             "candidates": {k: v["cv_mae"] for k, v in strain_model["candidates"].items()},
             "background_coverage": strain_model["background_coverage"],
             "alignment": alignment,
@@ -165,12 +199,7 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
 
     coefficients = {
         "feature_version": feature_version,
-        "strain": {
-            **{k: strain_model[k] for k in ("load", "a", "b", "c")},
-            "background_weight": strain_model["k"] if strain_model["background"] else 0.0,
-            "uses_background": strain_model["background"],
-            "min_monitored_minutes": strain_model["min_monitored_minutes"],
-        },
+        "strain": _strain_coefficients(strain_model),
         "sleep": {k: sleep_model[k] for k in ("base_min", "per_strain_min", "per_shortfall", "shortfall_reference_min", "shortfall_days")},
         "recovery": {k: rec_model[k] for k in ("intercept", "terms", "clip")},
         "bands": {"green_min": settings.green_min, "red_max": settings.red_max},
@@ -185,6 +214,7 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
         index=rec_test.index,
     ).join(recovery.contributions(rec_model, rec_test))
     test_days = test_days.join(test[["whoop_strain", "strain_pred", "whoop_sleep_need_min", "sleep_need_pred"]], how="left")
+    strain_days = _strain_days(test)
 
     train_idx = daily.index[is_train & (daily["whoop_strain"].notna() | daily["whoop_recovery"].notna())]
     return Result(
@@ -198,4 +228,5 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
         exclusions=exclusions,
         test_days=test_days,
         notes=notes,
+        strain_days=strain_days,
     )

@@ -123,3 +123,42 @@ def test_one_day_shift_is_detected_and_reported():
     assert r.metrics["strain"]["alignment"]["best"] == "next_day"
     assert any("shifted by one day" in n for n in r.notes)
     assert "Days look shifted" in report.render(r, "x", "m")
+
+
+def test_zone_fit_recovers_monotonic_weights():
+    from synthetic import make_zones
+
+    df = make_zones(600)
+    z = df[list(strain.ZONE_COLUMNS)].to_numpy()
+    p = strain.fit_zones(z, df["whoop_strain"])
+    w = p["zone_weights"]
+    assert all(b >= a for a, b in zip(w, w[1:], strict=False))  # never decreasing with intensity
+    assert all(x >= 0 for x in w)
+    assert np.abs(strain.predict_zones(p, z) - df["whoop_strain"]).mean() < 0.6
+
+
+def test_zone_model_wins_when_workouts_go_unrecorded():
+    from synthetic import make_zones
+
+    m = strain.choose_and_fit(make_zones(300))
+    assert m["form"] == "zones"
+    assert m["candidates"][strain.ZONES_NAME]["cv_mae"] < min(v["cv_mae"] for k, v in m["candidates"].items() if k != strain.ZONES_NAME)
+
+
+def test_pipeline_with_zones_scores_low_coverage_days_and_reports_misses():
+    from synthetic import make_zones
+
+    df = make_zones(300)
+    df.loc[df.index[-20:], "monitored_minutes"] = 300  # watch mostly off on 20 test days
+    r = pipeline.run(df, SETTINGS, "f3")
+    assert r.coefficients["strain"]["form"] == "zones"
+    assert len(r.coefficients["strain"]["zone_weights"]) == 6
+    assert r.metrics["strain"]["low_coverage"]["n"] == 20  # scored and reported separately, not dropped
+    assert r.metrics["strain"]["full_coverage"]["n"] > 0
+    html = report.render(r, "x", "m")
+    assert "Weight per minute" in html and "Largest strain misses" in html and "lower confidence" in html
+
+
+def test_without_zone_minutes_the_load_form_is_used():
+    r = pipeline.run(make(300), SETTINGS, "f3")
+    assert r.coefficients["strain"]["form"] == "load"

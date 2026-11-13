@@ -87,6 +87,26 @@ def _pct(v):
     return "–" if v is None or (isinstance(v, float) and math.isnan(v)) else f"{100 * v:.0f}%"
 
 
+def _strain_misses(sd) -> str:
+    """The test days where our strain is furthest from Whoop's, with what might explain each."""
+    worst = sd.assign(err=(sd["strain_pred"] - sd["whoop_strain"])).reindex((sd["strain_pred"] - sd["whoop_strain"]).abs().sort_values(ascending=False).index).head(10)
+    head = "<tr><th>Day</th><th>Whoop</th><th>Ours</th><th>All-day HR (min)</th><th>Hard min (70%+ HRR)</th><th>Whoop-only workouts</th></tr>"
+    rows = []
+    for day, r in worst.iterrows():
+        mon = r.get("monitored_minutes")
+        hard = r.get("hard_minutes")
+        only = r.get("diag_whoop_only_workouts")
+        rows.append(
+            f"<tr><td>{day.date()}</td><td>{r['whoop_strain']:.1f}</td><td>{r['strain_pred']:.1f}</td>"
+            f"<td>{'–' if mon is None or mon != mon else f'{mon:.0f}'}</td><td>{'–' if hard is None or hard != hard else f'{hard:.0f}'}</td>"
+            f"<td>{'–' if only is None or only != only else f'{only:.0f}'}</td></tr>"
+        )
+    return (
+        "<h3>Largest strain misses</h3><p>Days with little all-day HR, or Whoop workouts Garmin never recorded, "
+        "are the usual suspects.</p><table>" + head + "".join(rows) + "</table>"
+    )
+
+
 def render(result: Result, athlete_name: str, version: str) -> str:
     m = result.metrics
     rec, st = m["recovery"], m["strain"]
@@ -130,6 +150,13 @@ def render(result: Result, athlete_name: str, version: str) -> str:
             f"<tr><td>{label}</td><td>{s.get('n', 0)}</td><td>{_f(s.get('mae'))}</td><td>{_f(s.get('spearman'))}</td>"
             f"<td>{_f(s.get('bias'))}</td><td>{_f(s.get('loa_low'))} … {_f(s.get('loa_high'))}</td></tr>"
         )
+    for key, label in (("full_coverage", "· strain, days with ≥ 10 h of all-day HR"), ("low_coverage", "· strain, days with less (lower confidence)")):
+        s = st.get(key) or {}
+        if s.get("n"):
+            parts.append(
+                f"<tr><td>{label}</td><td>{s['n']}</td><td>{_f(s.get('mae'))}</td><td>{_f(s.get('spearman'))}</td>"
+                f"<td>{_f(s.get('bias'))}</td><td>{_f(s.get('loa_low'))} … {_f(s.get('loa_high'))}</td></tr>"
+            )
     parts.append("</table>")
 
     parts.append("<h2>Recovery bands</h2><p>Rows: Whoop's band. Columns: ours.</p><table><tr><th></th><th>GREEN</th><th>YELLOW</th><th>RED</th></tr>")
@@ -146,7 +173,7 @@ def render(result: Result, athlete_name: str, version: str) -> str:
         + _bland_altman(d["whoop_recovery"], d["recovery"], "recovery")
         + "</div>"
     )
-    sd = d[["whoop_strain", "strain_pred"]].dropna()
+    sd = result.strain_days if result.strain_days is not None else d[["whoop_strain", "strain_pred"]].dropna()
     if len(sd):
         parts.append(
             "<h2>Strain</h2><div class='grid'>"
@@ -154,6 +181,7 @@ def render(result: Result, athlete_name: str, version: str) -> str:
             + _bland_altman(sd["whoop_strain"], sd["strain_pred"], "strain")
             + "</div>"
         )
+        parts.append(_strain_misses(sd))
 
     al = st.get("alignment")
     if al:
@@ -175,15 +203,22 @@ def render(result: Result, athlete_name: str, version: str) -> str:
         parts.append(f"<tr><td>{e(term['feature'])}</td><td>{'+' if term['sign'] > 0 else '−'}</td><td>{_f(term['weight'], 2)}</td></tr>")
     parts.append("</table>")
     s = c["strain"]
-    bgtext = (
-        f" + {s['background_weight']:.2f} · background load (all-day HR outside workouts; days with ≥ {s['min_monitored_minutes']} min of HR)"
-        if s.get("uses_background")
-        else ""
-    )
-    parts.append(
-        f"<h3>Strain</h3><p>strain = {_f(s['c'])} + {_f(s['a'])} · ln(1 + {s['b']:.5f} · (<code>{e(s['load'])}</code>{bgtext})).</p>"
-        "<p>Time-series CV MAE per candidate: " + ", ".join(f"{e(k)} {_f(v)}" for k, v in st["candidates"].items()) + ".</p>"
-    )
+    cv_line = "<p>Time-series CV MAE per candidate (lowest wins): " + ", ".join(f"{e(k)} {_f(v)}" for k, v in st["candidates"].items()) + ".</p>"
+    if s.get("form") == "zones":
+        labels = ["below 50% HRR", "50–60%", "60–70%", "70–80%", "80–90%", "90%+"]
+        rows = "".join(f"<tr><td>{lab}</td><td>{w:.4f}</td><td>{_f(60 * w, 2)}</td></tr>" for lab, w in zip(labels, s["zone_weights"], strict=True))
+        parts.append(
+            f"<h3>Strain</h3><p>strain = {_f(s['c'])} + {_f(s['a'])} · ln(1 + Σ weight × minutes in heart-rate-reserve zone), "
+            "over the whole day: per-second HR in recorded workouts, all-day HR elsewhere. Weights never decrease with intensity.</p>"
+            f"<table><tr><th>Zone</th><th>Weight per minute</th><th>Per hour</th></tr>{rows}</table>" + cv_line
+        )
+    else:
+        bgtext = (
+            f" + {s['background_weight']:.2f} · background load (all-day HR outside workouts; days with ≥ {s['min_monitored_minutes']} min of HR)"
+            if s.get("uses_background")
+            else ""
+        )
+        parts.append(f"<h3>Strain</h3><p>strain = {_f(s['c'])} + {_f(s['a'])} · ln(1 + {s['b']:.5f} · (<code>{e(s['load'])}</code>{bgtext})).</p>" + cv_line)
     sl = c["sleep"]
     parts.append(
         f"<h3>Sleep</h3><p>need = {_f(sl['base_min'], 0)} min + {_f(sl['per_strain_min'], 1)} min × yesterday's strain "

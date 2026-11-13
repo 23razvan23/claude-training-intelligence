@@ -1,10 +1,11 @@
 # Project status and continuation plan
 
 Written so a new session (human or agent) can continue without the original conversation.
-Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions). Keep this
-file current: update the status, results log and next steps in every PR that changes them.
+Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions).
+**Ready-to-paste prompts for every remaining stage are in [`docs/PROMPTS.md`](PROMPTS.md).**
+Keep this file current: update the status, results log and next steps in every PR that changes them.
 
-_Last updated: 2026-11-13, with the strain parsimony rule, revised strain targets and model activation (PR after #12)._
+_Last updated: 2026-11-13, at the end of Phase 1a (calibration PASS, #13)._
 
 ---
 
@@ -12,125 +13,159 @@ _Last updated: 2026-11-13, with the strain parsimony rule, revised strain target
 
 | Phase (SPEC.md) | Status |
 |---|---|
-| 0 Foundation | **Done** (#1–#5): schema, auth, athletes, idempotent Whoop/Garmin/FIT import, coverage report, compose, CI, backups. |
-| 1a Recovery & Strain calibration | **Nearly done.** Recovery passes. Strain targets revised by the coach (≤ 2.0 MAE, Spearman ≥ 0.80). Remaining: rerun, then the coach activates a passing version (§5.1). |
-| 1b Daily scoring, Today/Trends, Garmin sync | Not started (§5.2). |
-| 2 Adaptive engine | Not started. Highest product priority after Module 1 (SPEC.md). |
-| 3 Plan builder | Not started. |
-| 4 Extensions | Not started. |
+| 0 Foundation | **Done** (#1–#5). |
+| 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). One step left for the coach: press **Activate** on the passing version (Calibration tab). |
+| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). |
+| 2 Adaptive engine | After 1b. Highest product priority after Module 1 (SPEC.md). Stages 2-1 … 2-5. |
+| 3 Plan builder | After 2. Stages 3-1 … 3-3. |
+| 4 Extensions | Last. Stages 4-1 … 4-3. |
 
-The spec's working agreement still applies. For each phase, restate the plan in under a page, wait for the coach's go, stop at the end of the phase for review, ask instead of assuming, and mark every sports-science number **[configurable]**.
+The spec's working agreement applies to every stage:
+- restate the plan in under a page, with files, open questions and risks, then **wait for the coach's go**;
+- stop at the end of each phase with a demo and a short written summary;
+- ask instead of assuming;
+- mark every sports-science number **[configurable]**, with a one-line rationale.
 
 ## 2. The coach's setup (important for how work is done)
 
 - **Machine:** a MacBook with Docker Desktop. The stock `python3` is **3.9**, so `tools/inspect_exports.py` must stay 3.9-compatible; CI checks this.
-- **All personal data lives only in the coach's local database.** The cloud session cannot reach it: there is no Remote Control or desktop app, and large files can't be uploaded to the web session. To diagnose problems, give the coach **read-only SQL** to paste (`docker compose exec db psql -U training -d training -c "…"`) and ask for the output. Never ask for exports or credentials in chat.
+- **All personal data lives only in the coach's local database.** The cloud session cannot reach it: there is no Remote Control or desktop app, and large files can't be uploaded. To diagnose problems, give the coach **read-only SQL** to paste (`docker compose exec db psql -U training -d training -c "…"`) and ask for the output. Never ask for exports or credentials in chat.
 - **Athlete id 1 = the coach.** Profile: HR max 184, resting HR 48, sex M, timezone Europe/Bucharest.
 - **Commands the coach runs** (in `~/claude-training-intelligence`):
   - update: `git checkout main && git pull && docker compose up --build -d`
-  - after any import or profile change: **Calibration → Recompute features** (in the UI)
-  - calibrate: `docker compose run --build --rm calibration --athlete 1`. **Keep `--build`**: `up --build` does not rebuild this on-demand service, and a stale image silently used old code once (#11). The job's first line prints `calibration <version> · feature set <fN>`.
+  - after any import or profile change, or a feature-version bump: **Calibration → Recompute features** (in the UI)
+  - calibrate: `docker compose run --build --rm calibration --athlete 1`. **Keep `--build`**: `up --build` does not rebuild this on-demand service (#11).
   - import status: `docker compose exec db psql -U training -d training -c "SELECT id, status, progress, stats, error FROM import_batch ORDER BY id DESC LIMIT 1;"`
-- The coach merges PRs themselves, usually quickly, and then reports results.
+- The coach merges PRs themselves, usually quickly, and then reports results. One PR per agreed step works well.
 
 ## 3. Calibration results log (athlete 1)
 
 Train 2026-01-19 → 2026-09-09; test 2026-09-10 → 2026-11-09 (the last ~20% of paired days).
-Targets (`calibration/targets.json`): recovery band agreement ≥ 70%, green-vs-red ≤ 3%. Strain: originally MAE ≤ 1.5; **since 2026-11-13, MAE ≤ 2.0 and Spearman ≥ 0.80, on days with ≥ 10 h of all-day HR** (the coach's decision, ADR 0007 item 6).
 
 | Model | Strain MAE | Recovery bands | Green↔red | What happened / fix |
 |---|---|---|---|---|
-| m1 | 5.03 | 55% | 0% | Whoop cycle dates were one day early: the export starts a cycle at sleep onset. Fixed in #8 (wake-day rule, migration V7, alignment check). |
+| m1 | 5.03 | 55% | 0% | Whoop cycle dates were one day early: the export starts a cycle at sleep onset. Fixed in #8 (wake-day rule, V7, alignment check). |
 | m2 | 2.34 | 88% | 0% | Aligned. Strain sees only workouts. |
 | m5 | 2.34 | 88% | 0% | Identical result: a stale calibration image and no f2 features. Fixed in #11 (`--build`, version line). |
-| m9 | 1.91 | 89% | 0% | All-day HR background load (f2). Background weight only 0.11, and the CV gain was tiny (1.865 → 1.862). Most of the test gain came from dropping 4 low-coverage days (n 59 → 55). Spearman 0.82, bias +0.64, LoA −4.3…+5.6. |
-| m12 | 2.57 (full-coverage days 2.38, n=55; low-coverage 4.64, n=5) | 88% | 0% | Whole-day HR zone model (f3) won training CV by only 4.8% (1.772 vs 1.862), was worse on the test days, and its weights collapsed into a step: overfitting. |
-| next | ? | ? | ? | Parsimony rule (zones must win CV by ≥ 10%) reselects workout + background load (m9-style: 1.91, Spearman 0.82 on full-coverage days). Expected to pass the revised targets. |
+| m9 | 1.91 | 89% | 0% | All-day HR background load (f2). Small weight (0.11). Low-coverage days were silently dropped (n 59 → 55). |
+| m12 | 2.38 on full-coverage days (2.57 overall) | 88% | 0% | Whole-day zone model (f3) won training CV by 4.8% but overfit. Led to the parsimony rule (#13). |
+| **PASS** | **1.91, Spearman 0.82** (55 full-coverage days) | **88%** | **0%** | #13: zones must win CV by ≥ 10%, so "Edwards workout load + background" was selected. Strain targets revised by the coach to MAE ≤ 2.0 and Spearman ≥ 0.80 on days with ≥ 10 h of all-day HR. |
 
-**Recovery is solid.** For strain, the coach chose to revise the target and move on to the live holdout rather than run another modelling round. Options left for later, if wanted: a smooth single-parameter intensity curve instead of 6 zone weights, or day-level steps and active kcal (not imported).
+### Phase 1a summary
+- **Recovery** agrees with Whoop's band on 88% of unseen days, with **no green-vs-red flips**. This is the score that drives training decisions.
+- **Strain** ranks days like Whoop (Spearman 0.82), but individual days can be off by up to ±4–5 points. The model: strain = c + a·ln(1 + b·(Edwards workout load + k·background load)).
+- **Main lessons:**
+  - Verify day alignment between data sources: the report now checks it.
+  - Daily life matters for strain.
+  - Flexible models overfit with only ~230 training days.
+  - Never let a stale image or stale features fool a comparison.
+- **Known gaps:**
+  - Low-coverage days (watch off) are lower confidence.
+  - 66 Whoop-only workouts are only partly visible to us.
+  - HRV only exists from 2025-09-17.
+  - Some test-window evidence was used when adopting the parsimony rule, so **the live holdout (stage 1b-3) is the clean go/no-go check**.
 
 ## 4. Facts learned from the real data
 
 - **Garmin export** (2024-09 → 2026-11):
   - 1,360 activities, 1,357 of them with activity FIT files; 719 sleeps; 728 daily summaries.
-  - Overnight HRV (`healthStatusData`) exists only **from 2025-09-17**.
+  - Overnight HRV exists only **from 2025-09-17**.
   - 21,451 FIT files: 9,716 monitoring files with HR (802k samples), 503 monitoring files without HR, and about 9.9k other non-activity files.
-  - `restingHeartRate` is smoothed; `currentDayRestingHeartRate` is the day's own value and is what we use.
+  - `restingHeartRate` is smoothed; we use `currentDayRestingHeartRate`.
   - Activity units: duration in ms, distance and elevation in cm. `startTimeLocal` gives the local date.
-  - Sleep files carry respiration and SpO2. Daily stress uses −2 to mean "no reading"; HRV metrics use values ≤ 0 as placeholders.
+  - Sleep files carry respiration and SpO2. Daily stress uses −2 to mean "no reading"; HRV values ≤ 0 are placeholders.
   - Details: ADR 0004.
 - **Whoop export:**
-  - 2026-01-12 → 2026-11-08: 302 cycles, 294 complete. **Whoop stays active until 2027-02**, which gives a live holdout (§5.3).
-  - `Cycle start time` is **sleep onset**, the evening before; a cycle belongs to the wake day (ADR 0002).
-  - 466 Whoop workouts, of which **66 have no Garmin activity within 30 min** (strength sessions and walks not started on the watch).
-- **Not imported yet, but available:** skin temperature (`healthStatusData` metrics), naps (`sleepData.napList`), per-activity `workoutRpe`/`workoutFeel` (143 activities, a possible seed for the check-in history), UDS steps/active kcal/intensity minutes. Activity `calories` units are unverified and unused.
+  - 2026-01-12 → 2026-11-08: 302 cycles. **Whoop stays active until 2027-02** (the live holdout).
+  - `Cycle start time` is **sleep onset**; a cycle belongs to the wake day (ADR 0002).
+  - 466 Whoop workouts, **66 with no Garmin activity within 30 min**.
+- **Not imported yet, but available:** skin temperature (`healthStatusData`), naps (`sleepData.napList`), per-activity `workoutRpe`/`workoutFeel` (143 activities, a possible seed for the check-in history in stage 2-1), UDS steps/active kcal/intensity minutes. Activity `calories` units are unverified and unused.
 
-## 5. Next steps, in order
+## 5. Plan moving forward
 
-### 5.1 Finish Phase 1a
-1. The coach merges this PR, updates, and reruns the calibration (no Recompute needed; features are still f3): `docker compose run --build --rm calibration --athlete 1`. The first line should say `calibration 0.5.0 · feature set f3`.
-2. Expected: the strain section says "Selected: … + background", strain passes the revised targets, and the result is PASS. If not, look at the report's strain section and "largest strain misses" table before changing anything.
-3. The coach reviews the report, then presses **Activate** on that version (Calibration tab). This is the frozen model for 1b and the live holdout.
-4. Stop for review: Phase 1a is complete. Write the phase summary (results, decisions, known gaps) in this file.
+Each stage below has a ready-to-paste prompt in `docs/PROMPTS.md`. Every stage:
+1. restates its plan and waits for the coach's go;
+2. lands as one PR (or a few small ones) with tests;
+3. updates this file;
+4. ends with the coach-run verification steps in the prompt.
 
-### 5.2 Phase 1b (restate the plan and get a go first)
-- **Daily scoring in Java:**
-  - read the ACTIVE `model_version.coefficients`. The contract is in ADR 0007 and `calibration/pipeline.py::_strain_coefficients`, and covers both strain forms, recovery terms with center/scale, sleep, and bands;
-  - compute from `day_features` and write `derived_day_metrics`, tagged with `model_version`;
-  - store per-feature contributions for explanations;
-  - allow recomputing any date range (the spec wants a CLI; today only REST exists).
-- **Today and Trends screens** (SPEC.md UI table), a drift warning when inputs leave the training range, and a stale-data banner ("never compute today's recovery from yesterday's data without saying so").
-- **Garmin daily sync:**
-  - implement `garmin-sync/garmin_sync/adapter.py` with `garminconnect`/`garth`;
-  - credentials stored encrypted at rest;
-  - scheduled each morning so scores are ready by 08:00 local, plus on demand;
-  - retry and alert on failure;
-  - manual FIT upload stays as the fallback.
-  This needs the coach's consent for storing their Garmin login, and network access in their setup.
-- **Live holdout (§5.3)** UI.
+### Phase 1b: daily Module 1 (Recovery, Strain, Sleep every morning)
+| Stage | What | Done when |
+|---|---|---|
+| **1b-1 Daily scoring service** | Java applies the ACTIVE model's coefficients to `day_features`. It writes `derived_day_metrics` (recovery, band, strain, sleep need and performance, per-feature contributions, `model_version`, data-quality flags: stale, low coverage, missing inputs, drift beyond the training range), with recompute for any date range via REST and a CLI. Includes a **Java/Python parity test**: same features + coefficients → same scores. | Parity test passes; the coach recomputes and sees a score per day. |
+| **1b-2 Today & Trends screens** | Today: recovery dial and band, strain vs target, sleep performance, contributions in plain words, stale and low-confidence banners. Trends: HRV, RHR, recovery, strain, sleep; acute vs chronic load; ranges from 4 weeks to 12 months; readable at phone width; i18n; dark mode. | The coach uses it on their phone for a few mornings. |
+| **1b-3 Live holdout vs Whoop** | A daily ours-vs-Whoop view for the ACTIVE model from its activation date: rolling MAE, band agreement, green↔red count, weekly summary. The coach keeps importing new Whoop exports until 2027-02. | A running go/no-go dashboard; final decision report around 2027-02. |
+| **1b-4 Garmin daily sync** | Implement the `garmin-sync` adapter (`garminconnect`/`garth`), with credentials encrypted at rest. A morning run (default 07:00 local, [configurable]) syncs, recomputes recent features and scores, so results are ready by 08:00; also on demand. Retry, alert, a "last sync" indicator; manual FIT upload as the fallback. **Needs the coach's consent** for storing their Garmin login. | Today's scores appear without manual imports. |
 
-### 5.3 Live holdout until 2027-02
-After freezing, compare the frozen model's daily scores with Whoop's every day until the subscription ends: a small report or chart of ours vs Whoop. This is the strongest go/no-go evidence for cancelling Whoop (ADR 0007).
+At the end of Phase 1b, stop with a demo and summary (SPEC.md Phase 1 "done when").
 
-### 5.4 Later phases
-Phase 2 (adaptive engine, rules engine, backtest over 12 months), Phase 3 (plan builder) and Phase 4 are as written in SPEC.md. Also open from the spec's engineering standards:
-- a **Settings screen** for all [configurable] thresholds;
-- a **golden-file test on a frozen 60-day real sample**. It can't be committed (personal data); consider a coach-run local golden check;
-- a Romanian translation (`frontend/src/i18n/ro.json`);
-- the athlete **Check-in** form (Phase 2).
+### Phase 2: adaptive training engine (highest priority)
+| Stage | What |
+|---|---|
+| **2-1 Schedules & check-in** | Manual plan entry and spreadsheet (CSV/XLSX) import into `plan`/`planned_session`; key/supporting/easy demand; the athlete **Check-in** form (RPE, soreness 1–5, niggle with body location, illness, note) into `subjective_log`; optionally seed history from Garmin `workoutRpe`/`workoutFeel`. |
+| **2-2 Signals** | Readiness and its 3/7-day trend; 7-day sleep debt; EWMA acute (7 d) and chronic (28 d) load, total and running-only, with ACWR; **running tolerance** (highest 4-week average weekly volume in 12 months without a niggle, decayed by time away, capped by chronic running load), with its derivation and a coach override; Foster monotony and strain. All [configurable]. |
+| **2-3 Rules engine & suggestions** | A deterministic, versioned rules engine with every SPEC.md starting rule and guardrail; **one scenario test per rule** ("given signals → expect suggestion + reason"); suggestions with action, before/after, 1–3 reasons with numbers, and a confidence; an accept/edit/reject workflow in Today and Plan; an inputs snapshot logged with every decision. |
+| **2-4 Backtest** | Replay the last 12 months day by day and report which suggestions the engine would have made, especially in the hard weeks the coach remembers. The coach reviews a sample. |
+| **2-5 Settings screen** | Every [configurable] threshold editable, with defaults, a rationale and a reset; versioned so suggestions record which settings produced them. |
+
+At the end of Phase 2, stop: every rule has a passing scenario test, and the backtest has been reviewed.
+
+### Phase 3: plan builder
+| Stage | What |
+|---|---|
+| **3-1 Methodology as data** | Session library (typed templates with structure, targets, estimated duration and strain), engine rules config (intensity distribution, progression, taper, long-run cap), race-equivalence paces (VDOT-style or Riegel) next to HR zones. |
+| **3-2 Generator + property tests** | Plans for the three goal types (get fit, improve at a distance, race), ramping from current tolerance; **property tests** (no week over +10% unless overridden, taper volume always decreasing, long-run cap, lighter week every 3rd–4th week). |
+| **3-3 Wizard & calendar** | Goal wizard → preview → generate → edit; week and month calendar with drag-and-drop; targets vs actuals; per-session suggestion history. The coach reviews a generated marathon plan. |
+
+### Phase 4: extensions
+| Stage | What |
+|---|---|
+| **4-1** | Export sessions to Garmin as structured workouts. |
+| **4-2** | Capacitor phone app with push notifications for new suggestions. |
+| **4-3** | Learning from logged coach decisions (a model trained on the accept/edit/reject history). |
+
+### Backlog (cross-cutting; pick up when relevant)
+- Romanian translation (`frontend/src/i18n/ro.json`).
+- A golden-file check on a frozen 60-day real sample (spec), run locally by the coach, since real data can't be committed.
+- Import skin temperature, naps, UDS steps/active kcal. These might later improve strain. Re-import doesn't update existing raw rows (ON CONFLICT DO NOTHING), so they need new tables or source_ids.
+- The strain improvement ideas parked in 1a: a smooth single-parameter intensity curve; day-level activity features.
+- Per-athlete export and delete (spec privacy); TLS/`COOKIE_SECURE` guidance for exposure beyond the LAN.
 
 ## 6. How the code is organised
 
 - `backend/` (Java 21, Spring Boot, Flyway, TimescaleDB):
   - `ingestion` (importers, `RawWriter`, import batches and progress);
-  - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions);
-  - `security`, `athletes`.
-  - Migrations V1–V10. **Never edit a merged migration; add a new one.**
-- `calibration/` (Python 3.12): `pipeline.run()` is a pure function of the `day_features` table, with `strain`, `sleep`, `recovery`, `metrics` and `report` modules. `FEATURE_VERSION` in `__main__.py` must match `app.metrics.feature-version`.
-- `frontend/` (React + TypeScript): screens for Coverage, Imports, Calibration (coach) and Athletes (coach).
-- `tools/inspect_exports.py`: a read-only export summary, Python 3.9+, that never prints free text.
-- `garmin-sync/`: the adapter boundary; Phase 1b work.
-- **Feature engineering exists only in Java**, materialised in `day_features`. Python only fits. Changing a feature definition means bumping `feature_version` in both places, after which the coach recomputes (ADR 0007).
+  - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions and activation);
+  - `security`, `athletes`; placeholder packages `planning` and `adaptation`.
+  - Migrations V1–V11. **Never edit a merged migration; add a new one.**
+- `calibration/` (Python 3.12, package 0.5.0): `pipeline.run()` is a pure function of `day_features`. `FEATURE_VERSION` (`f3`) must match `app.metrics.feature-version`. The **coefficients contract** read by 1b-1 is `pipeline._strain_coefficients`, plus the recovery terms (intercept, then each feature's sign, weight, center and scale), sleep and bands; see ADR 0007.
+- `frontend/` (React + TypeScript): Coverage, Imports, Calibration (coach) and Athletes (coach).
+- `tools/inspect_exports.py`: a read-only export summary, Python 3.9+, never prints free text.
+- `garmin-sync/`: the adapter boundary (stage 1b-4).
+- **Feature engineering exists only in Java**, materialised in `day_features`. Python only fits. Changing a feature definition means bumping `feature_version` in both places; the coach then recomputes (ADR 0007).
 
 ## 7. Working conventions
 
 - **Branch and PR flow:**
   - work on the session's designated branch;
-  - after a PR merges, restart that branch from `origin/main` before new work;
-  - force-push may be blocked: if the remote branch isn't an ancestor of main, merge main in instead of rewriting;
+  - after a PR merges, restart that branch from `origin/main`;
+  - force-push may be blocked: if the remote branch isn't an ancestor of main, merge main in instead;
   - one focused PR per change, with commits explaining *why*;
-  - PR bodies say what changed, how it was verified, and what the coach must do after merging;
-  - don't open PRs unless asked or clearly part of the agreed workflow (the coach has been asking for one per step).
+  - PR bodies say what changed, how it was verified, and what the coach must do after merging.
 - **Bugs:** first write a test that reproduces the failure and watch it fail, then fix it (e.g. `ProgressDeadlockIT`, `WhoopCycleDateMigrationIT`).
-- **No personal data in the repo:** fixtures are synthetic, and `.gitignore` covers exports and `.env`.
+- **No personal data in the repo:** fixtures are synthetic.
 - **Checks before pushing:**
   - backend: `cd backend && ./gradlew build` (with `-Werror`; Testcontainers needs Docker);
   - calibration, tools and garmin-sync: `ruff check . && ruff format --check . && python -m pytest -q`;
   - frontend: `npm run lint && npm run typecheck && npm run build`.
-- **CI:** `.github/workflows/ci.yml`. The `tools-py39` job runs in a `python:3.9-slim` container, because `ubuntu-latest` has no Python 3.9.
+- **CI:** `.github/workflows/ci.yml` (the `tools-py39` job runs in `python:3.9-slim`).
 
 ### Notes for the cloud session environment (not the coach's machine)
 - The Docker daemon may need starting: `nohup dockerd >/tmp/dockerd.log 2>&1 &`.
-- Image builds inside Docker can't download Maven, npm or apk packages (TLS proxy). For an end-to-end check, build the jar (`./gradlew bootJar`) and the frontend on the host. Then run a `timescale/timescaledb:2.17.2-pg16` container on port 5433, start the jar against it, use `curl` with the CSRF cookie flow, and run the calibration from a host venv with `PGHOST/PGPORT/…` set.
-- Python: create the venv with the system `python3.12 -m venv` plus `pip`. `uv pip install` hung here once.
+- Image builds inside Docker can't download packages (TLS proxy). For an end-to-end check:
+  - build the jar (`./gradlew bootJar`) and the frontend on the host;
+  - run `timescale/timescaledb:2.17.2-pg16` on port 5433 and start the jar against it;
+  - use `curl` with the CSRF cookie flow;
+  - run the calibration from a host venv with `PGHOST/PGPORT/…` set.
+- Python: create the venv with the system `python3.12 -m venv` plus `pip`.
 - `Fixtures` (backend tests) can write synthetic export files for manual runs.

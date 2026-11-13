@@ -2,7 +2,7 @@
 
 A self-hosted training app for a running coach and the athletes he coaches. It turns Garmin data into Whoop-like Recovery, Strain and Sleep scores, builds periodized plans, and suggests day-by-day adaptations that the coach accepts or rejects. The full specification is in [SPEC.md](SPEC.md).
 
-**Status: Phase 0 (Foundation).** Includes the repo, Docker Compose, CI, two-role auth, athlete profiles, the canonical schema, idempotent Whoop and Garmin imports, and a data-coverage report. Scores, plans and suggestions come in Phases 1–3.
+**Status: Phase 1a done** (Garmin-derived Recovery and Strain calibrated against Whoop: PASS). Next: Phase 1b, daily scores and the Today screen. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Quick start
 
@@ -147,6 +147,6 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 ## Architecture decisions
 
-**Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions.
+**Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md).
 
 See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007).

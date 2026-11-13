@@ -71,6 +71,27 @@ public class MetricsController {
     }
 
     /**
+     * Freezes a calibrated version as the athlete's ACTIVE model: the one daily scoring and
+     * the live comparison with Whoop will use. Only versions that met their targets qualify.
+     */
+    @PostMapping("/models/{id}/activate")
+    @PreAuthorize("hasRole('COACH')")
+    @Transactional
+    public ModelVersion activate(@PathVariable long id) {
+        var m = repo.model(id).orElseThrow(() -> ApiException.notFound("Model"));
+        if (!m.passed()) {
+            throw new ApiException(org.springframework.http.HttpStatus.CONFLICT,
+                    "Only a model version that met its acceptance targets can be activated.");
+        }
+        if ("RETIRED".equals(m.status())) {
+            throw new ApiException(org.springframework.http.HttpStatus.CONFLICT,
+                    "This version was retired (for example, fitted on corrected data). Run a new calibration instead.");
+        }
+        repo.activate(m);
+        return repo.model(id).orElseThrow();
+    }
+
+    /**
      * The calibration report: self-contained HTML written by the calibration job. Served
      * with a CSP that forbids scripts and remote loads; the UI shows it in a sandboxed iframe.
      */

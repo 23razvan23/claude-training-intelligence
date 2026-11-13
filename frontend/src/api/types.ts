@@ -124,6 +124,6 @@ export interface ModelVersion {
     strain?: ScoreMetrics;
     recovery?: ScoreMetrics & { agreement?: number; green_red_rate?: number };
     targets?: { strain_mae_max: number; recovery_band_agreement_min: number; recovery_green_red_max: number };
-    checks?: { strain_mae: boolean; recovery_band_agreement: boolean; recovery_green_red: boolean };
+    checks?: { strain_mae: boolean; strain_spearman?: boolean; recovery_band_agreement: boolean; recovery_green_red: boolean };
   };
 }

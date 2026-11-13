@@ -65,6 +65,14 @@ public class MetricsRepository {
         return jdbc.sql("SELECT * FROM model_version WHERE id = ?").param(id).query(this::map).optional();
     }
 
+    /** Makes this version the athlete's ACTIVE one; any previous ACTIVE version is RETIRED. */
+    public void activate(ModelVersion m) {
+        jdbc.sql("UPDATE model_version SET status = 'RETIRED' WHERE athlete_id = ? AND status = 'ACTIVE' AND id <> ?")
+                .params(m.athleteId(), m.id())
+                .update();
+        jdbc.sql("UPDATE model_version SET status = 'ACTIVE' WHERE id = ?").param(m.id()).update();
+    }
+
     public Optional<String> report(long id) {
         return jdbc.sql("SELECT report_html FROM model_version WHERE id = ?").param(id).query(String.class).optional();
     }

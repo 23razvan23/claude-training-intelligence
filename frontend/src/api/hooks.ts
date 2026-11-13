@@ -154,3 +154,11 @@ export function useModelReport(modelId?: number) {
     staleTime: Infinity,
   });
 }
+
+export function useActivateModel(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modelId: number) => api<ModelVersion>(`/api/models/${modelId}/activate`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['models', athleteId] }),
+  });
+}

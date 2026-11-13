@@ -195,6 +195,19 @@ class ImportIT extends IntegrationTest {
     }
 
     @Autowired org.springframework.transaction.support.TransactionTemplate tx;
+    @Autowired ImportService service;
+
+    @Test
+    void aSecondImportIsRefusedWhileOneIsRunning() {
+        long athlete = newAthlete("Busy athlete");
+        long user = createCoach();
+        long running = batches.create(athlete, ImportKind.GARMIN_EXPORT, "big.zip", null, user);
+        batches.markRunning(running);
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "big.zip", "application/zip", new byte[] {1});
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.start(athlete, ImportKind.GARMIN_EXPORT, List.of(file), user))
+                .isInstanceOf(app.training.common.ApiException.class)
+                .hasMessageContaining("already running");
+    }
 
     @Test
     void progressIsVisibleWhileTheImportTransactionIsOpen() {

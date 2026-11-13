@@ -38,7 +38,7 @@ public class DayFeatureService {
 
     private record Sleep(Integer minutes, Integer deep, Integer rem, Integer light, Integer score, Double resp, Double spo2) {}
 
-    private record Load(Double banister, Double edwards, double runKm, int count, int missing) {}
+    private record Load(Double banister, Double edwards, double runKm, int count, int missing, double[] zones) {}
 
     private record Whoop(Integer recovery, Double strain, Integer need, Integer perf, Integer asleep, Integer debt) {}
 
@@ -52,7 +52,7 @@ public class DayFeatureService {
         return o == null ? null : ((Number) o).doubleValue();
     }
 
-    private record Background(double load, long coveredSeconds) {}
+    private record Background(double load, long coveredSeconds, double[] zones) {}
 
     /**
      * Background load per cycle day from all-day monitoring HR: Banister-weighted minutes
@@ -102,16 +102,21 @@ public class DayFeatureService {
                 if (day == null) day = LocalDate.ofInstant(java.time.Instant.ofEpochSecond(p), zone);
                 while (w[0] < windows.size() && windows.get(w[0])[1] <= p) w[0]++;
                 boolean inActivity = w[0] < windows.size() && windows.get(w[0])[0] <= p;
-                double[] a = acc.computeIfAbsent(day, k -> new double[2]);
+                double[] a = acc.computeIfAbsent(day, k -> new double[2 + Trimp.ZONES]);
                 a[1] += t - p;
-                if (!inActivity && params != null) a[0] += (t - p) / 60.0 * Trimp.banisterWeight(prevHr[0], params);
+                if (!inActivity && params != null) {
+                    a[0] += (t - p) / 60.0 * Trimp.banisterWeight(prevHr[0], params);
+                    a[2 + Trimp.hrrZone(prevHr[0], params)] += (t - p) / 60.0;
+                }
             }
             prevT[0] = t;
             prevHr[0] = hr;
         }, athleteId);
 
         var out = new HashMap<LocalDate, Background>();
-        acc.forEach((day, a) -> out.put(day, new Background(params == null ? Double.NaN : a[0], (long) a[1])));
+        acc.forEach((day, a) -> out.put(day, new Background(
+                params == null ? Double.NaN : a[0], (long) a[1],
+                params == null ? null : java.util.Arrays.copyOfRange(a, 2, 2 + Trimp.ZONES))));
         return out;
     }
 
@@ -143,13 +148,27 @@ public class DayFeatureService {
                        sum(l.trimp_banister) AS banister, sum(l.trimp_edwards) AS edwards,
                        coalesce(sum(ac.distance_m) FILTER (WHERE ac.sport = 'running'), 0) / 1000.0 AS run_km,
                        count(*) AS n,
-                       count(*) FILTER (WHERE l.trimp_banister IS NULL) AS missing
+                       count(*) FILTER (WHERE l.trimp_banister IS NULL) AS missing,
+                       sum(l.hrr_zone_minutes[1]) AS z0, sum(l.hrr_zone_minutes[2]) AS z1, sum(l.hrr_zone_minutes[3]) AS z2,
+                       sum(l.hrr_zone_minutes[4]) AS z3, sum(l.hrr_zone_minutes[5]) AS z4, sum(l.hrr_zone_minutes[6]) AS z5
                 FROM activity_with_cycle ac
                 LEFT JOIN activity_load l ON l.activity_id = ac.id
                 WHERE ac.athlete_id = ? AND ac.source = 'GARMIN'
                 GROUP BY ac.cycle_date""", rs -> {
             load.put(rs.getObject("cycle_date", LocalDate.class), new Load(
-                    d(rs, "banister"), d(rs, "edwards"), rs.getDouble("run_km"), rs.getInt("n"), rs.getInt("missing")));
+                    d(rs, "banister"), d(rs, "edwards"), rs.getDouble("run_km"), rs.getInt("n"), rs.getInt("missing"),
+                    rs.getObject("z0") == null ? null : new double[] {
+                        rs.getDouble("z0"), rs.getDouble("z1"), rs.getDouble("z2"), rs.getDouble("z3"), rs.getDouble("z4"), rs.getDouble("z5")}));
+        }, athleteId);
+
+        var whoopOnly = new HashMap<LocalDate, Integer>();
+        template.query("""
+                SELECT w.cycle_date, count(*) AS n FROM activity_with_cycle w
+                WHERE w.athlete_id = ? AND w.source = 'WHOOP'
+                  AND NOT EXISTS (SELECT 1 FROM activity g WHERE g.athlete_id = w.athlete_id AND g.source = 'GARMIN'
+                                  AND g.start_at BETWEEN w.start_at - INTERVAL '30 minutes' AND w.start_at + INTERVAL '30 minutes')
+                GROUP BY w.cycle_date""", rs -> {
+            whoopOnly.put(rs.getObject("cycle_date", LocalDate.class), rs.getInt("n"));
         }, athleteId);
 
         var whoop = new HashMap<LocalDate, Whoop>();
@@ -194,6 +213,14 @@ public class DayFeatureService {
             Load l = load.get(day);
             Whoop wh = whoop.get(day);
             Background bg = background.get(day);
+            // Whole-day zone minutes: recorded workouts plus all-day HR outside them.
+            double[] zones = null;
+            if (params != null && ((l != null && l.zones() != null) || (bg != null && bg.zones() != null))) {
+                zones = new double[Trimp.ZONES];
+                for (int z = 0; z < Trimp.ZONES; z++) {
+                    zones[z] = (l != null && l.zones() != null ? l.zones()[z] : 0) + (bg != null && bg.zones() != null ? bg.zones()[z] : 0);
+                }
+            }
 
             Double ln = lnRmssd.get(day);
             var hrvBase = Baseline.of(lnRmssd, day, window, min);
@@ -228,7 +255,11 @@ public class DayFeatureService {
                 wh == null ? null : wh.need(), wh == null ? null : wh.perf(),
                 wh == null ? null : wh.asleep(), wh == null ? null : wh.debt(),
                 bg == null || Double.isNaN(bg.load()) ? null : dec(bg.load(), 2),
-                bg == null ? null : (int) (bg.coveredSeconds() / 60)});
+                bg == null ? null : (int) (bg.coveredSeconds() / 60),
+                zones == null ? null : dec(zones[0], 1), zones == null ? null : dec(zones[1], 1),
+                zones == null ? null : dec(zones[2], 1), zones == null ? null : dec(zones[3], 1),
+                zones == null ? null : dec(zones[4], 1), zones == null ? null : dec(zones[5], 1),
+                whoopOnly.getOrDefault(day, 0)});
         }
 
         jdbc.sql("DELETE FROM day_features WHERE athlete_id = ? AND feature_version = ?")
@@ -241,8 +272,10 @@ public class DayFeatureService {
                     day_load_banister, day_load_edwards, run_km, activity_count, load_missing_activities,
                     baseline_days, ln_rmssd_z, rhr_dev, resp_dev, has_garmin_core,
                     whoop_recovery, whoop_strain, whoop_sleep_need_min, whoop_sleep_perf, whoop_asleep_min, whoop_sleep_debt_min,
-                    background_load, monitored_minutes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", rows);
+                    background_load, monitored_minutes,
+                    zone_min_0, zone_min_1, zone_min_2, zone_min_3, zone_min_4, zone_min_5, diag_whoop_only_workouts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?)""", rows);
 
         return new Outcome(days.size(), core, withWhoop, paired,
                 days.isEmpty() ? null : days.first(), days.isEmpty() ? null : days.last());

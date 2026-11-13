@@ -59,9 +59,9 @@ Drag single activity `.fit` files under **FIT files**. A file that matches an al
 2. In **Calibration**, press **Recompute features**. Do this again after any import or profile change.
 3. Run the calibration job. It isn't started by `docker compose up`:
    ```bash
-   docker compose run --rm calibration --athlete 1
+   docker compose run --build --rm calibration --athlete 1
    ```
-   Use your athlete id, shown on the Calibration screen.
+   Use your athlete id, shown on the Calibration screen. Keep `--build`: `docker compose up --build` doesn't rebuild this on-demand job, so without it an old version keeps running after you update.
 4. The new model version appears under **Calibration**, with PASS/FAIL against the targets and its full report.
 
 How it works: [ADR 0007](docs/adr/0007-module1-calibration.md). The targets are in `calibration/targets.json`.

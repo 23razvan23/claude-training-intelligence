@@ -18,6 +18,15 @@ from . import config, data, pipeline, report
 FEATURE_VERSION = "f2"
 
 
+def _version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("calibration")
+    except Exception:  # running from a source checkout
+        return "dev"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="calibration", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--athlete", type=int, required=True)
@@ -28,11 +37,15 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     settings = config.load(args.targets)
+    print(f"calibration {_version()} · feature set {FEATURE_VERSION}")
     with data.connect() as conn:
         name = data.athlete_name(conn, args.athlete)
         features = data.load_features(conn, args.athlete, FEATURE_VERSION)
         if features.empty:
-            print("No day features yet: run 'Recompute features' in the app (Calibration tab) first.", file=sys.stderr)
+            print(
+                f"No day features for feature set {FEATURE_VERSION} yet: press 'Recompute features' in the app (Calibration tab) first.",
+                file=sys.stderr,
+            )
             return 2
         try:
             result = pipeline.run(features, settings, FEATURE_VERSION, args.test_from)

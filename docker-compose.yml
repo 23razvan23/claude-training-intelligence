@@ -51,7 +51,9 @@ services:
       - "8090"
 
   # Module 1 calibration job, run on demand (not started by `docker compose up`):
-  #   docker compose run --rm calibration --athlete 1
+  #   docker compose run --build --rm calibration --athlete 1
+  # --build matters: `docker compose up --build` does not rebuild on-demand services,
+  # so without it an old image of this job keeps running after an update.
   calibration:
     build: ./calibration
     profiles: [tools]

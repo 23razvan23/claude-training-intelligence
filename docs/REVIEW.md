@@ -130,7 +130,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
   - [ ] ADR 0007 and PLAN §6 point to ADR 0008 as the contract.
   - [ ] The coach has answered the question below.
 - **Verification:** documentation only; `cd calibration && python -m pytest -q` still passes (nothing changed).
-- **Coach decision needed:** yes. "If the watch was off all day yesterday, we cannot compute yesterday's strain. Should this morning's recovery (a) be shown as 'not available' with the reason, or (b) be shown anyway, marked lower confidence, assuming a typical day yesterday?" Recommendation: **(a) for now**, because that is what the calibrated model does; (b) needs a new calibration.
+- **Coach decision needed:** yes. "If the watch was off all day yesterday, we cannot compute yesterday's strain. Should this morning's recovery (a) be shown as 'not available' with the reason, or (b) be shown anyway, marked lower confidence, assuming a typical day yesterday?" Recommendation: **(a) for now**, because that is what the calibrated model does; (b) needs a new calibration. **Coach's answer (2026-11-13): (a), as understood from a short "yes"; confirm when restating the plan for R-01.** The coach also noted that the exports are a few days old, so recent days have no data at all: that is the "stale data" case (no score, "last data from …"), separate from a day with the watch off.
 - **Opus prompt:**
   ```text
   Task R-01: write ADR 0008 "Scoring contract" (documentation only, no code changes).

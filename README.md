@@ -147,6 +147,6 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 ## Architecture decisions
 
-**Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md).
+**Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md). For an independent review that produces work items for later sessions, use [docs/REVIEW_PROMPT.md](docs/REVIEW_PROMPT.md).
 
 See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007).

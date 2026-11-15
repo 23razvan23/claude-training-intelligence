@@ -208,5 +208,12 @@ Results, computed with the real Python functions (unrounded; "–" = blank):
 - **L5:** `uses_background = true` with k = 0 still blanks strain on days without all-day HR (S2), although the value would not change. This mirrors Python's mask.
 
 ## Consequences
-- Stage 1b-1 implements S1–S8 and nothing else. Its parity test (R-03) uses the synthetic grid above and must reproduce the results table to within floating-point tolerance, before rounding (S7).
+- Stage 1b-1 implements S1–S8 and nothing else. Its parity test (R-03) must reproduce the committed fixtures in `backend/src/test/resources/parity/`:
+  - `adr0008/`: the synthetic grid above, with its coefficients; `expected.json` reproduces the results table;
+  - `load/` and `zones/`: a synthetic model fitted by the calibration for each strain form (a valid contract v2), plus a 60-day window with planted edge cases, named in `expected.json` → `planted`. The cases are a missing day, no all-day HR, missing zone minutes, a workout without HR and the morning after it, a low-coverage day and the morning after it, no sleep, no HRV, a 0-minute sleep, raw strain above 21, raw recovery above 100 and below 0, and recovery 66.7 / 67.2 / 33.3 / 32.8.
+  - Each folder holds `day_features.csv` (the input columns at database precision; empty = NULL) and `expected.json` (the coefficients and, per grid day, `strain_raw`, `strain`, `strain_reason`, `low_coverage`, `prev_strain`, `shortfall`, `sleep_need`, `sleep_perf`, `contributions`, `recovery_raw` (unclipped), `recovery` (clipped), `recovery_reasons` [{reason, detail}], `recovery_lower_confidence`, `band`, and `stored`, the values rounded per S7).
+  - Unrounded values must agree to within 1e-7 relative. `stored` values and `band` must agree exactly.
+  - Recovery reasons are listed in the order of the S6 table. The `detail` of `NO_STRAIN_YESTERDAY` is yesterday's strain reason (`NO_DAY_DATA` before the first grid day).
+  - Storage rounding is half-up on the shortest decimal representation of the double: Java `BigDecimal.valueOf(x).setScale(n, RoundingMode.HALF_UP)`.
+  - The expected answers come from `calibration/calibration/parity.py`, a reference implementation of S1–S8 built on the calibration's own functions. The app never runs it. Regenerate them with `cd calibration && python tests/parity_fixtures.py --write`; a test fails if the committed files are stale.
 - Changing any rule here is a model change: change the Python, recalibrate, and update this ADR in the same PR.

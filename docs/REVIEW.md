@@ -80,7 +80,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 |---|---|---|---|---|---|---|
 | R-01 | Write down the scoring rules that today exist only in Python | P0 | design | S | – | 1b-1 |
 | R-02 | Emit a versioned coefficients contract with training ranges and a profile snapshot (done) | P0 | design | M | R-01 | 1b-1 |
-| R-03 | Generate a committed parity fixture and guard the feature version in CI | P0 | test-gap | S | R-02 | 1b-1 |
+| R-03 | Generate a committed parity fixture and guard the feature version in CI (done) | P0 | test-gap | S | R-02 | 1b-1 |
 | R-04 | Record when a model was activated and refuse unsafe activations | P0 | bug | S | R-02 | 1b-1, 1b-3 |
 | R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
 | R-06 | Stop freezing unfinished Whoop cycles on import (done) | P1 | bug | S | – | 1b-3 |
@@ -223,17 +223,17 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-03: Generate a committed parity fixture and guard the feature version in CI
 - **Priority / Type / Size:** P0 / test-gap / S
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED; done 2026-11-15 (`backend/src/test/resources/parity/`, `calibration/calibration/parity.py`, `calibration/tests/test_parity.py`). The fixture builder lives in `calibration/tests/parity_fixtures.py` because it needs the synthetic tables in `tests/`.
 - **Problem:** stage 1b-1 asks for a Java/Python parity test "generated from the Python tests", but nothing produces such a fixture, and the existing synthetic table (`tests/synthetic.py`) has no gaps, no null inputs and no low-coverage days in the places where Java is most likely to differ. Separately, the feature version is typed by hand in two files with no check that they agree.
 - **Evidence:** `tests/synthetic.py:49` only nulls `ln_rmssd_z` for the first 14 days; `calibration/__main__.py:18` `FEATURE_VERSION = "f3"` vs `application.yml:64` `feature-version: f3`; no CI step compares them (`.github/workflows/ci.yml`).
 - **Why it matters:** a parity test on clean rows proves little; the mismatches are on edge days (see R-01). A feature-version mismatch makes the calibration read an empty or stale table (this already cost one iteration, PLAN §3 row m5).
 - **Proposed change:** add `calibration/tools/make_parity_fixture.py` (or a `python -m calibration.parity` entry point) that builds a deterministic synthetic table with planted edge cases, runs `pipeline.run`, and writes two files to `backend/src/test/resources/parity/`: `day_features.csv` (the input columns, at database precision) and `expected.json` (the full coefficients plus, per day: strain, prev_strain, shortfall, sleep need, sleep performance, recovery unrounded and rounded, band, per-term contributions, null reasons). Planted cases: a missing calendar day; a day with null `background_load`; a low-coverage day; a null `sleep_minutes`; a null HRV day; a prediction within 0.5 of each band edge; raw predictions below 0 and above 100/21. Produce one fixture per strain form. Add a pytest that regenerates the fixture in memory and fails if the committed files differ, and a pytest that reads `application.yml` and asserts it equals `FEATURE_VERSION`.
 - **Out of scope:** the Java scorer and the Java side of the parity test (stage 1b-1); real data.
 - **Acceptance criteria:**
-  - [ ] Failing test first: "committed fixture equals regenerated fixture" (fails: no fixture).
-  - [ ] Fixture contains every planted case, asserted by name in a test.
-  - [ ] `FEATURE_VERSION` test fails if either file is changed alone.
-  - [ ] Fixture files are synthetic and under 200 KB.
+  - [x] Failing test first: "committed fixture equals regenerated fixture" (fails: no fixture).
+  - [x] Fixture contains every planted case, asserted by name in a test.
+  - [x] `FEATURE_VERSION` test fails if either file is changed alone.
+  - [x] Fixture files are synthetic and under 200 KB.
 - **Verification:** `cd calibration && ruff check . && ruff format --check . && python -m pytest -q`.
 - **Coach decision needed:** no.
 - **Opus prompt:**

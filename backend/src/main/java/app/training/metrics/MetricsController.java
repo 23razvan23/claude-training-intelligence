@@ -72,23 +72,39 @@ public class MetricsController {
 
     /**
      * Freezes a calibrated version as the athlete's ACTIVE model: the one daily scoring and
-     * the live comparison with Whoop will use. Only versions that met their targets qualify.
+     * the live comparison with Whoop will use, from its activation time. Only versions that
+     * met their targets and that the daily scoring can read qualify (ADR 0007 item 8).
+     * Activating the version that is already ACTIVE changes nothing, so its activation time
+     * (the start of the live comparison) cannot move by accident.
      */
     @PostMapping("/models/{id}/activate")
     @PreAuthorize("hasRole('COACH')")
     @Transactional
-    public ModelVersion activate(@PathVariable long id) {
+    public ModelVersion activate(@PathVariable long id, @AuthenticationPrincipal CurrentUser user) {
         var m = repo.model(id).orElseThrow(() -> ApiException.notFound("Model"));
+        if ("ACTIVE".equals(m.status())) {
+            return m;
+        }
         if (!m.passed()) {
-            throw new ApiException(org.springframework.http.HttpStatus.CONFLICT,
-                    "Only a model version that met its acceptance targets can be activated.");
+            throw conflict("Only a model version that met its acceptance targets can be activated.");
         }
         if ("RETIRED".equals(m.status())) {
-            throw new ApiException(org.springframework.http.HttpStatus.CONFLICT,
-                    "This version was retired (for example, fitted on corrected data). Run a new calibration instead.");
+            throw conflict("This version was retired (for example, fitted on corrected data). Run a new calibration instead.");
         }
-        repo.activate(m);
+        if (m.contractIssue() == ModelVersion.ContractIssue.FEATURE_VERSION) {
+            throw conflict("This version was built on feature set " + m.featureVersion() + ", but the app now computes "
+                    + props.featureVersion() + ". Press Recompute features, run a new calibration, and activate that version.");
+        }
+        if (m.contractIssue() == ModelVersion.ContractIssue.SCHEMA_VERSION) {
+            throw conflict("This version was made by an older calibration (before 0.6.0) whose output the daily scoring "
+                    + "can't read. Run a new calibration and activate that version.");
+        }
+        repo.activate(m, user.id());
         return repo.model(id).orElseThrow();
+    }
+
+    private static ApiException conflict(String message) {
+        return new ApiException(org.springframework.http.HttpStatus.CONFLICT, message);
     }
 
     /**

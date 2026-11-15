@@ -188,9 +188,11 @@ class MetricsIT extends IntegrationTest {
         assertThat(retired).isNotNull().isEqualTo(instant("activated_at", second));
         assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(first).query(String.class).single()).isEqualTo("RETIRED");
         assertThat(instant("activated_at", first)).as("the retired version keeps its activation time").isEqualTo(firstActivated);
-        mvc.perform(get("/api/athletes/" + a + "/models").with(user(coach)))
-                .andExpect(jsonPath("$[?(@.id == " + first + ")].retiredAt").isNotEmpty())
-                .andExpect(jsonPath("$[?(@.id == " + second + ")].contractIssue").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
+        mvc.perform(get("/api/models/" + first).with(user(coach)))
+                .andExpect(jsonPath("$.retiredAt").isNotEmpty());
+        // A usable version has no contract issue (null fields are left out of the JSON).
+        mvc.perform(get("/api/models/" + second).with(user(coach)))
+                .andExpect(jsonPath("$.contractIssue").doesNotExist());
 
         // Deleting the login that pressed Activate keeps the history, without the link.
         long other = users.insert("coach-del" + System.nanoTime(), "x", Role.COACH, null);

@@ -4,7 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** A calibrated model version (without its HTML report, which is fetched separately). */
+/**
+ * A calibrated model version (without its HTML report, which is fetched separately).
+ *
+ * @param activatedAt when the coach activated it; null if never, or if it was already ACTIVE
+ *     before activation times were recorded (V13)
+ * @param retiredAt when it was replaced by another ACTIVE version; null if not (or before V13)
+ * @param contractIssue why the daily scoring could not use this version, or null if it can
+ */
 public record ModelVersion(
         long id,
         long athleteId,
@@ -18,4 +25,31 @@ public record ModelVersion(
         JsonNode coefficients,
         JsonNode metrics,
         boolean passed,
-        Instant createdAt) {}
+        Instant createdAt,
+        Instant activatedAt,
+        Instant retiredAt,
+        ContractIssue contractIssue) {
+
+    /** The coefficients contract version the daily scoring supports (ADR 0008, calibration/contract.schema.json). */
+    public static final int SUPPORTED_SCHEMA_VERSION = 2;
+
+    /** Why a version cannot be scored with by this app. */
+    public enum ContractIssue {
+        /** Built on another feature set than the one the app computes (app.metrics.feature-version). */
+        FEATURE_VERSION,
+        /** coefficients.schema_version is missing (made before calibration 0.6.0) or not the supported one. */
+        SCHEMA_VERSION
+    }
+
+    /** The first reason the daily scoring could not use these coefficients, or null. */
+    static ContractIssue contractIssue(String featureVersion, JsonNode coefficients, String appFeatureVersion) {
+        if (!appFeatureVersion.equals(featureVersion)) {
+            return ContractIssue.FEATURE_VERSION;
+        }
+        var v = coefficients == null ? null : coefficients.get("schema_version");
+        if (v == null || !v.isIntegralNumber() || v.asInt() != SUPPORTED_SCHEMA_VERSION) {
+            return ContractIssue.SCHEMA_VERSION;
+        }
+        return null;
+    }
+}

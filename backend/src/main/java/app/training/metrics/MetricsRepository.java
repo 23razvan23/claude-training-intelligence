@@ -15,10 +15,12 @@ import org.springframework.stereotype.Repository;
 public class MetricsRepository {
     private final JdbcClient jdbc;
     private final ObjectMapper json;
+    private final MetricsProperties props;
 
-    public MetricsRepository(JdbcClient jdbc, ObjectMapper json) {
+    public MetricsRepository(JdbcClient jdbc, ObjectMapper json, MetricsProperties props) {
         this.jdbc = jdbc;
         this.json = json;
+        this.props = props;
     }
 
     public record FeatureSummary(
@@ -65,12 +67,20 @@ public class MetricsRepository {
         return jdbc.sql("SELECT * FROM model_version WHERE id = ?").param(id).query(this::map).optional();
     }
 
-    /** Makes this version the athlete's ACTIVE one; any previous ACTIVE version is RETIRED. */
-    public void activate(ModelVersion m) {
-        jdbc.sql("UPDATE model_version SET status = 'RETIRED' WHERE athlete_id = ? AND status = 'ACTIVE' AND id <> ?")
+    /**
+     * Makes this version the athlete's ACTIVE one, recording when and by whom; any previous
+     * ACTIVE version is RETIRED with the same time as its retired_at. now() is the
+     * transaction's start time, so both rows carry exactly the same instant.
+     */
+    public void activate(ModelVersion m, long userId) {
+        jdbc.sql("""
+                UPDATE model_version SET status = 'RETIRED', retired_at = now()
+                WHERE athlete_id = ? AND status = 'ACTIVE' AND id <> ?""")
                 .params(m.athleteId(), m.id())
                 .update();
-        jdbc.sql("UPDATE model_version SET status = 'ACTIVE' WHERE id = ?").param(m.id()).update();
+        jdbc.sql("UPDATE model_version SET status = 'ACTIVE', activated_at = now(), activated_by = ? WHERE id = ?")
+                .params(userId, m.id())
+                .update();
     }
 
     public Optional<String> report(long id) {
@@ -79,6 +89,7 @@ public class MetricsRepository {
 
     private ModelVersion map(ResultSet rs, int row) throws SQLException {
         try {
+            var coefficients = json.readTree(rs.getString("coefficients"));
             return new ModelVersion(
                     rs.getLong("id"),
                     rs.getLong("athlete_id"),
@@ -89,12 +100,20 @@ public class MetricsRepository {
                     rs.getObject("train_to", LocalDate.class),
                     rs.getObject("test_from", LocalDate.class),
                     rs.getObject("test_to", LocalDate.class),
-                    json.readTree(rs.getString("coefficients")),
+                    coefficients,
                     json.readTree(rs.getString("metrics")),
                     rs.getBoolean("passed"),
-                    rs.getTimestamp("created_at").toInstant());
+                    rs.getTimestamp("created_at").toInstant(),
+                    instant(rs, "activated_at"),
+                    instant(rs, "retired_at"),
+                    ModelVersion.contractIssue(rs.getString("feature_version"), coefficients, props.featureVersion()));
         } catch (JsonProcessingException e) {
             throw new SQLException(e);
         }
+    }
+
+    private static java.time.Instant instant(ResultSet rs, String column) throws SQLException {
+        var ts = rs.getTimestamp(column);
+        return ts == null ? null : ts.toInstant();
     }
 }

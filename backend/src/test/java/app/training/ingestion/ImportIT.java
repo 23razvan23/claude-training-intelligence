@@ -80,6 +80,30 @@ class ImportIT extends IntegrationTest {
     }
 
     @Test
+    void unfinishedWhoopCycleIsNotStoredAndTheFinishedOneComesInLater() throws Exception {
+        long athlete = newAthlete("Whoop open cycle");
+        // Export taken during the day: the last cycle has no end yet and its strain is still 3.1.
+        Fixtures.whoopCsvs(dir, FIRST, 5, true, "3.1");
+        var files = List.of(dir.resolve("physiological_cycles.csv"), dir.resolve("journal_entries.csv"));
+        var first = run(athlete, ImportKind.WHOOP_EXPORT, files);
+        assertThat(first.status()).isEqualTo("SUCCEEDED");
+        assertThat(count("SELECT count(*) FROM whoop_reference WHERE athlete_id = ?", athlete)).isEqualTo(4);
+        assertThat(count("SELECT count(*) FROM whoop_journal_entry WHERE athlete_id = ?", athlete)).isEqualTo(4);
+        assertThat(first.stats().path("whoop_reference").path("skipped").asLong()).isEqualTo(1);
+        assertThat(first.stats().path("whoop_journal_entry").path("skipped").asLong()).isEqualTo(1);
+        assertThat(first.warnings().toString()).contains("the current, unfinished day was not imported");
+
+        // Later export: the same cycle is finished and its strain reached 12.4.
+        Fixtures.whoopCsvs(dir, FIRST, 5, false, "12.4");
+        var second = run(athlete, ImportKind.WHOOP_EXPORT, files);
+        assertThat(second.warnings().toString()).doesNotContain("unfinished");
+        assertThat(count("SELECT count(*) FROM whoop_reference WHERE athlete_id = ?", athlete)).isEqualTo(5);
+        assertThat(jdbc.sql("SELECT day_strain FROM whoop_reference WHERE athlete_id = ? ORDER BY cycle_start DESC LIMIT 1")
+                .param(athlete).query(java.math.BigDecimal.class).single()).isEqualByComparingTo("12.4");
+        assertThat(count("SELECT count(*) FROM whoop_reference WHERE athlete_id = ? AND cycle_end IS NULL", athlete)).isZero();
+    }
+
+    @Test
     void whoopExportZipIsAccepted() throws Exception {
         long athlete = newAthlete("Zip athlete");
         Fixtures.whoopCsvs(dir, FIRST, 3);

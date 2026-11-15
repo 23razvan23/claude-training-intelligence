@@ -1,0 +1,407 @@
+{
+ "case": "adr0008",
+ "description": "Worked example of ADR 0008 with its hand-set coefficients.",
+ "generated_by": "calibration/tests/parity_fixtures.py",
+ "coefficients": {
+  "strain": {
+   "form": "load",
+   "load": "day_load_edwards",
+   "a": 5.0,
+   "b": 0.01,
+   "c": 2.0,
+   "background_weight": 0.2,
+   "uses_background": true,
+   "min_monitored_minutes": 600,
+   "clip": [
+    0,
+    21
+   ]
+  },
+  "sleep": {
+   "base_min": 400.0,
+   "per_strain_min": 3.0,
+   "per_shortfall": 0.05,
+   "shortfall_reference_min": 450.0,
+   "shortfall_days": 7,
+   "performance_clip": [
+    0,
+    100
+   ]
+  },
+  "recovery": {
+   "intercept": 55.0,
+   "terms": [
+    {
+     "feature": "ln_rmssd_z",
+     "sign": 1,
+     "weight": 8.0,
+     "center": 0.1,
+     "scale": 1.0
+    },
+    {
+     "feature": "rhr_dev",
+     "sign": -1,
+     "weight": 5.0,
+     "center": 0.2,
+     "scale": 2.5
+    },
+    {
+     "feature": "resp_dev",
+     "sign": -1,
+     "weight": 2.0,
+     "center": 0.0,
+     "scale": 0.5
+    },
+    {
+     "feature": "sleep_perf",
+     "sign": 1,
+     "weight": 6.0,
+     "center": 90.0,
+     "scale": 10.0
+    },
+    {
+     "feature": "prev_strain",
+     "sign": -1,
+     "weight": 3.0,
+     "center": -9.33,
+     "scale": 3.0
+    }
+   ],
+   "clip": [
+    0,
+    100
+   ]
+  },
+  "bands": {
+   "green_min": 67,
+   "red_max": 33
+  }
+ },
+ "planted": {},
+ "days": [
+  {
+   "date": "2026-03-01",
+   "has_row": true,
+   "strain_raw": 7.148097085905792,
+   "strain": 7.148097085905792,
+   "strain_reason": null,
+   "low_coverage": false,
+   "prev_strain": null,
+   "shortfall": 0.0,
+   "sleep_need": 400.0,
+   "sleep_perf": 100.0,
+   "contributions": {
+    "ln_rmssd_z": 3.2,
+    "rhr_dev": 1.6,
+    "resp_dev": 0.8,
+    "sleep_perf": 6.0,
+    "prev_strain": null
+   },
+   "recovery_raw": null,
+   "recovery": null,
+   "recovery_reasons": [
+    {
+     "reason": "NO_STRAIN_YESTERDAY",
+     "detail": "NO_DAY_DATA"
+    }
+   ],
+   "recovery_lower_confidence": false,
+   "band": null,
+   "stored": {
+    "strain": 7.1,
+    "sleep_need": 400,
+    "sleep_perf": 100,
+    "recovery": null
+   }
+  },
+  {
+   "date": "2026-03-02",
+   "has_row": true,
+   "strain_raw": 5.709686723646887,
+   "strain": 5.709686723646887,
+   "strain_reason": null,
+   "low_coverage": false,
+   "prev_strain": 7.148097085905792,
+   "shortfall": 0.0,
+   "sleep_need": 421.4442912577174,
+   "sleep_perf": 94.91171390797082,
+   "contributions": {
+    "ln_rmssd_z": 0.8,
+    "rhr_dev": -1.4,
+    "resp_dev": -0.4,
+    "sleep_perf": 2.9470283447824928,
+    "prev_strain": 2.1819029140942083
+   },
+   "recovery_raw": 59.128931258876705,
+   "recovery": 59.128931258876705,
+   "recovery_reasons": [],
+   "recovery_lower_confidence": false,
+   "band": "YELLOW",
+   "stored": {
+    "strain": 5.7,
+    "sleep_need": 421,
+    "sleep_perf": 95,
+    "recovery": 59
+   }
+  },
+  {
+   "date": "2026-03-03",
+   "has_row": true,
+   "strain_raw": 9.586613117631472,
+   "strain": 9.586613117631472,
+   "strain_reason": null,
+   "low_coverage": false,
+   "prev_strain": 5.709686723646887,
+   "shortfall": 50.0,
+   "sleep_need": 419.62906017094065,
+   "sleep_perf": 90.55616878516533,
+   "contributions": {
+    "ln_rmssd_z": -4.0,
+    "rhr_dev": -4.4,
+    "resp_dev": -1.6,
+    "sleep_perf": 0.3337012710991957,
+    "prev_strain": 3.6203132763531136
+   },
+   "recovery_raw": 48.95401454745231,
+   "recovery": 48.95401454745231,
+   "recovery_reasons": [],
+   "recovery_lower_confidence": false,
+   "band": "YELLOW",
+   "stored": {
+    "strain": 9.6,
+    "sleep_need": 420,
+    "sleep_perf": 91,
+    "recovery": 49
+   }
+  },
+  {
+   "date": "2026-03-04",
+   "has_row": true,
+   "strain_raw": null,
+   "strain": null,
+   "strain_reason": "NO_ALL_DAY_HR",
+   "low_coverage": true,
+   "prev_strain": 9.586613117631472,
+   "shortfall": 120.0,
+   "sleep_need": 434.7598393528944,
+   "sleep_perf": 100.0,
+   "contributions": {
+    "ln_rmssd_z": 0.0,
+    "rhr_dev": -0.4,
+    "resp_dev": -0.0,
+    "sleep_perf": 6.0,
+    "prev_strain": -0.2566131176314723
+   },
+   "recovery_raw": 60.34338688236853,
+   "recovery": 60.34338688236853,
+   "recovery_reasons": [],
+   "recovery_lower_confidence": false,
+   "band": "YELLOW",
+   "stored": {
+    "strain": null,
+    "sleep_need": 435,
+    "sleep_perf": 100,
+    "recovery": 60
+   }
+  },
+  {
+   "date": "2026-03-05",
+   "has_row": false,
+   "strain_raw": null,
+   "strain": null,
+   "strain_reason": "NO_DAY_DATA",
+   "low_coverage": true,
+   "prev_strain": null,
+   "shortfall": 120.0,
+   "sleep_need": 406.0,
+   "sleep_perf": null,
+   "contributions": {
+    "ln_rmssd_z": null,
+    "rhr_dev": null,
+    "resp_dev": null,
+    "sleep_perf": null,
+    "prev_strain": null
+   },
+   "recovery_raw": null,
+   "recovery": null,
+   "recovery_reasons": [
+    {
+     "reason": "NO_DAY_DATA",
+     "detail": null
+    }
+   ],
+   "recovery_lower_confidence": false,
+   "band": null,
+   "stored": {
+    "strain": null,
+    "sleep_need": 406,
+    "sleep_perf": null,
+    "recovery": null
+   }
+  },
+  {
+   "date": "2026-03-06",
+   "has_row": true,
+   "strain_raw": 5.804029145168801,
+   "strain": 5.804029145168801,
+   "strain_reason": null,
+   "low_coverage": true,
+   "prev_strain": null,
+   "shortfall": 120.0,
+   "sleep_need": 406.0,
+   "sleep_perf": null,
+   "contributions": {
+    "ln_rmssd_z": 1.5999999999999999,
+    "rhr_dev": 0.6,
+    "resp_dev": -0.0,
+    "sleep_perf": null,
+    "prev_strain": null
+   },
+   "recovery_raw": null,
+   "recovery": null,
+   "recovery_reasons": [
+    {
+     "reason": "NO_SLEEP",
+     "detail": null
+    },
+    {
+     "reason": "NO_STRAIN_YESTERDAY",
+     "detail": "NO_DAY_DATA"
+    }
+   ],
+   "recovery_lower_confidence": false,
+   "band": null,
+   "stored": {
+    "strain": 5.8,
+    "sleep_need": 406,
+    "sleep_perf": null,
+    "recovery": null
+   }
+  },
+  {
+   "date": "2026-03-07",
+   "has_row": true,
+   "strain_raw": 5.261625930198451,
+   "strain": 5.261625930198451,
+   "strain_reason": null,
+   "low_coverage": false,
+   "prev_strain": 5.804029145168801,
+   "shortfall": 120.0,
+   "sleep_need": 423.4120874355064,
+   "sleep_perf": 100.0,
+   "contributions": {
+    "ln_rmssd_z": -0.8,
+    "rhr_dev": -0.4,
+    "resp_dev": -0.0,
+    "sleep_perf": 6.0,
+    "prev_strain": 3.5259708548311988
+   },
+   "recovery_raw": 63.3259708548312,
+   "recovery": 63.3259708548312,
+   "recovery_reasons": [],
+   "recovery_lower_confidence": true,
+   "band": "YELLOW",
+   "stored": {
+    "strain": 5.3,
+    "sleep_need": 423,
+    "sleep_perf": 100,
+    "recovery": 63
+   }
+  },
+  {
+   "date": "2026-03-08",
+   "has_row": true,
+   "strain_raw": null,
+   "strain": null,
+   "strain_reason": "MISSING_WORKOUT_HR",
+   "low_coverage": false,
+   "prev_strain": 5.261625930198451,
+   "shortfall": 120.0,
+   "sleep_need": 421.7848777905954,
+   "sleep_perf": 100.0,
+   "contributions": {
+    "ln_rmssd_z": 4.0,
+    "rhr_dev": 2.6,
+    "resp_dev": 1.2,
+    "sleep_perf": 6.0,
+    "prev_strain": 4.068374069801549
+   },
+   "recovery_raw": 72.86837406980155,
+   "recovery": 72.86837406980155,
+   "recovery_reasons": [],
+   "recovery_lower_confidence": false,
+   "band": "GREEN",
+   "stored": {
+    "strain": null,
+    "sleep_need": 422,
+    "sleep_perf": 100,
+    "recovery": 73
+   }
+  },
+  {
+   "date": "2026-03-09",
+   "has_row": true,
+   "strain_raw": 6.120877214831747,
+   "strain": 6.120877214831747,
+   "strain_reason": null,
+   "low_coverage": false,
+   "prev_strain": null,
+   "shortfall": 120.0,
+   "sleep_need": 406.0,
+   "sleep_perf": 100.0,
+   "contributions": {
+    "ln_rmssd_z": 2.4000000000000004,
+    "rhr_dev": 0.6,
+    "resp_dev": 0.4,
+    "sleep_perf": 6.0,
+    "prev_strain": null
+   },
+   "recovery_raw": null,
+   "recovery": null,
+   "recovery_reasons": [
+    {
+     "reason": "NO_STRAIN_YESTERDAY",
+     "detail": "MISSING_WORKOUT_HR"
+    }
+   ],
+   "recovery_lower_confidence": false,
+   "band": null,
+   "stored": {
+    "strain": 6.1,
+    "sleep_need": 406,
+    "sleep_perf": 100,
+    "recovery": null
+   }
+  },
+  {
+   "date": "2026-03-10",
+   "has_row": true,
+   "strain_raw": 22.036665926162357,
+   "strain": 21.0,
+   "strain_reason": null,
+   "low_coverage": false,
+   "prev_strain": 6.120877214831747,
+   "shortfall": 100.0,
+   "sleep_need": 423.36263164449525,
+   "sleep_perf": 100.0,
+   "contributions": {
+    "ln_rmssd_z": 0.8,
+    "rhr_dev": -0.4,
+    "resp_dev": -0.0,
+    "sleep_perf": 6.0,
+    "prev_strain": 3.209122785168253
+   },
+   "recovery_raw": 64.60912278516825,
+   "recovery": 64.60912278516825,
+   "recovery_reasons": [],
+   "recovery_lower_confidence": false,
+   "band": "YELLOW",
+   "stored": {
+    "strain": 21.0,
+    "sleep_need": 423,
+    "sleep_perf": 100,
+    "recovery": 65
+   }
+  }
+ ]
+}

@@ -16,4 +16,6 @@ public record MetricsProperties(
         int maxSampleGapSeconds,
         int monitoringMaxGapSeconds,
         int baselineWindowDays,
-        int baselineMinDays) {}
+        int baselineMinDays,
+        int holdoutMinRecoveryDays,
+        double holdoutConfidence) {}

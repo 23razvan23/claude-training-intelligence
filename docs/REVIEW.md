@@ -98,7 +98,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-01: Write down the scoring rules that today exist only in Python
 - **Priority / Type / Size:** P0 / design / S
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED; done 2026-11-15 (ADR 0008)
 - **Problem:** ADR 0007 and PLAN §6 describe the contract as "`_strain_coefficients` plus the
   recovery terms, sleep and bands". But three recovery/sleep inputs are not columns of
   `day_features`; they are computed inside `pipeline.run` as a chain: strain → `prev_strain` →
@@ -125,12 +125,12 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
   Where the three treatments of missing `prev_strain` conflict, **document today's Python behaviour as the rule** (so the active model stays valid) and list the inconsistency as a known limitation to revisit at the next recalibration.
 - **Out of scope:** changing any Python or Java behaviour; changing `FEATURE_VERSION`; moving the derived inputs into `day_features`.
 - **Acceptance criteria:**
-  - [ ] ADR 0008 exists; every rule cites the Python line it mirrors.
-  - [ ] Each rule has a small numeric example that R-03's fixture will contain.
-  - [ ] ADR 0007 and PLAN §6 point to ADR 0008 as the contract.
-  - [ ] The coach has answered the question below.
+  - [x] ADR 0008 exists; every rule cites the Python line it mirrors.
+  - [x] Each rule has a small numeric example that R-03's fixture will contain.
+  - [x] ADR 0007 and PLAN §6 point to ADR 0008 as the contract.
+  - [x] The coach has answered the question below.
 - **Verification:** documentation only; `cd calibration && python -m pytest -q` still passes (nothing changed).
-- **Coach decision needed:** yes. "If the watch was off all day yesterday, we cannot compute yesterday's strain. Should this morning's recovery (a) be shown as 'not available' with the reason, or (b) be shown anyway, marked lower confidence, assuming a typical day yesterday?" Recommendation: **(a) for now**, because that is what the calibrated model does; (b) needs a new calibration. **Coach's answer (2026-11-13): (a), as understood from a short "yes"; confirm when restating the plan for R-01.** The coach also noted that the exports are a few days old, so recent days have no data at all: that is the "stale data" case (no score, "last data from …"), separate from a day with the watch off.
+- **Coach decision needed:** yes. "If the watch was off all day yesterday, we cannot compute yesterday's strain. Should this morning's recovery (a) be shown as 'not available' with the reason, or (b) be shown anyway, marked lower confidence, assuming a typical day yesterday?" Recommendation: **(a) for now**, because that is what the calibrated model does; (b) needs a new calibration. **Coach's answer (2026-11-13): (a); confirmed 2026-11-15 and recorded in ADR 0008 (C1–C3).** The coach also noted that the exports are a few days old, so recent days have no data at all: that is the "stale data" case (no score, "last data from …"), separate from a day with the watch off.
 - **Opus prompt:**
   ```text
   Task R-01: write ADR 0008 "Scoring contract" (documentation only, no code changes).

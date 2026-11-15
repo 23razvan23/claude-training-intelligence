@@ -205,6 +205,32 @@ class MetricsIT extends IntegrationTest {
     }
 
     @Test
+    void aCandidateOlderThanTheActiveVersionIsRefused() throws Exception {
+        long a = athlete(190);
+        long older = model(a, "m-old", true);
+        long newer = model(a, "m-new", true);
+        jdbc.sql("UPDATE model_version SET created_at = now() - interval '1 hour' WHERE id = ?").param(older).update();
+        mvc.perform(post("/api/models/" + newer + "/activate").with(user(coach)).with(csrf())).andExpect(status().isOk());
+
+        mvc.perform(get("/api/models/" + older).with(user(coach)))
+                .andExpect(jsonPath("$.olderThanActive").value(true));
+        mvc.perform(get("/api/models/" + newer).with(user(coach)))
+                .andExpect(jsonPath("$.olderThanActive").value(false));
+        mvc.perform(post("/api/models/" + older + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("m-new")));
+        assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(older).query(String.class).single()).isEqualTo("CANDIDATE");
+        assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(newer).query(String.class).single()).isEqualTo("ACTIVE");
+
+        // Same creation time: the later row (higher id) counts as newer.
+        long sameTime = model(a, "m-same", true);
+        jdbc.sql("UPDATE model_version SET created_at = (SELECT created_at FROM model_version WHERE id = ?) WHERE id = ?")
+                .params(newer, sameTime).update();
+        mvc.perform(post("/api/models/" + sameTime + "/activate").with(user(coach)).with(csrf())).andExpect(status().isOk());
+        mvc.perform(post("/api/models/" + newer + "/activate").with(user(coach)).with(csrf())).andExpect(status().isConflict());
+    }
+
+    @Test
     void aModelBuiltOnAnotherFeatureSetIsRefused() throws Exception {
         long a = athlete(190);
         long old = model(a, "m-f2", true, "f2", "{\"schema_version\": 2}");

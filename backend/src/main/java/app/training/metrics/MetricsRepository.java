@@ -56,15 +56,28 @@ public class MetricsRepository {
                 (LocalDate) s[4], (LocalDate) s[5], (LocalDate) s[6], (LocalDate) s[7], (Long) s[8], (Long) s[9], methods);
     }
 
+    /** Every column, plus whether the athlete's ACTIVE version is newer (created later; ties by id). */
+    private static final String SELECT_MODEL = """
+            SELECT mv.*, EXISTS (
+                SELECT 1 FROM model_version a
+                WHERE a.athlete_id = mv.athlete_id AND a.status = 'ACTIVE'
+                  AND (a.created_at, a.id) > (mv.created_at, mv.id)) AS older_than_active
+            FROM model_version mv""";
+
     public List<ModelVersion> models(long athleteId) {
-        return jdbc.sql("SELECT * FROM model_version WHERE athlete_id = ? ORDER BY created_at DESC, id DESC")
+        return jdbc.sql(SELECT_MODEL + " WHERE mv.athlete_id = ? ORDER BY mv.created_at DESC, mv.id DESC")
                 .param(athleteId)
                 .query(this::map)
                 .list();
     }
 
     public Optional<ModelVersion> model(long id) {
-        return jdbc.sql("SELECT * FROM model_version WHERE id = ?").param(id).query(this::map).optional();
+        return jdbc.sql(SELECT_MODEL + " WHERE mv.id = ?").param(id).query(this::map).optional();
+    }
+
+    /** The athlete's ACTIVE version, if any. */
+    public Optional<ModelVersion> active(long athleteId) {
+        return jdbc.sql(SELECT_MODEL + " WHERE mv.athlete_id = ? AND mv.status = 'ACTIVE'").param(athleteId).query(this::map).optional();
     }
 
     /**
@@ -106,7 +119,8 @@ public class MetricsRepository {
                     rs.getTimestamp("created_at").toInstant(),
                     instant(rs, "activated_at"),
                     instant(rs, "retired_at"),
-                    ModelVersion.contractIssue(rs.getString("feature_version"), coefficients, props.featureVersion()));
+                    ModelVersion.contractIssue(rs.getString("feature_version"), coefficients, props.featureVersion()),
+                    rs.getBoolean("older_than_active"));
         } catch (JsonProcessingException e) {
             throw new SQLException(e);
         }

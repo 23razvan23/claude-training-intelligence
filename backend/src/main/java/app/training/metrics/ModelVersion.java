@@ -11,6 +11,8 @@ import java.time.LocalDate;
  *     before activation times were recorded (V13)
  * @param retiredAt when it was replaced by another ACTIVE version; null if not (or before V13)
  * @param contractIssue why the daily scoring could not use this version, or null if it can
+ * @param olderThanActive true when the athlete's ACTIVE version was created after this one
+ *     (ties broken by id); such a version can no longer be activated
  */
 public record ModelVersion(
         long id,
@@ -28,7 +30,8 @@ public record ModelVersion(
         Instant createdAt,
         Instant activatedAt,
         Instant retiredAt,
-        ContractIssue contractIssue) {
+        ContractIssue contractIssue,
+        boolean olderThanActive) {
 
     /** The coefficients contract version the daily scoring supports (ADR 0008, calibration/contract.schema.json). */
     public static final int SUPPORTED_SCHEMA_VERSION = 2;

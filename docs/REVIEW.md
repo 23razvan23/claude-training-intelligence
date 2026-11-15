@@ -263,7 +263,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-04: Record when a model was activated and refuse unsafe activations
 - **Priority / Type / Size:** P0 / bug / S
-- **Status:** CONFIRMED; done 2026-11-15 (`V13__model_activation.sql`; V12 was taken by R-06). m13 keeps a null `activated_at` (coach decision: no invented time) and the Calibration page warns that it uses the old format. Re-activating the ACTIVE version is a no-op. Coach activation of m15 pending.
+- **Status:** CONFIRMED; done 2026-11-15 (`V13__model_activation.sql`; V12 was taken by R-06). m13 keeps a null `activated_at` (coach decision: no invented time) and the Calibration page warns that it uses the old format. Re-activating the ACTIVE version is a no-op. A candidate older than the ACTIVE version is also refused (coach decision, follow-up PR). m15 activated by the coach on 2026-11-15 19:47:54 UTC; m13 retired at the same instant.
 - **Problem:** activation only flips a status. The time of activation is not stored, although stage 1b-3 is defined "from its activation date". Activation also accepts a model built on a different feature set from the one the app is currently computing, and (after R-02) should refuse a contract version the scorer does not understand.
 - **Evidence:** `MetricsRepository.java:69-74` (two `UPDATE … SET status`); V6:64-80 has no `activated_at`; `MetricsController.java:80-92` checks only `passed` and `RETIRED`.
 - **Why it matters:** without the timestamp the holdout window cannot be reconstructed after the fact; activating an `f2` model while the app computes `f3` rows would score nothing, or score the wrong columns.

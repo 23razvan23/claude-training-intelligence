@@ -91,6 +91,11 @@ public class MetricsController {
         if ("RETIRED".equals(m.status())) {
             throw conflict("This version was retired (for example, fitted on corrected data). Run a new calibration instead.");
         }
+        if (m.olderThanActive()) {
+            var active = repo.active(m.athleteId()).map(ModelVersion::version).orElse("another version");
+            throw conflict("A newer version (" + active + ") is already active. An older version can't replace it: "
+                    + "run a new calibration instead.");
+        }
         if (m.contractIssue() == ModelVersion.ContractIssue.FEATURE_VERSION) {
             throw conflict("This version was built on feature set " + m.featureVersion() + ", but the app now computes "
                     + props.featureVersion() + ". Press Recompute features, run a new calibration, and activate that version.");

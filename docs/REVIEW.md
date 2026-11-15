@@ -79,7 +79,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | ID | Title | Priority | Type | Size | Depends on | Blocks stage |
 |---|---|---|---|---|---|---|
 | R-01 | Write down the scoring rules that today exist only in Python | P0 | design | S | – | 1b-1 |
-| R-02 | Emit a versioned coefficients contract with training ranges and a profile snapshot | P0 | design | M | R-01 | 1b-1 |
+| R-02 | Emit a versioned coefficients contract with training ranges and a profile snapshot (done) | P0 | design | M | R-01 | 1b-1 |
 | R-03 | Generate a committed parity fixture and guard the feature version in CI | P0 | test-gap | S | R-02 | 1b-1 |
 | R-04 | Record when a model was activated and refuse unsafe activations | P0 | bug | S | R-02 | 1b-1, 1b-3 |
 | R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
@@ -162,7 +162,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-02: Emit a versioned coefficients contract with training ranges and a profile snapshot
 - **Priority / Type / Size:** P0 / design / M
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED; done 2026-11-15 (calibration 0.6.0, `calibration/contract.schema.json`). Coach re-run and comparison query pending.
 - **Problem:** the coefficients JSON has no schema version, no training ranges (needed for the drift flag 1b-1 must write), no record of the athlete profile and feature settings the features were built with, and no calibration package version. Its shape is only checked by one key-set assertion. Re-running calibration later cannot reproduce the PASS model's test window because there is `--test-from` but no `--test-to`.
 - **Evidence:**
   - `pipeline.py:207-213`: keys are exactly `feature_version, strain, sleep, recovery, bands`.
@@ -181,11 +181,11 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
   Update ADR 0007/0008. Alternative considered: let Java compute ranges from `day_features` between `train_from` and `train_to` — rejected, because a later recompute would move the "frozen" ranges.
 - **Out of scope:** changing how any model is fitted or selected; `FEATURE_VERSION`; Java code; the report layout beyond one line showing the contract version.
 - **Acceptance criteria:**
-  - [ ] First, a failing test: the pipeline output validates against `contract.schema.json` (fails today: no `schema_version`).
-  - [ ] Test: every `recovery.terms[*].feature` and every strain/sleep input has a `training_ranges` entry with `min ≤ p01 ≤ p99 ≤ max`.
-  - [ ] Test: `--test-from X --test-to Y` limits the test window; coefficients are identical with and without `--test-to`.
-  - [ ] Test: both strain forms produce valid contracts.
-  - [ ] Package version bumped; `docs/PLAN.md` §6 updated.
+  - [x] First, a failing test: the pipeline output validates against `contract.schema.json` (fails today: no `schema_version`).
+  - [x] Test: every `recovery.terms[*].feature` and every strain/sleep input has a `training_ranges` entry with `min ≤ p01 ≤ p99 ≤ max`.
+  - [x] Test: `--test-from X --test-to Y` limits the test window; coefficients are identical with and without `--test-to`.
+  - [x] Test: both strain forms produce valid contracts.
+  - [x] Package version bumped; `docs/PLAN.md` §6 updated.
 - **Verification:** `cd calibration && ruff check . && ruff format --check . && python -m pytest -q`. Coach, after merging (do not Activate yet):
   `docker compose run --build --rm calibration --athlete 1 --test-from 2026-09-10 --test-to 2026-11-09`, then
   `docker compose exec db psql -U training -d training -c "SELECT n.version, n.passed, n.coefficients->'recovery' = o.coefficients->'recovery' AS same_recovery, (n.coefficients->'strain') @> (o.coefficients->'strain') AS same_strain FROM model_version n, model_version o WHERE n.athlete_id = 1 AND o.athlete_id = 1 AND n.id = (SELECT max(id) FROM model_version WHERE athlete_id = 1) AND o.id = (SELECT max(id) FROM model_version WHERE athlete_id = 1 AND passed AND id < n.id);"`

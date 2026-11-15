@@ -39,6 +39,22 @@ def load_features(conn, athlete_id: int, feature_version: str) -> pd.DataFrame:
     return df
 
 
+def feature_config(conn, athlete_id: int, feature_version: str) -> dict:
+    """Profile values the features were built with: activity_load records them per activity, and
+    'Recompute features' rewrites every row, so the newest row speaks for all. Unknown (None) when the
+    athlete has no activity loads."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT hr_max, hr_rest, sex_assumed FROM activity_load WHERE athlete_id = %s AND feature_version = %s
+               ORDER BY computed_at DESC, activity_id DESC LIMIT 1""",
+            (athlete_id, feature_version),
+        )
+        row = cur.fetchone()
+    if not row:
+        return {"hr_max": None, "hr_rest": None, "sex_assumed": None}
+    return {"hr_max": row[0], "hr_rest": row[1], "sex_assumed": row[2]}
+
+
 def next_version(conn, athlete_id: int, today: str) -> str:
     with conn.cursor() as cur:
         cur.execute("SELECT count(*) FROM model_version WHERE athlete_id = %s", (athlete_id,))

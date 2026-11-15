@@ -13,11 +13,17 @@ today's strain → tomorrow's "yesterday's strain" → 7-day sleep shortfall →
 So do the rules for gaps (watch off, no sleep recorded), clipping and rounding. This ADR writes all of that down as numbered rules. Each rule has a worked example with made-up numbers. **It describes what Python does today; it does not change it.**
 
 ## Context
-- The coefficients JSON (`pipeline.py:207-213`) holds:
-  - `strain`: the form and its parameters, see `_strain_coefficients`, `pipeline.py:63-80`;
-  - `sleep`: `base_min`, `per_strain_min`, `per_shortfall`, `shortfall_reference_min`, `shortfall_days`;
+- The coefficients JSON (`model_version.coefficients`, built at the end of `pipeline.run`) has a formal shape: **`calibration/contract.schema.json`** (JSON Schema, checked by `calibration/tests/test_contract.py`). Since calibration 0.6.0 (R-02) it holds:
+  - `schema_version`: **2**. The scorer must refuse a contract whose version it does not know. Any change to the shape bumps it.
+  - `calibration_version`: the calibration package version that produced it (e.g. `0.6.0`).
+  - `feature_version`: the `day_features` version the model was fitted on (`f3`).
+  - `feature_config`: the profile values the features were built with, from the newest `activity_load` row: `hr_max`, `hr_rest`, `sex_assumed` (null when there were no activities). The scorer can compare them with the live profile to notice a profile edit under a frozen model (R-04).
+  - `strain`: the form and its parameters (see `_strain_coefficients`), plus **`clip`: `[0, 21]`** (rule S2).
+  - `sleep`: `base_min`, `per_strain_min`, `per_shortfall`, `shortfall_reference_min`, `shortfall_days`, plus **`performance_clip`: `[0, 100]`** (rule S5);
   - `recovery`: `intercept`, `terms[]` (each with `feature`, `sign`, `weight`, `center`, `scale`), and `clip`;
-  - `bands`: `green_min`, `red_max`.
+  - `bands`: `green_min`, `red_max`;
+  - `training_ranges`: for each model part (`strain`, `sleep`, `recovery`) and each of its inputs, `{min, p01, p99, max, n}` over the exact rows that part was fitted on. Strain: the chosen load column and `background_load` (load form with background) or `zone_min_0…5` (zones form). Sleep: `prev_strain`, `shortfall`. Recovery: every `terms[].feature`, including the derived `prev_strain` and `sleep_perf`. `prev_strain` appears twice because sleep and recovery were fitted on different days (L1). These ranges are frozen with the model; the scorer uses them for the "outside the training range" flag rather than recomputing them from `day_features`, which a later recompute could move.
+- Contracts stored before 0.6.0 (such as m13-20261113) have no `schema_version`; they are version 1 and must be recalibrated before 1b-1 scores with them (R-02 verification step).
 - Scoring always uses the coefficients of the athlete's **ACTIVE** model version, never the current `targets.json`. Today that version is m13-20261113 (feature version f3, form "Edwards workout load + background").
 - **Inputs (assumption A2):** the service reads the stored `day_features` row of the model's `feature_version`. Values are exactly as stored, already rounded by `DayFeatureService.dec` (`DayFeatureService.java:285`). This is what Python reads (`data.py:27-39`). The service must not recompute features in memory.
 

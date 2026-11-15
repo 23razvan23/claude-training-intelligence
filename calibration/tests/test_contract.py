@@ -115,3 +115,56 @@ def test_test_to_limits_the_test_window_and_keeps_the_coefficients():
 def test_test_to_before_test_from_is_refused():
     with pytest.raises(ValueError, match="test-to"):
         pipeline.run(make(300), SETTINGS, "f3", test_from=date(2026, 9, 1), test_to=date(2026, 8, 1))
+
+
+class _FakeCursor:
+    def __init__(self, row):
+        self.row, self.sql = row, None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params):
+        self.sql, self.params = sql, params
+
+    def fetchone(self):
+        return self.row
+
+
+class _FakeConn:
+    def __init__(self, row):
+        self.cur = _FakeCursor(row)
+
+    def cursor(self):
+        return self.cur
+
+
+def test_feature_config_reads_the_newest_activity_load_row_or_reports_unknown():
+    conn = _FakeConn((184, 48, False))
+    assert data.feature_config(conn, 1, "f3") == {"hr_max": 184, "hr_rest": 48, "sex_assumed": False}
+    assert "activity_load" in conn.cur.sql and "ORDER BY computed_at DESC" in conn.cur.sql and conn.cur.params == (1, "f3")
+    assert data.feature_config(_FakeConn(None), 1, "f3") == {"hr_max": None, "hr_rest": None, "sex_assumed": None}
+
+
+def test_command_line_passes_test_to_and_the_profile_into_the_stored_contract(monkeypatch, capsys):
+    from contextlib import nullcontext
+
+    from calibration import __main__ as cli
+
+    saved = {}
+    monkeypatch.setattr(data, "connect", lambda: nullcontext(object()))
+    monkeypatch.setattr(data, "athlete_name", lambda conn, a: "Synthetic")
+    monkeypatch.setattr(data, "load_features", lambda conn, a, fv: make(300))
+    monkeypatch.setattr(data, "feature_config", lambda conn, a, fv: dict(CONTEXT["feature_config"]))
+    monkeypatch.setattr(data, "next_version", lambda conn, a, today: "m1-test")
+    monkeypatch.setattr(data, "save_model", lambda conn, a, version, result, html: saved.setdefault("r", result) and 1)
+
+    assert cli.main(["--athlete", "1", "--test-from", "2026-09-01", "--test-to", "2026-09-30"]) == 0
+    r = saved["r"]
+    assert r.test_to <= date(2026, 9, 30)
+    jsonschema.validate(stored(r), SCHEMA)
+    assert r.coefficients["feature_config"] == CONTEXT["feature_config"]
+    assert "Contract schema 2" in capsys.readouterr().out

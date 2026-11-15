@@ -1,6 +1,6 @@
 """Calibrate Module 1 against Whoop for one athlete.
 
-    python -m calibration --athlete 1 [--test-from 2026-09-01] [--out report.html] [--dry-run]
+    python -m calibration --athlete 1 [--test-from 2026-09-01] [--test-to 2026-11-09] [--out report.html] [--dry-run]
 
 Reads day_features (run "Recompute features" in the app first), fits strain, sleep and
 recovery on the training window, validates on the held-out window, and stores a CANDIDATE
@@ -13,31 +13,23 @@ import argparse
 import sys
 from datetime import date
 
-from . import config, data, pipeline, report
+from . import __version__, config, data, pipeline, report
 
 FEATURE_VERSION = "f3"
-
-
-def _version() -> str:
-    try:
-        from importlib.metadata import version
-
-        return version("calibration")
-    except Exception:  # running from a source checkout
-        return "dev"
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="calibration", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--athlete", type=int, required=True)
     ap.add_argument("--test-from", type=date.fromisoformat, help="first day of the held-out test window (default: last 20%% of paired days)")
+    ap.add_argument("--test-to", type=date.fromisoformat, help="last day used at all; later days are ignored (default: all data)")
     ap.add_argument("--targets", help="path to a targets.json overriding the defaults")
     ap.add_argument("--out", help="also write the HTML report to this file")
     ap.add_argument("--dry-run", action="store_true", help="do not store the model version")
     args = ap.parse_args(argv)
 
     settings = config.load(args.targets)
-    print(f"calibration {_version()} · feature set {FEATURE_VERSION}")
+    print(f"calibration {__version__} · feature set {FEATURE_VERSION}")
     with data.connect() as conn:
         name = data.athlete_name(conn, args.athlete)
         features = data.load_features(conn, args.athlete, FEATURE_VERSION)
@@ -48,7 +40,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 2
         try:
-            result = pipeline.run(features, settings, FEATURE_VERSION, args.test_from)
+            context = {"feature_config": data.feature_config(conn, args.athlete, FEATURE_VERSION)}
+            result = pipeline.run(features, settings, FEATURE_VERSION, args.test_from, args.test_to, context)
         except ValueError as e:
             print(f"Cannot calibrate: {e}", file=sys.stderr)
             return 2
@@ -63,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
 
     m = result.metrics
     print(f"Train {result.train_from} → {result.train_to}, test {result.test_from} → {result.test_to}")
+    fc = result.coefficients["feature_config"]
+    print(f"Contract schema {result.coefficients['schema_version']}; features built with HR max {fc['hr_max']}, resting HR {fc['hr_rest']}")
     print(
         f"Strain MAE {m['strain'].get('mae', float('nan')):.2f} (target ≤ {settings.strain_mae_max}), "
         f"rank correlation {m['strain'].get('spearman', float('nan')):.2f} (target ≥ {settings.strain_spearman_min}), "

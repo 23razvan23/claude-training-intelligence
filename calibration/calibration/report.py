@@ -124,6 +124,12 @@ def render(result: Result, athlete_name: str, version: str) -> str:
         f"<div class='muted'>{e(athlete_name)} · feature set {e(result.coefficients['feature_version'])} · "
         f"train {result.train_from} → {result.train_to} · test {result.test_from} → {result.test_to}</div>"
     )
+    c, fc = result.coefficients, result.coefficients.get("feature_config", {})
+    parts.append(
+        f"<div class='muted'>Contract schema {e(str(c.get('schema_version')))} · calibration {e(str(c.get('calibration_version')))} · "
+        f"profile used for the features: HR max {e(str(fc.get('hr_max')))}, resting HR {e(str(fc.get('hr_rest')))}"
+        f"{', sex assumed male' if fc.get('sex_assumed') else ''}</div>"
+    )
     verdict = "All acceptance targets met." if result.passed else "Not all acceptance targets are met — see below."
     parts.append(f"<div class='verdict {'ok' if result.passed else 'no'}'>{verdict}</div>")
 

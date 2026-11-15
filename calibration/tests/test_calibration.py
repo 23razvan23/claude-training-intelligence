@@ -79,7 +79,8 @@ def test_pipeline_split_is_chronological_and_targets_are_met_on_clean_data():
     assert r.test_from == paired["cycle_date"].iloc[int(len(paired) * 0.8)]
     assert r.metrics["strain"]["mae"] <= SETTINGS.strain_mae_max
     assert r.metrics["recovery"]["agreement"] > 0.6
-    assert set(r.coefficients) == {"feature_version", "strain", "sleep", "recovery", "bands"}
+    contract = {"schema_version", "calibration_version", "feature_version", "feature_config", "strain", "sleep", "recovery", "bands", "training_ranges"}
+    assert set(r.coefficients) == contract  # full shape: tests/test_contract.py
     assert r.exclusions["no_baseline_yet"] == 14
 
 

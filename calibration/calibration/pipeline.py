@@ -9,8 +9,13 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import metrics, recovery, sleep, strain
+from . import __version__, metrics, recovery, sleep, strain
 from .config import Settings
+
+SCHEMA_VERSION = 2  # shape of the coefficients JSON; must match calibration/contract.schema.json
+STRAIN_CLIP = [0, 21]  # Whoop's strain scale (strain.predict, strain.predict_zones)
+SLEEP_PERFORMANCE_CLIP = [0, 100]  # a percentage (sleep.performance)
+UNKNOWN_FEATURE_CONFIG = {"hr_max": None, "hr_rest": None, "sex_assumed": None}
 
 
 @dataclass
@@ -70,6 +75,7 @@ def _strain_coefficients(m: dict) -> dict:
             "zone_columns": list(strain.ZONE_COLUMNS),
             "zone_weights": m["zone_weights"],
             "min_monitored_minutes": m["min_monitored_minutes"],
+            "clip": list(STRAIN_CLIP),
         }
     return {
         "form": "load",
@@ -77,7 +83,27 @@ def _strain_coefficients(m: dict) -> dict:
         "background_weight": m["k"] if m["background"] else 0.0,
         "uses_background": m["background"],
         "min_monitored_minutes": m["min_monitored_minutes"],
+        "clip": list(STRAIN_CLIP),
     }
+
+
+def _strain_inputs(coefficients: dict) -> list[str]:
+    """The day_features columns the stored strain form reads (ADR 0008, S2)."""
+    if coefficients["form"] == "zones":
+        return list(coefficients["zone_columns"])
+    return [coefficients["load"], strain.BACKGROUND] if coefficients["uses_background"] else [coefficients["load"]]
+
+
+def _ranges(rows: pd.DataFrame, columns: list[str]) -> dict:
+    """Spread of each input on the rows a model was fitted on. Daily scoring flags a day whose input
+    falls outside [min, max] (or, more softly, [p01, p99]) as drifting beyond the training data."""
+    out = {}
+    for col in columns:
+        v = rows[col].dropna().to_numpy(dtype=float)
+        if len(v) == 0:
+            raise ValueError(f"No training values for model input {col}")
+        out[col] = {"min": float(v.min()), "p01": float(np.quantile(v, 0.01)), "p99": float(np.quantile(v, 0.99)), "max": float(v.max()), "n": len(v)}
+    return out
 
 
 def _strain_days(test: pd.DataFrame) -> pd.DataFrame:
@@ -90,8 +116,22 @@ def _strain_days(test: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_from: date | None = None) -> Result:
+def run(
+    features: pd.DataFrame,
+    settings: Settings,
+    feature_version: str,
+    test_from: date | None = None,
+    test_to: date | None = None,
+    context: dict | None = None,
+) -> Result:
+    """context (optional): {"feature_config": {"hr_max", "hr_rest", "sex_assumed"}}, the profile values
+    the features were built with, read from the database by the caller; recorded, never used to fit.
+    test_to (optional): the last day used at all; later days are ignored, as if the data ended there."""
+    if test_from is not None and test_to is not None and test_to < test_from:
+        raise ValueError(f"--test-to {test_to} is before --test-from {test_from}")
     daily = _daily(features)
+    if test_to is not None:
+        daily = daily[daily.index <= pd.Timestamp(test_to)]
     split = pd.Timestamp(test_from) if test_from else default_test_from(daily, settings.test_share)
     is_train = daily.index < split
     notes: list[str] = []
@@ -204,12 +244,25 @@ def run(features: pd.DataFrame, settings: Settings, feature_version: str, test_f
     }
     result_metrics["checks"] = checks
 
+    strain_coefficients = _strain_coefficients(strain_model)
+    feature_config = {**UNKNOWN_FEATURE_CONFIG, **((context or {}).get("feature_config") or {})}
     coefficients = {
+        "schema_version": SCHEMA_VERSION,
+        "calibration_version": __version__,
         "feature_version": feature_version,
-        "strain": _strain_coefficients(strain_model),
-        "sleep": {k: sleep_model[k] for k in ("base_min", "per_strain_min", "per_shortfall", "shortfall_reference_min", "shortfall_days")},
+        "feature_config": {k: feature_config[k] for k in UNKNOWN_FEATURE_CONFIG},
+        "strain": strain_coefficients,
+        "sleep": {
+            **{k: sleep_model[k] for k in ("base_min", "per_strain_min", "per_shortfall", "shortfall_reference_min", "shortfall_days")},
+            "performance_clip": list(SLEEP_PERFORMANCE_CLIP),
+        },
         "recovery": {k: rec_model[k] for k in ("intercept", "terms", "clip")},
         "bands": {"green_min": settings.green_min, "red_max": settings.red_max},
+        "training_ranges": {
+            "strain": _ranges(daily.loc[strain_model["train_index"]], _strain_inputs(strain_coefficients)),
+            "sleep": _ranges(daily.loc[sleep_model["train_index"]], ["prev_strain", "shortfall"]),
+            "recovery": _ranges(rec_train, chosen_cols),
+        },
     }
 
     test_days = pd.DataFrame(

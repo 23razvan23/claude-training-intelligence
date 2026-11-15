@@ -1,6 +1,6 @@
 [project]
 name = "calibration"
-version = "0.5.0"
+dynamic = ["version"]
 requires-python = ">=3.12"
 dependencies = [
   "pandas==2.2.3",
@@ -20,6 +20,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["calibration"]
+
+[tool.setuptools.dynamic]
+version = {attr = "calibration.__version__"}
 
 [tool.setuptools.package-data]
 calibration = ["targets.json"]

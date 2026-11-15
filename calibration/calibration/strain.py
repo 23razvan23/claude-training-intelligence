@@ -182,6 +182,7 @@ def choose_and_fit(train: pd.DataFrame, min_monitored_minutes: int = 600, min_ba
         "selection": why,
         "background_coverage": float(ok.mean()),
         "min_monitored_minutes": min_monitored_minutes,
+        "train_index": rows.index,  # the days every candidate was fitted on (for training_ranges)
     }
     if chosen["form"] == "load":
         model.update({"load": chosen["load"], "background": chosen["background"]})

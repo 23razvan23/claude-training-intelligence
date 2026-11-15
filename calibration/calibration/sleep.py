@@ -26,7 +26,7 @@ def fit(train: pd.DataFrame) -> dict:
     a = np.column_stack([np.ones(len(rows)), rows["prev_strain"], rows["shortfall"]])
     res = lsq_linear(a, rows["whoop_sleep_need_min"].to_numpy(dtype=float), bounds=([0, 0, 0], [900, 60, 1]))
     base, per_strain, per_shortfall = res.x
-    return {"base_min": float(base), "per_strain_min": float(per_strain), "per_shortfall": float(per_shortfall), "n": len(rows)}
+    return {"base_min": float(base), "per_strain_min": float(per_strain), "per_shortfall": float(per_shortfall), "n": len(rows), "train_index": rows.index}
 
 
 def need(params: dict, prev_strain, shortfall) -> np.ndarray:

@@ -5,7 +5,7 @@ Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions
 **Ready-to-paste prompts for every remaining stage are in [`docs/PROMPTS.md`](PROMPTS.md).**
 Keep this file current: update the status, results log and next steps in every PR that changes them.
 
-_Last updated: 2026-11-15: ADR 0008 scoring contract (review item R-01). Model m13-20261113 (f3) is ACTIVE since 2026-11-13._
+_Last updated: 2026-11-15: ADR 0008 scoring contract (R-01); backup hardened and restore-tested (R-08). Model m13-20261113 (f3) is ACTIVE since 2026-11-13._
 
 ---
 
@@ -15,7 +15,7 @@ _Last updated: 2026-11-15: ADR 0008 scoring contract (review item R-01). Model m
 |---|---|
 | 0 Foundation | **Done** (#1–#5). |
 | 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). Model m13-20261113 activated by the coach on 2026-11-13. |
-| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-02, R-03, R-04 next. |
+| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-08 done (backup); R-02, R-03, R-04 next. |
 | 2 Adaptive engine | After 1b. Highest product priority after Module 1 (SPEC.md). Stages 2-1 … 2-5. |
 | 3 Plan builder | After 2. Stages 3-1 … 3-3. |
 | 4 Extensions | Last. Stages 4-1 … 4-3. |
@@ -158,6 +158,7 @@ At the end of Phase 2, stop: every rule has a passing scenario test, and the bac
   - backend: `cd backend && ./gradlew build` (with `-Werror`; Testcontainers needs Docker);
   - calibration, tools and garmin-sync: `ruff check . && ruff format --check . && python -m pytest -q`;
   - frontend: `npm run lint && npm run typecheck && npm run build`.
+- **Backups:** `deploy/backup/backup.sh` keeps a file only after it decrypts, passes `gunzip -t` and has pg_dump's footer; it prunes only after that, writes `backups/STATUS`, and fails with a non-zero exit and a stderr message otherwise. `deploy/backup/test-backup.sh` (CI job `backup`) tests failure, the size floor `BACKUP_MIN_BYTES` (default 10240), pruning and a full restore. Locally without the image: `TEST_HOST=1 sh deploy/backup/test-backup.sh`.
 - **CI:** `.github/workflows/ci.yml` (the `tools-py39` job runs in `python:3.9-slim`).
 
 ### Notes for the cloud session environment (not the coach's machine)

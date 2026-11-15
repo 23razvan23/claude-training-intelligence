@@ -99,6 +99,25 @@ export interface FeatureSummary {
 export interface RecomputeResult {
   load: { computed: number; fromStream: number; fromAverage: number; withoutLoad: number; hrRest?: number; sexAssumed: boolean };
   features: { days: number; withGarminCore: number; withWhoop: number; paired: number; from?: string; to?: string };
+  scores: ScoringOutcome;
+}
+
+/** What a daily-scoring run did (backend ScoringService.Outcome); `skipped` says why nothing was scored. */
+export interface ScoringOutcome {
+  modelVersion?: string;
+  featureVersion?: string;
+  days: number;
+  withRecovery: number;
+  withStrain: number;
+  withSleepPerformance: number;
+  lowerConfidence: number;
+  withDrift: number;
+  stale: number;
+  profileChanged: boolean;
+  from?: string;
+  to?: string;
+  lastDataDate?: string;
+  skipped?: string;
 }
 
 interface ScoreMetrics {

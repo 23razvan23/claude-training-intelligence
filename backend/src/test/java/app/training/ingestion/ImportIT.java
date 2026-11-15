@@ -91,7 +91,8 @@ class ImportIT extends IntegrationTest {
         assertThat(count("SELECT count(*) FROM whoop_journal_entry WHERE athlete_id = ?", athlete)).isEqualTo(4);
         assertThat(first.stats().path("whoop_reference").path("skipped").asLong()).isEqualTo(1);
         assertThat(first.stats().path("whoop_journal_entry").path("skipped").asLong()).isEqualTo(1);
-        assertThat(first.warnings().toString()).contains("the current, unfinished day was not imported");
+        // One plain warning per import, even though both the cycle and its journal rows were skipped.
+        assertThat(warningCount(first.warnings(), "The current, unfinished day was not imported")).isEqualTo(1);
 
         // Later export: the same cycle is finished and its strain reached 12.4.
         Fixtures.whoopCsvs(dir, FIRST, 5, false, "12.4");
@@ -101,6 +102,22 @@ class ImportIT extends IntegrationTest {
         assertThat(jdbc.sql("SELECT day_strain FROM whoop_reference WHERE athlete_id = ? ORDER BY cycle_start DESC LIMIT 1")
                 .param(athlete).query(java.math.BigDecimal.class).single()).isEqualByComparingTo("12.4");
         assertThat(count("SELECT count(*) FROM whoop_reference WHERE athlete_id = ? AND cycle_end IS NULL", athlete)).isZero();
+    }
+
+    @Test
+    void unfinishedDayInAJournalOnlyExportWarnsOnce() throws Exception {
+        long athlete = newAthlete("Whoop open journal");
+        Fixtures.whoopCsvs(dir, FIRST, 5, true, "3.1");
+        var first = run(athlete, ImportKind.WHOOP_EXPORT, List.of(dir.resolve("journal_entries.csv")));
+        assertThat(first.status()).isEqualTo("SUCCEEDED");
+        assertThat(count("SELECT count(*) FROM whoop_journal_entry WHERE athlete_id = ?", athlete)).isEqualTo(4);
+        assertThat(warningCount(first.warnings(), "The current, unfinished day was not imported")).isEqualTo(1);
+    }
+
+    private static long warningCount(com.fasterxml.jackson.databind.JsonNode warnings, String text) {
+        long n = 0;
+        for (var w : warnings) if (w.asText().contains(text)) n++;
+        return n;
     }
 
     @Test

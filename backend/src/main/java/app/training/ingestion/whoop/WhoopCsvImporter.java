@@ -62,17 +62,20 @@ public class WhoopCsvImporter {
         }
         // Cycles first, then sleeps, workouts, journal: order matters only for readable stats.
         tables.sort(Comparator.comparing(Named::type));
+        boolean skippedOpenDay = false;
         for (var n : tables) {
             ctx.progress().phase("whoop", (long) n.table().records().size());
             switch (n.type()) {
-                case CYCLES -> cycles(ctx, n.table(), athleteZone);
+                case CYCLES -> skippedOpenDay |= cycles(ctx, n.table(), athleteZone);
                 case SLEEPS -> sleeps(ctx, n.table(), athleteZone);
                 case WORKOUTS -> workouts(ctx, n.table(), athleteZone);
-                case JOURNAL -> journal(ctx, n.table(), athleteZone);
+                case JOURNAL -> skippedOpenDay |= journal(ctx, n.table(), athleteZone);
                 case UNKNOWN -> ctx.stats().warn("Skipped " + n.name() + ": not a recognised Whoop CSV (headers: "
                         + String.join(", ", n.table().headers()) + ")");
             }
         }
+        // One warning per import, however many files (cycles, journal) held the unfinished day.
+        if (skippedOpenDay) ctx.stats().warn(UNFINISHED_DAY_WARNING);
         if (tables.stream().noneMatch(t -> t.type() == FileType.CYCLES)) {
             ctx.stats().warn("No physiological_cycles.csv found: recovery and strain references were not imported.");
         }
@@ -125,7 +128,7 @@ public class WhoopCsvImporter {
     private static final String UNFINISHED_DAY_WARNING =
             "The current, unfinished day was not imported; it will come in with your next export.";
 
-    private void cycles(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
+    private boolean cycles(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
         boolean skippedOpen = false;
         for (CSVRecord r : t.records()) {
             ctx.progress().step();
@@ -163,7 +166,7 @@ public class WhoopCsvImporter {
                 ctx.stats().warn("physiological_cycles.csv line " + r.getRecordNumber() + ": " + e.getMessage());
             }
         }
-        if (skippedOpen) ctx.stats().warn(UNFINISHED_DAY_WARNING);
+        return skippedOpen;
     }
 
     private void sleeps(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
@@ -239,7 +242,7 @@ public class WhoopCsvImporter {
         }
     }
 
-    private void journal(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
+    private boolean journal(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
         boolean skippedOpen = false;
         for (CSVRecord r : t.records()) {
             ctx.progress().step();
@@ -264,6 +267,6 @@ public class WhoopCsvImporter {
                 ctx.stats().warn("journal_entries.csv line " + r.getRecordNumber() + ": " + e.getMessage());
             }
         }
-        if (skippedOpen) ctx.stats().warn(UNFINISHED_DAY_WARNING);
+        return skippedOpen;
     }
 }

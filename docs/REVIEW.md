@@ -85,7 +85,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
 | R-06 | Stop freezing unfinished Whoop cycles on import | P1 | bug | S | – | 1b-3 |
 | R-07 | Fix the live-holdout rules in writing before looking at holdout data | P1 | design | S | R-04 | 1b-3 |
-| R-08 | Make the nightly backup fail loudly and prove it restores | P1 | bug | S | – | – |
+| R-08 | Make the nightly backup fail loudly and prove it restores (done) | P1 | bug | S | – | – |
 | R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access) |
 | R-10 | Define how re-fetched Garmin days replace earlier partial ones | P1 | design | M | – | 1b-4 |
 | R-11 | Decide how Garmin credentials are stored before writing sync code | P1 | security | S | – | 1b-4 |
@@ -435,7 +435,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-08: Make the nightly backup fail loudly and prove it restores
 - **Priority / Type / Size:** P1 / bug / S
-- **Status:** CONFIRMED (by reading; not executed)
+- **Status:** CONFIRMED (by reading; not executed); **done 2026-11-15** (`deploy/backup/backup.sh`, `deploy/backup/test-backup.sh`, CI job `backup`)
 - **Problem:** the backup is `pg_dump | gzip | openssl`. In `sh`, a pipeline's result is the last command's, so if `pg_dump` fails (database down, wrong password, disk full mid-dump) `openssl` still succeeds, the script prints "backup written" and then prunes older files. Fourteen bad nights erase every good backup. Nothing ever tests that a backup can be restored. Uploaded exports are deleted after import (ADR 0006), so this database is the only copy of the coach's data in the system.
 - **Evidence:** `deploy/backup/backup.sh:4` `set -eu` (no pipefail), `:25-27` the pipeline, `:29` `prune`; CI only runs `sh -n` on it (`ci.yml`, job `compose`).
 - **Why it matters:** silent loss of all health data and model history after a disk or volume failure.

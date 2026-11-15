@@ -141,6 +141,8 @@ docker compose exec -T db psql -U training -d training -c "SELECT timescaledb_po
 
 Keep the passphrase somewhere other than this server: without it the backups cannot be read.
 
+Copy `backups/` to another disk now and then (the files are encrypted; keep the passphrase elsewhere, not next to them). A backup is only kept if it was checked after writing; `backups/STATUS` shows the last success (time, size). If a run fails, the reason is in `docker compose logs backup`, and older backups are left alone. `BACKUP_MIN_BYTES` (default 10240) is the smallest size accepted.
+
 ## Privacy
 
 This is health data. Self-host only. Uploaded export files are deleted once imported. Logs never contain payloads or credentials. Deleting an athlete (coach only) removes all their data. Put the app behind TLS and set `COOKIE_SECURE=true` before exposing it beyond your LAN.

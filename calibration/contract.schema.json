@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "calibration/contract.schema.json",
+  "title": "model_version.coefficients (scoring contract, schema version 2)",
+  "description": "What the calibration stores and the daily scoring (stage 1b-1) reads. The rules that turn these numbers into scores are in docs/adr/0008-scoring-contract.md. Any change to this shape bumps schema_version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "calibration_version", "feature_version", "feature_config", "strain", "sleep", "recovery", "bands", "training_ranges"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "calibration_version": {"type": "string", "minLength": 1},
+    "feature_version": {"type": "string", "minLength": 1},
+    "feature_config": {
+      "description": "Profile values the features were built with (newest activity_load row); null when unknown, e.g. no activities.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hr_max", "hr_rest", "sex_assumed"],
+      "properties": {
+        "hr_max": {"type": ["integer", "null"]},
+        "hr_rest": {"type": ["integer", "null"]},
+        "sex_assumed": {"type": ["boolean", "null"]}
+      }
+    },
+    "strain": {"oneOf": [{"$ref": "#/$defs/strain_load"}, {"$ref": "#/$defs/strain_zones"}]},
+    "sleep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_min", "per_strain_min", "per_shortfall", "shortfall_reference_min", "shortfall_days", "performance_clip"],
+      "properties": {
+        "base_min": {"type": "number", "minimum": 0},
+        "per_strain_min": {"type": "number", "minimum": 0},
+        "per_shortfall": {"type": "number", "minimum": 0},
+        "shortfall_reference_min": {"type": "number"},
+        "shortfall_days": {"type": "integer", "minimum": 1},
+        "performance_clip": {"const": [0, 100]}
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intercept", "terms", "clip"],
+      "properties": {
+        "intercept": {"type": "number"},
+        "terms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature", "sign", "weight", "center", "scale"],
+            "properties": {
+              "feature": {"type": "string", "minLength": 1},
+              "sign": {"enum": [-1, 1]},
+              "weight": {"type": "number", "minimum": 0},
+              "center": {"type": "number"},
+              "scale": {"type": "number", "exclusiveMinimum": 0}
+            }
+          }
+        },
+        "clip": {"$ref": "#/$defs/interval"}
+      }
+    },
+    "bands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["green_min", "red_max"],
+      "properties": {
+        "green_min": {"type": "number"},
+        "red_max": {"type": "number"}
+      }
+    },
+    "training_ranges": {
+      "description": "Per model part, per input: the spread on the days that part was fitted on. Used for the 'outside the training range' flag.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strain", "sleep", "recovery"],
+      "properties": {
+        "strain": {"$ref": "#/$defs/ranges"},
+        "sleep": {"$ref": "#/$defs/ranges"},
+        "recovery": {"$ref": "#/$defs/ranges"}
+      }
+    }
+  },
+  "$defs": {
+    "interval": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}], "minItems": 2, "maxItems": 2},
+    "strain_clip": {"const": [0, 21]},
+    "strain_load": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form", "load", "a", "b", "c", "background_weight", "uses_background", "min_monitored_minutes", "clip"],
+      "properties": {
+        "form": {"const": "load"},
+        "load": {"enum": ["day_load_banister", "day_load_edwards"]},
+        "a": {"type": "number"},
+        "b": {"type": "number"},
+        "c": {"type": "number"},
+        "background_weight": {"type": "number", "minimum": 0},
+        "uses_background": {"type": "boolean"},
+        "min_monitored_minutes": {"type": "integer", "minimum": 0},
+        "clip": {"$ref": "#/$defs/strain_clip"}
+      }
+    },
+    "strain_zones": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form", "a", "c", "zone_columns", "zone_weights", "min_monitored_minutes", "clip"],
+      "properties": {
+        "form": {"const": "zones"},
+        "a": {"type": "number"},
+        "c": {"type": "number"},
+        "zone_columns": {"type": "array", "items": {"type": "string"}, "minItems": 6, "maxItems": 6},
+        "zone_weights": {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 6, "maxItems": 6},
+        "min_monitored_minutes": {"type": "integer", "minimum": 0},
+        "clip": {"$ref": "#/$defs/strain_clip"}
+      }
+    },
+    "range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "p01", "p99", "max", "n"],
+      "properties": {
+        "min": {"type": "number"},
+        "p01": {"type": "number"},
+        "p99": {"type": "number"},
+        "max": {"type": "number"},
+        "n": {"type": "integer", "minimum": 1}
+      }
+    },
+    "ranges": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/range"}}
+  }
+}

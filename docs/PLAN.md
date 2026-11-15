@@ -5,7 +5,7 @@ Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions
 **Ready-to-paste prompts for every remaining stage are in [`docs/PROMPTS.md`](PROMPTS.md).**
 Keep this file current: update the status, results log and next steps in every PR that changes them.
 
-_Last updated: 2026-11-13, at the end of Phase 1a (calibration PASS, #13)._
+_Last updated: 2026-11-15: ADR 0008 scoring contract (review item R-01). Model m13-20261113 (f3) is ACTIVE since 2026-11-13._
 
 ---
 
@@ -14,8 +14,8 @@ _Last updated: 2026-11-13, at the end of Phase 1a (calibration PASS, #13)._
 | Phase (SPEC.md) | Status |
 |---|---|
 | 0 Foundation | **Done** (#1–#5). |
-| 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). One step left for the coach: press **Activate** on the passing version (Calibration tab). |
-| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). |
+| 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). Model m13-20261113 activated by the coach on 2026-11-13. |
+| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-02, R-03, R-04 next. |
 | 2 Adaptive engine | After 1b. Highest product priority after Module 1 (SPEC.md). Stages 2-1 … 2-5. |
 | 3 Plan builder | After 2. Stages 3-1 … 3-3. |
 | 4 Extensions | Last. Stages 4-1 … 4-3. |
@@ -138,7 +138,7 @@ At the end of Phase 2, stop: every rule has a passing scenario test, and the bac
   - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions and activation);
   - `security`, `athletes`; placeholder packages `planning` and `adaptation`.
   - Migrations V1–V11. **Never edit a merged migration; add a new one.**
-- `calibration/` (Python 3.12, package 0.5.0): `pipeline.run()` is a pure function of `day_features`. `FEATURE_VERSION` (`f3`) must match `app.metrics.feature-version`. The **coefficients contract** read by 1b-1 is `pipeline._strain_coefficients`, plus the recovery terms (intercept, then each feature's sign, weight, center and scale), sleep and bands; see ADR 0007.
+- `calibration/` (Python 3.12, package 0.5.0): `pipeline.run()` is a pure function of `day_features`. `FEATURE_VERSION` (`f3`) must match `app.metrics.feature-version`. The **scoring contract** for 1b-1 is **ADR 0008**: the coefficients (`pipeline._strain_coefficients`, recovery terms, sleep, bands) *plus* the rules that turn them into daily scores (day grid, yesterday's strain, 7-day shortfall, gaps and their named reasons, clipping, rounding, bands, low-confidence flag), each with a worked example for the parity test.
 - `frontend/` (React + TypeScript): Coverage, Imports, Calibration (coach) and Athletes (coach).
 - `tools/inspect_exports.py`: a read-only export summary, Python 3.9+, never prints free text.
 - `garmin-sync/`: the adapter boundary (stage 1b-4).

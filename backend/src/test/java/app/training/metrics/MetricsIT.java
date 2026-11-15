@@ -145,10 +145,26 @@ class MetricsIT extends IntegrationTest {
     }
 
     private long model(long athlete, String version, boolean passed, String featureVersion, String coefficients) {
+        return model(athlete, version, passed, featureVersion, coefficients, TARGETS_METRICS, LocalDate.of(2026, 9, 30));
+    }
+
+    /** The pass marks a calibration stores in metrics.targets (synthetic values). */
+    static final String TARGETS_METRICS = """
+            {"targets": {"strain_mae_max": 2.0, "strain_spearman_min": 0.8,
+                         "recovery_band_agreement_min": 0.7, "recovery_green_red_max": 0.03}}""";
+
+    private long model(long athlete, String version, boolean passed, String featureVersion, String coefficients,
+            String metrics, LocalDate testTo) {
         return jdbc.sql("""
-                INSERT INTO model_version (athlete_id, version, feature_version, coefficients, metrics, passed, report_html)
-                VALUES (?, ?, ?, ?::jsonb, '{}', ?, '') RETURNING id""")
-                .params(athlete, version, featureVersion, coefficients, passed).query(Long.class).single();
+                INSERT INTO model_version (athlete_id, version, feature_version, coefficients, metrics, passed, report_html, test_to)
+                VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?, '', ?) RETURNING id""")
+                .params(athlete, version, featureVersion, coefficients, metrics, passed, testTo).query(Long.class).single();
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode holdoutTargets(long modelId) throws Exception {
+        var raw = jdbc.sql("SELECT holdout_targets::text FROM model_version WHERE id = ?").param(modelId)
+                .query(String.class).optional().orElse(null);
+        return raw == null ? null : new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
     }
 
     private java.time.Instant instant(String column, long modelId) {
@@ -202,6 +218,67 @@ class MetricsIT extends IntegrationTest {
         jdbc.sql("DELETE FROM app_user WHERE id = ?").param(other).update();
         assertThat(instant("activated_at", third)).isNotNull();
         assertThat(jdbc.sql("SELECT activated_by FROM model_version WHERE id = ?").param(third).query(Long.class).optional()).isEmpty();
+    }
+
+    @Test
+    void activationFreezesTheHoldoutTargets() throws Exception {
+        long a = athlete(190);
+        String coefficients = "{\"schema_version\": 2, \"strain\": {\"min_monitored_minutes\": 600}}";
+        long first = model(a, "m-h1", true, "f3", coefficients, TARGETS_METRICS, LocalDate.of(2026, 9, 30));
+        long second = model(a, "m-h2", true, "f3", coefficients, """
+                {"targets": {"strain_mae_max": 1.5, "strain_spearman_min": 0.85,
+                             "recovery_band_agreement_min": 0.75, "recovery_green_red_max": 0.02}}""",
+                LocalDate.of(2026, 10, 31));
+
+        // A candidate has no frozen holdout targets.
+        assertThat(holdoutTargets(first)).isNull();
+        mvc.perform(get("/api/models/" + first).with(user(coach)))
+                .andExpect(jsonPath("$.holdoutTargets").doesNotExist());
+
+        mvc.perform(post("/api/models/" + first + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.holdoutTargets.recovery_green_red_max").value(0.03))
+                .andExpect(jsonPath("$.holdoutTargets.window_from").value("2026-10-01"));
+        var frozen = holdoutTargets(first);
+        // The pass marks the version was calibrated against (ADR 0009, R-07) ...
+        assertThat(frozen.get("strain_mae_max").asDouble()).isEqualTo(2.0);
+        assertThat(frozen.get("strain_spearman_min").asDouble()).isEqualTo(0.8);
+        assertThat(frozen.get("recovery_band_agreement_min").asDouble()).isEqualTo(0.7);
+        assertThat(frozen.get("recovery_green_red_max").asDouble()).isEqualTo(0.03);
+        // ... plus the protocol values in force at activation.
+        assertThat(frozen.get("strain_min_monitored_minutes").asInt()).isEqualTo(600);
+        assertThat(frozen.get("min_recovery_days").asInt()).isEqualTo(90);
+        assertThat(frozen.get("confidence").asDouble()).isEqualTo(0.95);
+        assertThat(frozen.get("interval").asText()).isEqualTo("wilson");
+        assertThat(frozen.get("window_from").asText()).as("the first day after the test window").isEqualTo("2026-10-01");
+        assertThat(frozen.get("protocol").asText()).isEqualTo("ADR 0009");
+        assertThat(frozen.get("source").asText()).isEqualTo("activation");
+
+        // Pressing Activate again changes nothing, even if the stored metrics were edited since.
+        jdbc.sql("UPDATE model_version SET metrics = jsonb_set(metrics, '{targets,recovery_green_red_max}', '0.5') WHERE id = ?")
+                .param(first).update();
+        mvc.perform(post("/api/models/" + first + "/activate").with(user(coach)).with(csrf())).andExpect(status().isOk());
+        assertThat(holdoutTargets(first)).isEqualTo(frozen);
+
+        // A new activation freezes the new version's own marks; the retired one keeps its record.
+        mvc.perform(post("/api/models/" + second + "/activate").with(user(coach)).with(csrf())).andExpect(status().isOk());
+        assertThat(holdoutTargets(second).get("recovery_green_red_max").asDouble()).isEqualTo(0.02);
+        assertThat(holdoutTargets(second).get("window_from").asText()).isEqualTo("2026-11-01");
+        assertThat(holdoutTargets(first)).isEqualTo(frozen);
+    }
+
+    @Test
+    void aVersionWithoutStoredTargetsOrTestWindowIsRefused() throws Exception {
+        long a = athlete(190);
+        long noTargets = model(a, "m-nt", true, "f3", "{\"schema_version\": 2}", "{}", LocalDate.of(2026, 9, 30));
+        long noWindow = model(a, "m-nw", true, "f3", "{\"schema_version\": 2}", TARGETS_METRICS, null);
+        for (long m : List.of(noTargets, noWindow)) {
+            mvc.perform(post("/api/models/" + m + "/activate").with(user(coach)).with(csrf()))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("pass marks")));
+            assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(m).query(String.class).single()).isEqualTo("CANDIDATE");
+            assertThat(holdoutTargets(m)).isNull();
+        }
     }
 
     @Test

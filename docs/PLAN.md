@@ -5,7 +5,7 @@ Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions
 **Ready-to-paste prompts for every remaining stage are in [`docs/PROMPTS.md`](PROMPTS.md).**
 Keep this file current: update the status, results log and next steps in every PR that changes them.
 
-_Last updated: 2026-11-15: ADR 0008 scoring contract (R-01); backup hardened and restore-tested (R-08); unfinished Whoop cycles (R-06); versioned coefficients contract, calibration 0.6.0 (R-02); parity fixtures and feature-version guard (R-03); activation time recorded and unsafe activations refused (R-04, V13). **Model m15-20261115 (f3, contract v2) is ACTIVE since 2026-11-15 19:47:54 UTC**; m13 is RETIRED at the same instant; a candidate older than the ACTIVE version (m14) can no longer be activated._
+_Last updated: 2026-11-15: **stage 1b-1 daily scoring** (ScoringService, REST + CLI, Recompute features rescores, V14, ADR 0012; parity test green on all three fixtures). Earlier the same day: ADR 0008 scoring contract (R-01); backup hardened and restore-tested (R-08); unfinished Whoop cycles (R-06); versioned coefficients contract, calibration 0.6.0 (R-02); parity fixtures and feature-version guard (R-03); activation time recorded and unsafe activations refused (R-04, V13). **Model m15-20261115 (f3, contract v2) is ACTIVE since 2026-11-15 19:47:54 UTC**; m13 is RETIRED at the same instant; a candidate older than the ACTIVE version (m14) can no longer be activated._
 
 ---
 
@@ -15,7 +15,7 @@ _Last updated: 2026-11-15: ADR 0008 scoring contract (R-01); backup hardened and
 |---|---|
 | 0 Foundation | **Done** (#1–#5). |
 | 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). m13-20261113 activated 2026-11-13; replaced by m15-20261115 (same coefficients, contract v2), ACTIVE since 2026-11-15 19:47:54 UTC. |
-| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-08 done (backup); R-06 done; R-02 done (contract v2; m15 reproduces the PASS model); R-03 done (parity fixtures); R-04 done (activation record and guards); m15 activated 2026-11-15. **Next: 1b-1** (R-07 can run alongside). |
+| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-08 done (backup); R-06 done; R-02 done (contract v2; m15 reproduces the PASS model); R-03 done (parity fixtures); R-04 done (activation record and guards); m15 activated 2026-11-15. **1b-1 done in code** (PR pending the coach's check on real data: every paired day scored by m15). **Next: 1b-3** (live holdout, needs R-07 / ADR 0009), with 1b-2 alongside. |
 | 2 Adaptive engine | After 1b. Highest product priority after Module 1 (SPEC.md). Stages 2-1 … 2-5. |
 | 3 Plan builder | After 2. Stages 3-1 … 3-3. |
 | 4 Extensions | Last. Stages 4-1 … 4-3. |
@@ -33,7 +33,8 @@ The spec's working agreement applies to every stage:
 - **Athlete id 1 = the coach.** Profile: HR max 184, resting HR 48, sex M, timezone Europe/Bucharest.
 - **Commands the coach runs** (in `~/claude-training-intelligence`):
   - update: `git checkout main && git pull && docker compose up --build -d`
-  - after any import or profile change, or a feature-version bump: **Calibration → Recompute features** (in the UI)
+  - after any import or profile change, or a feature-version bump: **Calibration → Recompute features** (in the UI). Since 1b-1 this also recomputes the daily scores from the ACTIVE model; also press it after activating a new model.
+  - rescore only (all days, or a range): `docker compose run --rm app score --athlete 1 [--from YYYY-MM-DD] [--to YYYY-MM-DD]`
   - calibrate: `docker compose run --build --rm calibration --athlete 1`. **Keep `--build`**: `up --build` does not rebuild this on-demand service (#11).
   - import status: `docker compose exec db psql -U training -d training -c "SELECT id, status, progress, stats, error FROM import_batch ORDER BY id DESC LIMIT 1;"`
 - The coach merges PRs themselves, usually quickly, and then reports results. One PR per agreed step works well.
@@ -96,7 +97,7 @@ Each stage below has a ready-to-paste prompt in `docs/PROMPTS.md`. Every stage:
 ### Phase 1b: daily Module 1 (Recovery, Strain, Sleep every morning)
 | Stage | What | Done when |
 |---|---|---|
-| **1b-1 Daily scoring service** | Java applies the ACTIVE model's coefficients to `day_features`. It writes `derived_day_metrics` (recovery, band, strain, sleep need and performance, per-feature contributions, `model_version`, data-quality flags: stale, low coverage, missing inputs, drift beyond the training range), with recompute for any date range via REST and a CLI. Includes a **Java/Python parity test**: same features + coefficients → same scores. | Parity test passes; the coach recomputes and sees a score per day. |
+| **1b-1 Daily scoring service** (done in code, 2026-11-15) | Java applies the ACTIVE model's coefficients to `day_features`. It writes `derived_day_metrics` (recovery, band, strain, sleep need and performance, per-feature contributions, `model_version`, data-quality flags: stale, low coverage, missing inputs, drift beyond the training range), with recompute for any date range via REST and a CLI. Includes a **Java/Python parity test**: same features + coefficients → same scores. | Parity test passes; the coach recomputes and sees a score per day. |
 | **1b-2 Today & Trends screens** | Today: recovery dial and band, strain vs target, sleep performance, contributions in plain words, stale and low-confidence banners. Trends: HRV, RHR, recovery, strain, sleep; acute vs chronic load; ranges from 4 weeks to 12 months; readable at phone width; i18n; dark mode. | The coach uses it on their phone for a few mornings. |
 | **1b-3 Live holdout vs Whoop** | A daily ours-vs-Whoop view for the ACTIVE model from its activation date: rolling MAE, band agreement, green↔red count, weekly summary. The coach keeps importing new Whoop exports until 2027-02. | A running go/no-go dashboard; final decision report around 2027-02. |
 | **1b-4 Garmin daily sync** | Implement the `garmin-sync` adapter (`garminconnect`/`garth`), with credentials encrypted at rest. A morning run (default 07:00 local, [configurable]) syncs, recomputes recent features and scores, so results are ready by 08:00; also on demand. Retry, alert, a "last sync" indicator; manual FIT upload as the fallback. **Needs the coach's consent** for storing their Garmin login. | Today's scores appear without manual imports. |
@@ -141,9 +142,10 @@ At the end of Phase 2, stop: every rule has a passing scenario test, and the bac
   - `ingestion` (importers, `RawWriter`, import batches and progress);
   - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions and activation: `activated_at`/`activated_by`/`retired_at`, refused for another feature version, a contract without `schema_version` 2, or a candidate older than the ACTIVE version);
   - `security`, `athletes`; placeholder packages `planning` and `adaptation`.
-  - Migrations V1–V13 (V12 removes unfinished Whoop cycles, R-06; V13 records activation and retirement times, R-04). **Never edit a merged migration; add a new one.**
+  - daily scoring (stage 1b-1, ADR 0012): `ScoringContract` (reads coefficients, refuses anything but `schema_version` 2), `DailyScorer` (ADR 0008 S1–S8, pure arithmetic, checked by `DailyScorerParityTest` on the committed fixtures), `ScoringService` (the one entry point; scores the whole grid, replaces only the requested dates of the ACTIVE model's rows, keeps other models' rows), `ScoreController` (`POST /api/athletes/{id}/scores/recompute`, `GET /api/athletes/{id}/scores`), `ScoringCli` (`score` command; the app starts without its web server and skips import housekeeping);
+  - Migrations V1–V14 (V12 removes unfinished Whoop cycles, R-06; V13 records activation and retirement times, R-04; V14 adds `derived_day_metrics.feature_version`, R-15). **Never edit a merged migration; add a new one.**
 - `calibration/` (Python 3.12, package 0.6.0, version in `calibration/__init__.py`): `pipeline.run()` is a pure function of `day_features` (plus an optional `context` with the profile values, read by `__main__` from `activity_load`). CLI: `--test-from` / `--test-to` fix the test window. `FEATURE_VERSION` (`f3`) must match `app.metrics.feature-version` (a test checks this). The **scoring contract** for 1b-1 is **ADR 0008**: the coefficients JSON, whose shape is `calibration/contract.schema.json` (`schema_version` 2: `calibration_version`, `feature_version`, `feature_config` {hr_max, hr_rest, sex_assumed}, `strain` with `clip` [0, 21], `sleep` with `performance_clip` [0, 100], `recovery`, `bands`, and `training_ranges` {min, p01, p99, max, n} per model part and input, for drift flags), *plus* the rules that turn them into daily scores (day grid, yesterday's strain, 7-day shortfall, gaps and their named reasons, clipping, rounding, bands, low-confidence flag), each with a worked example. The **parity fixtures** for 1b-1's Java test are in `backend/src/test/resources/parity/` (`adr0008`, `load`, `zones`), produced by the reference scorer `calibration/parity.py` (R-03; ADR 0008, Consequences).
-- `frontend/` (React + TypeScript): Coverage, Imports, Calibration (coach) and Athletes (coach).
+- `frontend/` (React + TypeScript): Coverage, Imports, Calibration (coach; shows the scoring result after Recompute features) and Athletes (coach).
 - `tools/inspect_exports.py`: a read-only export summary, Python 3.9+, never prints free text.
 - `garmin-sync/`: the adapter boundary (stage 1b-4).
 - **Feature engineering exists only in Java**, materialised in `day_features`. Python only fits. Changing a feature definition means bumping `feature_version` in both places; the coach then recomputes (ADR 0007).

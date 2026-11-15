@@ -84,7 +84,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-04 | Record when a model was activated and refuse unsafe activations | P0 | bug | S | R-02 | 1b-1, 1b-3 |
 | R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
 | R-06 | Stop freezing unfinished Whoop cycles on import (done) | P1 | bug | S | – | 1b-3 |
-| R-07 | Fix the live-holdout rules in writing before looking at holdout data | P1 | design | S | R-04 | 1b-3 |
+| R-07 | Fix the live-holdout rules in writing before looking at holdout data (done) | P1 | design | S | R-04 | 1b-3 |
 | R-08 | Make the nightly backup fail loudly and prove it restores (done) | P1 | bug | S | – | – |
 | R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access) |
 | R-10 | Define how re-fetched Garmin days replace earlier partial ones | P1 | design | M | – | 1b-4 |
@@ -392,7 +392,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-07: Fix the live-holdout rules in writing before looking at holdout data
 - **Priority / Type / Size:** P1 / design / S
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED; done 2026-11-15 (`docs/adr/0009-live-holdout-protocol.md`, `V15__holdout_targets.sql`). Window from the day after the ACTIVE model's `test_to` (2026-11-09 for m15) to the last Whoop day (subscription ends 2027-02-19); minimum lowered to 90 compared recovery days (coach); m15's frozen marks filled in by V15.
 - **Problem:** PLAN §3 says the holdout is "the clean go/no-go check" because the parsimony rule was chosen after seeing the test window. The same is true of two more choices: the strain targets (2.0 / 0.80) and the "≥ 600 minutes" filter were set after seeing 1.91 / 0.82. The holdout only stays clean if its rules are fixed before its data is looked at, and today nothing fixes them: no start date, no minimum number of days, no rule for excluded days, and targets live in an editable file. Also, the 1a evidence is thinner than the headline suggests: with about 55 test days, "0 green↔red flips" cannot show a rate under 3% (the 95% upper bound for 0 of 55 is about 5%).
 - **Evidence:** ADR 0007 items 3 and 6 (dates 2026-11-13); `targets.json:3-5`; PROMPTS stage 1b-3 "Only days after activation" (but every day after `test_to` is unseen, and the activation time is not stored — R-04).
 - **Why it matters:** this is the evidence for cancelling a paid subscription the coach currently trusts. Without pre-set rules the holdout can be bent the same way the test window was, with nobody intending to.
@@ -405,11 +405,12 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
   - what resets the holdout: any new activation.
 - **Out of scope:** building the holdout view (stage 1b-3); changing 1a results.
 - **Acceptance criteria:**
-  - [ ] ADR 0009 merged; PROMPTS stage 1b-3 references it.
-  - [ ] Coach has answered question 3 in §5.
-  - [ ] If the column is added here: test that activation copies the current targets into `holdout_targets`.
+  - [x] ADR 0009 merged; PROMPTS stage 1b-3 references it.
+  - [x] Coach has answered question 3 in §5 (see below).
+  - [x] Column added (V15): `MetricsIT.activationFreezesTheHoldoutTargets` checks that activation copies the version's own pass marks (its `metrics.targets`; Java can't read `targets.json`) into `holdout_targets`; `HoldoutTargetsMigrationIT` checks the fill-in for the version that was already ACTIVE.
 - **Verification:** `cd backend && ./gradlew build` if the column is added; otherwise documentation only.
 - **Coach decision needed:** yes. "How much evidence do you want before cancelling Whoop? Options: (a) decide at the end of the subscription whatever the count; (b) at least 100 compared days and the same targets as today (recommended); (c) stricter targets." Recommendation: (b), with the numbers shown together with their uncertainty.
+- **Coach answer (2026-11-15):** (b), today's pass marks, judged on the measured value with the interval shown. Whoop ends 2027-02-19 and will not be extended, so the window holds at most 103 days; the coach lowered the minimum from 100 to **90 compared recovery days**. Window starts the day after the test window (2026-11-09), not at activation. m15's frozen marks are filled in from its own stored marks (V15).
 - **Opus prompt:**
   ```text
   Task R-07: write ADR 0009 "Live holdout protocol" before stage 1b-3 is built.
@@ -829,6 +830,7 @@ Proposed edits, not applied.
 3. **How much evidence do you want before cancelling Whoop?**
    Why it matters: the 1a result is encouraging but rests on about 55 days, and some pass marks were set after seeing the numbers. Zero bad "green vs red" days out of 55 cannot rule out a real rate of up to about 5%.
    Recommended: at least 100 compared days after 2026-11-09 with today's pass marks, shown with their uncertainty. That is reachable by mid-February 2027.
+   **Answered 2026-11-15:** (b) with today's marks, but at least **90** compared recovery days: Whoop ends 2027-02-19 (103 days from 2026-11-09), so 100 was out of reach. Recorded in ADR 0009 (D1).
 
 4. **If the watch was off all day yesterday, what should this morning's recovery show?**
    Why it matters: yesterday's strain is one input to recovery; without it the calibrated model has no answer.

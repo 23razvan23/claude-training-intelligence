@@ -101,21 +101,39 @@ I use it for a few mornings and report back.
 ```text
 Stage 1b-3: live holdout against Whoop (Phase 1b). Requires 1b-1 merged.
 
-Goal: from the ACTIVE model's activation date until my Whoop subscription ends (2027-02), show
-daily how our scores compare with Whoop's on days the model has never seen. This is the clean
-go/no-go evidence for cancelling Whoop (see the Phase 1a summary in docs/PLAN.md).
+Goal: until my Whoop subscription ends (2027-02-19), show daily how our scores compare with
+Whoop's on days the ACTIVE model has never seen. This is the clean go/no-go evidence for
+cancelling Whoop (see the Phase 1a summary in docs/PLAN.md).
+
+Follow docs/adr/0009-live-holdout-protocol.md exactly (rules H1-H9); its rules were fixed before
+any holdout data was seen and must not be changed by this stage:
+- Window: days after the active model's test window (holdout_targets.window_from; 2026-11-09 for
+  m15) up to the last finished Whoop day. Unfinished Whoop cycles are never compared.
+- Pass marks: read only from model_version.holdout_targets (frozen at activation, V15), never from
+  targets.json. No way in the UI to edit marks or exclude days.
+- Every day in the window counted once: compared, no Whoop, or no score from us with its ADR 0008
+  reason. Low-coverage strain days shown separately, without a mark.
+- n and the 95% Wilson interval next to every rate; MAE and Spearman with n.
+- Verdict: "not enough days yet" below min_recovery_days (90) compared recovery days; then met /
+  not met per mark on the measured value, labelled interim until the last Whoop day; "not enough
+  days by the rule" if the window ends short.
+- The naive baseline (yesterday's Whoop band and recovery as today's guess) next to ours on the
+  same days.
+- A new activation restarts the count; a retired version's comparison is kept as history.
 
 Scope:
 - A Holdout view (coach): per day, ours vs Whoop for recovery (and band), strain and sleep
-  performance; rolling and cumulative MAE, band agreement, green-vs-red count, strain Spearman;
-  weekly summary; the same targets as targets.json, marked pass or fail as data accumulates.
-- Only days after activation, and only days where both sides exist; show the count.
+  performance; cumulative figures (the evidence) and rolling / weekly figures (for drift);
+  exclusion counts by reason; the frozen marks and window dates.
 - Make it easy for me to keep feeding Whoop data: I will re-import the Whoop export every week
-  or two. Imports are idempotent; check the flow and the instructions.
+  or two, and take the last one on or after 2027-02-19. Imports are idempotent; check the flow
+  and the instructions.
 - A one-click "decision report" (static HTML like the calibration report) to keep when the
-  subscription ends.
+  subscription ends, stating pass / not met / not enough days by the rule per ADR 0009 H6.
 
-Done when: the view works on synthetic data in tests and on my data after my next Whoop import.
+Done when: the view passes synthetic tests for every rule in ADR 0009 (window, exclusions,
+Wilson intervals, verdict states, naive baseline, restart on activation), shows n and intervals,
+and works on my data after my next Whoop import.
 ```
 
 ---

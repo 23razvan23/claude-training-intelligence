@@ -34,6 +34,15 @@ public final class Fixtures {
 
     /** Whoop CSVs for {@code days} consecutive cycles starting at {@code first}. */
     public static void whoopCsvs(Path dir, LocalDate first, int days) throws IOException {
+        whoopCsvs(dir, first, days, false, "12.3");
+    }
+
+    /**
+     * As above, but the last cycle can be left open (blank "Cycle end time", as in an export taken
+     * during the day) and given its own day strain.
+     */
+    public static void whoopCsvs(Path dir, LocalDate first, int days, boolean lastCycleOpen, String lastDayStrain)
+            throws IOException {
         var cycles = new StringBuilder("Cycle start time,Cycle end time,Cycle timezone,Recovery score %,"
                 + "Resting heart rate (bpm),Heart rate variability (ms),Skin temp (celsius),Blood oxygen %,Day Strain,"
                 + "Energy burned (cal),Max HR (bpm),Average HR (bpm),Sleep onset,Wake onset,Sleep performance %,"
@@ -56,15 +65,18 @@ public final class Fixtures {
             // next sleep onset, so its start date is one day before the day it belongs to.
             String cs = LOCAL.format(onset);
             String ce = LOCAL.format(d.atTime(23, 0));
-            cycles.append(String.join(",", cs, ce, "UTC+02:00", String.valueOf(40 + i % 50), "48", "65.5", "33.4",
-                    "96.1", "12.3", "2500", "170", "70", LOCAL.format(onset), LOCAL.format(wake), "88", "14.8", "420", "470", "200",
+            boolean open = lastCycleOpen && i == days - 1;
+            String cycleEnd = open ? "" : ce;
+            String strain = i == days - 1 ? lastDayStrain : "12.3";
+            cycles.append(String.join(",", cs, cycleEnd, "UTC+02:00", String.valueOf(40 + i % 50), "48", "65.5", "33.4",
+                    "96.1", strain, "2500", "170", "70", LOCAL.format(onset), LOCAL.format(wake), "88", "14.8", "420", "470", "200",
                     "100", "120", "50", "480", "30", "90", "80")).append('\n');
             sleeps.append(String.join(",", cs, ce, "UTC+02:00", LOCAL.format(onset), LOCAL.format(wake), "88", "14.8", "420", "470",
                     "200", "100", "120", "50", "480", "30", "90", "80", "false")).append('\n');
             workouts.append(String.join(",", cs, ce, "UTC+02:00", LOCAL.format(d.atTime(18, 0)),
                     LOCAL.format(d.atTime(19, 0)), "60", "Running", "11.2", "700", "175", "150", "10", "true",
                     "10000", "80")).append('\n');
-            journal.append(String.join(",", cs, ce, "UTC+02:00", "Drank alcohol?", "false", "")).append('\n');
+            journal.append(String.join(",", cs, cycleEnd, "UTC+02:00", "Drank alcohol?", "false", "")).append('\n');
         }
         Files.writeString(dir.resolve("physiological_cycles.csv"), cycles);
         Files.writeString(dir.resolve("sleeps.csv"), sleeps);

@@ -4,6 +4,7 @@
 
 ## Decision
 - Raw tables (`daily_wellness`, `sleep_session`, `activity`, `activity_stream`, `whoop_reference`, `whoop_journal_entry`, `subjective_log`) are append-only. All importer writes go through `RawWriter`, using `INSERT … ON CONFLICT DO NOTHING`. Re-running an import inserts nothing and reports every row as a duplicate.
+- **Exception: unfinished Whoop cycles are not stored (R-06).** A cycle with no "Cycle end time" is the current day, and its day strain is still growing. Raw rows are never updated on re-import, so storing it would keep the partial value forever. The importer skips such cycles and their journal rows, counts them as skipped and adds one batch warning ("the current, unfinished day was not imported; it will come in with your next export"). The finished cycle is inserted by a later export. Migration V12 removed the open cycles stored before this rule. Whoop sleeps and workouts are unchanged (their keys are start times of finished events).
 - Dedup keys ("source ID plus timestamp"):
 
   | Table | Unique key | source_id used |

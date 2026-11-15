@@ -117,7 +117,16 @@ public class WhoopCsvImporter {
         return min == null ? null : min * 60;
     }
 
+    /**
+     * An export taken during the day contains the current cycle with a blank "Cycle end time" and a
+     * day strain that is still growing. It is not a measurement yet, and the raw tables never update
+     * a stored row, so storing it would freeze the partial value (R-06, ADR 0003).
+     */
+    private static final String UNFINISHED_DAY_WARNING =
+            "The current, unfinished day was not imported; it will come in with your next export.";
+
     private void cycles(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
+        boolean skippedOpen = false;
         for (CSVRecord r : t.records()) {
             ctx.progress().step();
             try {
@@ -127,9 +136,15 @@ public class WhoopCsvImporter {
                     ctx.stats().skipped("whoop_reference", 1);
                     continue;
                 }
+                Instant end = TimeParsing.instant(t.text(r, CYCLE_END), z);
+                if (end == null) {
+                    ctx.stats().skipped("whoop_reference", 1);
+                    skippedOpen = true;
+                    continue;
+                }
                 writer.whoopCycle(ctx, new RawRows.WhoopCycle(
                         start,
-                        TimeParsing.instant(t.text(r, CYCLE_END), z),
+                        end,
                         cycleDate(start, TimeParsing.instant(t.text(r, WAKE_ONSET), z), z),
                         t.integer(r, RECOVERY),
                         t.decimal(r, DAY_STRAIN),
@@ -148,6 +163,7 @@ public class WhoopCsvImporter {
                 ctx.stats().warn("physiological_cycles.csv line " + r.getRecordNumber() + ": " + e.getMessage());
             }
         }
+        if (skippedOpen) ctx.stats().warn(UNFINISHED_DAY_WARNING);
     }
 
     private void sleeps(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
@@ -224,6 +240,7 @@ public class WhoopCsvImporter {
     }
 
     private void journal(RawWriter.Ctx ctx, CsvTable t, ZoneId fallback) {
+        boolean skippedOpen = false;
         for (CSVRecord r : t.records()) {
             ctx.progress().step();
             try {
@@ -234,6 +251,12 @@ public class WhoopCsvImporter {
                     ctx.stats().skipped("whoop_journal_entry", 1);
                     continue;
                 }
+                if (TimeParsing.instant(t.text(r, CYCLE_END), z) == null) {
+                    // Journal rows of an unfinished cycle: same rule as the cycle itself.
+                    ctx.stats().skipped("whoop_journal_entry", 1);
+                    skippedOpen = true;
+                    continue;
+                }
                 writer.journal(ctx, new RawRows.JournalEntry(
                         start, cycleDate(start, null, z), q, t.bool(r, ANSWERED_YES), t.text(r, NOTES)));
             } catch (RuntimeException e) {
@@ -241,5 +264,6 @@ public class WhoopCsvImporter {
                 ctx.stats().warn("journal_entries.csv line " + r.getRecordNumber() + ": " + e.getMessage());
             }
         }
+        if (skippedOpen) ctx.stats().warn(UNFINISHED_DAY_WARNING);
     }
 }

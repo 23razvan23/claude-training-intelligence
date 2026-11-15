@@ -83,7 +83,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-03 | Generate a committed parity fixture and guard the feature version in CI | P0 | test-gap | S | R-02 | 1b-1 |
 | R-04 | Record when a model was activated and refuse unsafe activations | P0 | bug | S | R-02 | 1b-1, 1b-3 |
 | R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
-| R-06 | Stop freezing unfinished Whoop cycles on import | P1 | bug | S | – | 1b-3 |
+| R-06 | Stop freezing unfinished Whoop cycles on import (done) | P1 | bug | S | – | 1b-3 |
 | R-07 | Fix the live-holdout rules in writing before looking at holdout data | P1 | design | S | R-04 | 1b-3 |
 | R-08 | Make the nightly backup fail loudly and prove it restores (done) | P1 | bug | S | – | – |
 | R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access) |

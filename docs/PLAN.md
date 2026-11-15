@@ -59,6 +59,7 @@ Train 2026-01-19 → 2026-09-09; test 2026-09-10 → 2026-11-09 (the last ~20% o
   - Daily life matters for strain.
   - Flexible models overfit with only ~230 training days.
   - Never let a stale image or stale features fool a comparison.
+- **Note (R-06):** the last day of the test window, 2026-11-09, carried a partial Whoop strain (an unfinished cycle was stored). It does not change the PASS. Unfinished Whoop cycles are no longer imported (ADR 0003).
 - **Known gaps:**
   - Low-coverage days (watch off) are lower confidence.
   - 66 Whoop-only workouts are only partly visible to us.
@@ -137,7 +138,7 @@ At the end of Phase 2, stop: every rule has a passing scenario test, and the bac
   - `ingestion` (importers, `RawWriter`, import batches and progress);
   - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions and activation);
   - `security`, `athletes`; placeholder packages `planning` and `adaptation`.
-  - Migrations V1–V11. **Never edit a merged migration; add a new one.**
+  - Migrations V1–V12 (V12 removes unfinished Whoop cycles, R-06). **Never edit a merged migration; add a new one.**
 - `calibration/` (Python 3.12, package 0.5.0): `pipeline.run()` is a pure function of `day_features`. `FEATURE_VERSION` (`f3`) must match `app.metrics.feature-version`. The **scoring contract** for 1b-1 is **ADR 0008**: the coefficients (`pipeline._strain_coefficients`, recovery terms, sleep, bands) *plus* the rules that turn them into daily scores (day grid, yesterday's strain, 7-day shortfall, gaps and their named reasons, clipping, rounding, bands, low-confidence flag), each with a worked example for the parity test.
 - `frontend/` (React + TypeScript): Coverage, Imports, Calibration (coach) and Athletes (coach).
 - `tools/inspect_exports.py`: a read-only export summary, Python 3.9+, never prints free text.

@@ -4,6 +4,14 @@ backend/src/test/resources/parity/<case>/ holds day_features.csv (inputs at data
 expected.json (coefficients plus every per-day value the daily scoring must reproduce). These tests
 fail when the committed files are missing or stale; regenerate with
     cd calibration && python tests/parity_fixtures.py --write
+
+Staleness is checked in two parts, because the zones fit (8 parameters) lands a few 1e-6 apart on
+different machines (seen between a dev container and CI):
+  strict  scoring the committed CSV with the committed coefficients reproduces the committed days
+          (no fitting involved, so this is machine-independent): catches any change to the scoring rules;
+  loose   a fresh fit stays close to the committed coefficients and inputs: catches changes to the fitting
+          code or the synthetic tables.
+The other tests read the committed files, which are exactly what Java reads.
 """
 
 import json
@@ -13,30 +21,38 @@ from pathlib import Path
 
 import jsonschema
 import pytest
-from parity_fixtures import CASES, FIXTURE_DIR, build
+from parity_fixtures import CASES, COLUMNS, FIXTURE_DIR, build, from_csv
 
 from calibration import __main__ as cli
+from calibration import parity
 
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA = json.loads((REPO / "calibration" / "contract.schema.json").read_text(encoding="utf-8"))
-TOLERANCE = 1e-7  # relative: fitted coefficients may differ in the last bits between machines
+STRICT = 1e-9  # relative, same coefficients and inputs: only libm rounding may differ
+LOOSE = 1e-3  # relative, a fresh fit on another machine: optimizer end points differ slightly
 
 
-def close(a, b, path="") -> None:
-    """Recursive equality; floats within TOLERANCE."""
+def close(a, b, path="", rel=STRICT) -> None:
+    """Recursive equality; floats within rel."""
     if isinstance(a, float) or isinstance(b, float):
         assert a is not None and b is not None, path
-        assert math.isclose(a, b, rel_tol=TOLERANCE, abs_tol=1e-9), f"{path}: {a} != {b}"
+        assert math.isclose(a, b, rel_tol=rel, abs_tol=rel), f"{path}: {a} != {b}"
     elif isinstance(a, dict):
         assert isinstance(b, dict) and set(a) == set(b), f"{path}: keys {sorted(a)} != {sorted(b)}"
         for k in a:
-            close(a[k], b[k], f"{path}.{k}")
+            close(a[k], b[k], f"{path}.{k}", rel)
     elif isinstance(a, list):
         assert isinstance(b, list) and len(a) == len(b), f"{path}: length"
         for i, (x, y) in enumerate(zip(a, b, strict=True)):
-            close(x, y, f"{path}[{i}]")
+            close(x, y, f"{path}[{i}]", rel)
     else:
         assert a == b, f"{path}: {a!r} != {b!r}"
+
+
+def committed(case: str) -> tuple[str, dict]:
+    folder = FIXTURE_DIR / case
+    assert (folder / "day_features.csv").exists(), f"missing fixture {folder}: run python tests/parity_fixtures.py --write"
+    return (folder / "day_features.csv").read_text(encoding="utf-8"), json.loads((folder / "expected.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -45,12 +61,26 @@ def fresh():
 
 
 @pytest.mark.parametrize("case", CASES)
-def test_committed_fixture_equals_a_fresh_generation(case, fresh):
-    folder = FIXTURE_DIR / case
-    assert (folder / "day_features.csv").exists(), f"missing fixture {folder}: run python tests/parity_fixtures.py --write"
-    csv_text, expected = fresh[case]
-    assert (folder / "day_features.csv").read_text(encoding="utf-8") == csv_text
-    close(json.loads((folder / "expected.json").read_text(encoding="utf-8")), json.loads(json.dumps(expected)))
+def test_committed_days_follow_from_the_committed_inputs_and_coefficients(case):
+    csv_text, expected = committed(case)
+    days = json.loads(json.dumps(parity.score(from_csv(csv_text), expected["coefficients"])))
+    close(expected["days"], days, "days")
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_committed_fixture_matches_a_fresh_generation(case, fresh):
+    csv_text, expected = committed(case)
+    fresh_csv, fresh_expected = fresh[case]
+    fresh_expected = json.loads(json.dumps(fresh_expected))
+    close(expected["coefficients"], fresh_expected["coefficients"], "coefficients", LOOSE)
+    assert expected["planted"] == fresh_expected["planted"]
+    a, b = from_csv(csv_text), from_csv(fresh_csv)
+    assert list(a["cycle_date"]) == list(b["cycle_date"]) and list(a["has_garmin_core"]) == list(b["has_garmin_core"])
+    for col, scale in COLUMNS.items():
+        if isinstance(scale, int):
+            # one unit of the stored precision: a band-edge input is solved from the fitted coefficients
+            assert a[col].isna().equals(b[col].isna()), col
+            assert ((a[col] - b[col]).abs().fillna(0) <= 1.01 * 10.0**-scale).all(), col
 
 
 @pytest.mark.parametrize("case", CASES)
@@ -60,8 +90,8 @@ def test_fixture_files_are_small(case):
 
 
 @pytest.mark.parametrize("case", ["load", "zones"])
-def test_fitted_fixtures_carry_a_valid_contract(case, fresh):
-    c = fresh[case][1]["coefficients"]
+def test_fitted_fixtures_carry_a_valid_contract(case):
+    c = committed(case)[1]["coefficients"]
     jsonschema.validate(json.loads(json.dumps(c)), SCHEMA)
     assert c["strain"]["form"] == case
 
@@ -71,8 +101,8 @@ def _days(expected) -> dict:
 
 
 @pytest.mark.parametrize("case", ["load", "zones"])
-def test_every_planted_case_is_present(case, fresh):
-    expected = fresh[case][1]
+def test_every_planted_case_is_present(case):
+    expected = committed(case)[1]
     days, planted = _days(expected), expected["planted"]
     day = lambda name: days[planted[name]]  # noqa: E731
 
@@ -125,8 +155,8 @@ ADR_REASONS = {
 }
 
 
-def test_adr_0008_worked_example_is_reproduced(fresh):
-    days = _days(fresh["adr0008"][1])
+def test_adr_0008_worked_example_is_reproduced():
+    days = _days(committed("adr0008")[1])
     assert list(days) == list(ADR_TABLE)
     for date, (st, prev, short, need, perf, rec, band) in ADR_TABLE.items():
         d = days[date]

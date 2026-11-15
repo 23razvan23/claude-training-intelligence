@@ -120,6 +120,11 @@ export interface ModelVersion {
   testTo?: string;
   passed: boolean;
   createdAt: string;
+  /** Absent if never activated, or if it was already ACTIVE before activation times were recorded. */
+  activatedAt?: string;
+  retiredAt?: string;
+  /** Why the daily scoring could not use this version; absent when it can. */
+  contractIssue?: 'FEATURE_VERSION' | 'SCHEMA_VERSION';
   metrics: {
     strain?: ScoreMetrics;
     recovery?: ScoreMetrics & { agreement?: number; green_red_rate?: number };

@@ -263,17 +263,17 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-04: Record when a model was activated and refuse unsafe activations
 - **Priority / Type / Size:** P0 / bug / S
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED; done 2026-11-15 (`V13__model_activation.sql`; V12 was taken by R-06). m13 keeps a null `activated_at` (coach decision: no invented time) and the Calibration page warns that it uses the old format. Re-activating the ACTIVE version is a no-op. Coach activation of m15 pending.
 - **Problem:** activation only flips a status. The time of activation is not stored, although stage 1b-3 is defined "from its activation date". Activation also accepts a model built on a different feature set from the one the app is currently computing, and (after R-02) should refuse a contract version the scorer does not understand.
 - **Evidence:** `MetricsRepository.java:69-74` (two `UPDATE … SET status`); V6:64-80 has no `activated_at`; `MetricsController.java:80-92` checks only `passed` and `RETIRED`.
 - **Why it matters:** without the timestamp the holdout window cannot be reconstructed after the fact; activating an `f2` model while the app computes `f3` rows would score nothing, or score the wrong columns.
 - **Proposed change:** new migration `V12__model_activation.sql`: `activated_at TIMESTAMPTZ`, `activated_by BIGINT REFERENCES app_user ON DELETE SET NULL`, `retired_at TIMESTAMPTZ`. `activate` sets them; it returns 409 with a plain message when `feature_version ≠ app.metrics.feature-version` or `coefficients.schema_version` is missing/unsupported. Add `activatedAt` to `ModelVersion` and show it on the Calibration page. If a model is already ACTIVE when V12 runs, leave `activated_at` null and let the UI say "activation time unknown".
 - **Out of scope:** scoring; holdout logic; editing V6 or V11.
 - **Acceptance criteria:**
-  - [ ] Failing test first in `MetricsIT`: activating sets `activated_at`; the previously active version gets `retired_at`.
-  - [ ] Test: activation of a model with another `feature_version` → 409.
-  - [ ] Test: activation of a model without `schema_version` 2 → 409.
-  - [ ] Calibration page shows the activation date; i18n key added.
+  - [x] Failing test first in `MetricsIT`: activating sets `activated_at`; the previously active version gets `retired_at`.
+  - [x] Test: activation of a model with another `feature_version` → 409.
+  - [x] Test: activation of a model without `schema_version` 2 → 409.
+  - [x] Calibration page shows the activation date; i18n key added.
 - **Verification:** `cd backend && ./gradlew build`; `cd frontend && npm run lint && npm run typecheck && npm run build`. Coach: `docker compose exec db psql -U training -d training -c "SELECT id, version, status, feature_version, passed, activated_at FROM model_version WHERE athlete_id = 1 ORDER BY id DESC LIMIT 5;"` → exactly one `ACTIVE` row with a timestamp after they press Activate.
 - **Coach decision needed:** no (but see question 1 in §5: has Activate already been pressed?).
 - **Opus prompt:**

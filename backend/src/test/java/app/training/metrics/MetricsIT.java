@@ -139,10 +139,104 @@ class MetricsIT extends IntegrationTest {
         assertThat(count("SELECT diag_whoop_only_workouts FROM day_features WHERE athlete_id = ? AND cycle_date = ?", a, FIRST)).isEqualTo(1);
     }
 
+    /** A model the scorer can use: the app's feature version and contract schema_version 2. */
     private long model(long athlete, String version, boolean passed) {
+        return model(athlete, version, passed, "f3", "{\"schema_version\": 2}");
+    }
+
+    private long model(long athlete, String version, boolean passed, String featureVersion, String coefficients) {
         return jdbc.sql("""
                 INSERT INTO model_version (athlete_id, version, feature_version, coefficients, metrics, passed, report_html)
-                VALUES (?, ?, 'f3', '{}', '{}', ?, '') RETURNING id""").params(athlete, version, passed).query(Long.class).single();
+                VALUES (?, ?, ?, ?::jsonb, '{}', ?, '') RETURNING id""")
+                .params(athlete, version, featureVersion, coefficients, passed).query(Long.class).single();
+    }
+
+    private java.time.Instant instant(String column, long modelId) {
+        var ts = jdbc.sql("SELECT " + column + " FROM model_version WHERE id = ?").param(modelId)
+                .query(java.sql.Timestamp.class).optional().orElse(null);
+        return ts == null ? null : ts.toInstant();
+    }
+
+    @Test
+    void activationRecordsWhenAndWhoAndWhenThePreviousVersionWasRetired() throws Exception {
+        long a = athlete(190);
+        long first = model(a, "m-t1", true);
+        long second = model(a, "m-t2", true);
+
+        // A fresh candidate has no activation or retirement time.
+        mvc.perform(get("/api/models/" + first).with(user(coach)))
+                .andExpect(jsonPath("$.activatedAt").doesNotExist())
+                .andExpect(jsonPath("$.retiredAt").doesNotExist());
+
+        mvc.perform(post("/api/models/" + first + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.retiredAt").doesNotExist());
+        var firstActivated = instant("activated_at", first);
+        assertThat(firstActivated).isNotNull();
+        assertThat(count("SELECT activated_by FROM model_version WHERE id = ?", first)).isEqualTo(coach.id());
+
+        // Pressing Activate again on the ACTIVE version changes nothing: the start of the
+        // live comparison with Whoop must not move.
+        mvc.perform(post("/api/models/" + first + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertThat(instant("activated_at", first)).isEqualTo(firstActivated);
+
+        mvc.perform(post("/api/models/" + second + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk());
+        var retired = instant("retired_at", first);
+        assertThat(retired).isNotNull().isEqualTo(instant("activated_at", second));
+        assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(first).query(String.class).single()).isEqualTo("RETIRED");
+        assertThat(instant("activated_at", first)).as("the retired version keeps its activation time").isEqualTo(firstActivated);
+        mvc.perform(get("/api/models/" + first).with(user(coach)))
+                .andExpect(jsonPath("$.retiredAt").isNotEmpty());
+        // A usable version has no contract issue (null fields are left out of the JSON).
+        mvc.perform(get("/api/models/" + second).with(user(coach)))
+                .andExpect(jsonPath("$.contractIssue").doesNotExist());
+
+        // Deleting the login that pressed Activate keeps the history, without the link.
+        long other = users.insert("coach-del" + System.nanoTime(), "x", Role.COACH, null);
+        long third = model(a, "m-t3", true);
+        mvc.perform(post("/api/models/" + third + "/activate").with(user(users.findById(other).orElseThrow())).with(csrf()))
+                .andExpect(status().isOk());
+        jdbc.sql("DELETE FROM app_user WHERE id = ?").param(other).update();
+        assertThat(instant("activated_at", third)).isNotNull();
+        assertThat(jdbc.sql("SELECT activated_by FROM model_version WHERE id = ?").param(third).query(Long.class).optional()).isEmpty();
+    }
+
+    @Test
+    void aModelBuiltOnAnotherFeatureSetIsRefused() throws Exception {
+        long a = athlete(190);
+        long old = model(a, "m-f2", true, "f2", "{\"schema_version\": 2}");
+        mvc.perform(get("/api/models/" + old).with(user(coach)))
+                .andExpect(jsonPath("$.contractIssue").value("FEATURE_VERSION"));
+        mvc.perform(post("/api/models/" + old + "/activate").with(user(coach)).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("feature set f2")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("f3")));
+        assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(old).query(String.class).single()).isEqualTo("CANDIDATE");
+        assertThat(instant("activated_at", old)).isNull();
+    }
+
+    @Test
+    void aModelWithoutContractVersion2IsRefused() throws Exception {
+        long a = athlete(190);
+        long active = model(a, "m-ok", true);
+        mvc.perform(post("/api/models/" + active + "/activate").with(user(coach)).with(csrf())).andExpect(status().isOk());
+
+        for (String coefficients : List.of("{}", "{\"schema_version\": 1}", "{\"schema_version\": 3}", "{\"schema_version\": \"2\"}")) {
+            long m = model(a, "m-v" + System.nanoTime(), true, "f3", coefficients);
+            mvc.perform(get("/api/models/" + m).with(user(coach)))
+                    .andExpect(jsonPath("$.contractIssue").value("SCHEMA_VERSION"));
+            mvc.perform(post("/api/models/" + m + "/activate").with(user(coach)).with(csrf()))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("older calibration")));
+            assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(m).query(String.class).single())
+                    .as(coefficients).isEqualTo("CANDIDATE");
+        }
+        // The active version is untouched by the refused attempts.
+        assertThat(jdbc.sql("SELECT status FROM model_version WHERE id = ?").param(active).query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(instant("retired_at", active)).isNull();
     }
 
     @Test

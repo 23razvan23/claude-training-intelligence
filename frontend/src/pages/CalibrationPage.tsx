@@ -98,7 +98,7 @@ function ModelRow({ model, open, onToggle }: { model: ModelVersion; open: boolea
   const { t } = useTranslation();
   const report = useModelReport(open ? model.id : undefined);
   const activate = useActivateModel(model.athleteId);
-  const canActivate = model.passed && model.status === 'CANDIDATE' && !model.contractIssue;
+  const canActivate = model.passed && model.status === 'CANDIDATE' && !model.contractIssue && !model.olderThanActive;
   const when = (iso: string) => new Date(iso).toLocaleString();
   const c = model.metrics.checks;
   const chip = (ok: boolean | undefined, text: string) => <span className={`badge ${ok ? 'succeeded' : 'failed'}`}>{text}</span>;
@@ -130,12 +130,16 @@ function ModelRow({ model, open, onToggle }: { model: ModelVersion; open: boolea
       {model.status === 'RETIRED' && model.retiredAt && (
         <div className="muted small">{t('calibration.retiredOn', { when: when(model.retiredAt) })}</div>
       )}
+      {model.status === 'CANDIDATE' && model.passed && model.olderThanActive && (
+        <p className="muted small">{t('calibration.olderThanActive')}</p>
+      )}
       {model.contractIssue &&
         (model.status === 'ACTIVE' ? (
           <p className="warn small">{t('calibration.activeContractIssue')}</p>
         ) : (
           model.status === 'CANDIDATE' &&
-          model.passed && (
+          model.passed &&
+          !model.olderThanActive && (
             <p className="muted small">{t(`calibration.contractIssue.${model.contractIssue}`, { featureVersion: model.featureVersion })}</p>
           )
         ))}

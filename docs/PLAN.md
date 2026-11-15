@@ -5,7 +5,7 @@ Read this file first, then `SPEC.md` (the build spec) and `docs/adr/` (decisions
 **Ready-to-paste prompts for every remaining stage are in [`docs/PROMPTS.md`](PROMPTS.md).**
 Keep this file current: update the status, results log and next steps in every PR that changes them.
 
-_Last updated: 2026-11-15: ADR 0008 scoring contract (R-01); backup hardened and restore-tested (R-08); unfinished Whoop cycles (R-06); versioned coefficients contract, calibration 0.6.0 (R-02); parity fixtures and feature-version guard (R-03); activation time recorded and unsafe activations refused (R-04, V13). Model m13-20261113 (f3) is ACTIVE since 2026-11-13 (no stored time). m15-20261115 is the same model in contract version 2 with a clean test window: **activate it now**._
+_Last updated: 2026-11-15: ADR 0008 scoring contract (R-01); backup hardened and restore-tested (R-08); unfinished Whoop cycles (R-06); versioned coefficients contract, calibration 0.6.0 (R-02); parity fixtures and feature-version guard (R-03); activation time recorded and unsafe activations refused (R-04, V13). **Model m15-20261115 (f3, contract v2) is ACTIVE since 2026-11-15 19:47:54 UTC**; m13 is RETIRED at the same instant; a candidate older than the ACTIVE version (m14) can no longer be activated._
 
 ---
 
@@ -14,8 +14,8 @@ _Last updated: 2026-11-15: ADR 0008 scoring contract (R-01); backup hardened and
 | Phase (SPEC.md) | Status |
 |---|---|
 | 0 Foundation | **Done** (#1–#5). |
-| 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). Model m13-20261113 activated by the coach on 2026-11-13. |
-| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-08 done (backup); R-06 done; R-02 done (contract v2; m15 reproduces the PASS model); R-03 done (parity fixtures); R-04 done (activation record and guards); next: the coach activates m15, then 1b-1. |
+| 1a Recovery & Strain calibration | **Done: PASS on 2026-11-13** (§3). m13-20261113 activated 2026-11-13; replaced by m15-20261115 (same coefficients, contract v2), ACTIVE since 2026-11-15 19:47:54 UTC. |
+| 1b Daily scoring, Today/Trends, live holdout, Garmin sync | **Next.** Stages 1b-1 … 1b-4 (§5). First the review items that block 1b-1 (`docs/REVIEW.md`): R-01 done (ADR 0008); R-08 done (backup); R-06 done; R-02 done (contract v2; m15 reproduces the PASS model); R-03 done (parity fixtures); R-04 done (activation record and guards); m15 activated 2026-11-15. **Next: 1b-1** (R-07 can run alongside). |
 | 2 Adaptive engine | After 1b. Highest product priority after Module 1 (SPEC.md). Stages 2-1 … 2-5. |
 | 3 Plan builder | After 2. Stages 3-1 … 3-3. |
 | 4 Extensions | Last. Stages 4-1 … 4-3. |
@@ -51,7 +51,7 @@ Train 2026-01-19 → 2026-09-09; test 2026-09-10 → 2026-11-09 (the last ~20% o
 | m12 | 2.38 on full-coverage days (2.57 overall) | 88% | 0% | Whole-day zone model (f3) won training CV by 4.8% but overfit. Led to the parsimony rule (#13). |
 | **PASS** (m13) | **1.91, Spearman 0.82** (55 full-coverage days) | **88%** | **0%** | #13: zones must win CV by ≥ 10%, so "Edwards workout load + background" was selected. Strain targets revised by the coach to MAE ≤ 2.0 and Spearman ≥ 0.80 on days with ≥ 10 h of all-day HR. |
 | m14 (2026-11-15) | 1.91, 0.82 (55) | 88% | 0% | R-02 re-run with `--test-from 2026-09-10 --test-to 2026-11-09`: contract v2, same recovery and strain coefficients as m13. But the features predated V12 and still held the removed 9 Nov Whoop recovery, so the test window ran to 11-09. Not to be activated. |
-| **m15** (2026-11-15) | **1.91, 0.82 (55)** | **88%** | **0%** | After Recompute features: test window 2026-09-10 → 2026-11-08, same coefficients as m14 (and m13). **The model to activate now (R-04 is merged).** |
+| **m15** (2026-11-15) | **1.91, 0.82 (55)** | **88%** | **0%** | After Recompute features: test window 2026-09-10 → 2026-11-08, same coefficients as m14 (and m13). **ACTIVE since 2026-11-15 19:47:54 UTC.** |
 
 ### Phase 1a summary
 - **Recovery** agrees with Whoop's band on 88% of unseen days, with **no green-vs-red flips**. This is the score that drives training decisions.
@@ -139,7 +139,7 @@ At the end of Phase 2, stop: every rule has a passing scenario test, and the bac
 
 - `backend/` (Java 21, Spring Boot, Flyway, TimescaleDB):
   - `ingestion` (importers, `RawWriter`, import batches and progress);
-  - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions and activation: `activated_at`/`activated_by`/`retired_at`, refused for another feature version or a contract without `schema_version` 2);
+  - `metrics` (`Trimp`, `Baseline`, `ActivityLoadService`, `DayFeatureService`, model versions and activation: `activated_at`/`activated_by`/`retired_at`, refused for another feature version, a contract without `schema_version` 2, or a candidate older than the ACTIVE version);
   - `security`, `athletes`; placeholder packages `planning` and `adaptation`.
   - Migrations V1–V13 (V12 removes unfinished Whoop cycles, R-06; V13 records activation and retirement times, R-04). **Never edit a merged migration; add a new one.**
 - `calibration/` (Python 3.12, package 0.6.0, version in `calibration/__init__.py`): `pipeline.run()` is a pure function of `day_features` (plus an optional `context` with the profile values, read by `__main__` from `activity_load`). CLI: `--test-from` / `--test-to` fix the test window. `FEATURE_VERSION` (`f3`) must match `app.metrics.feature-version` (a test checks this). The **scoring contract** for 1b-1 is **ADR 0008**: the coefficients JSON, whose shape is `calibration/contract.schema.json` (`schema_version` 2: `calibration_version`, `feature_version`, `feature_config` {hr_max, hr_rest, sex_assumed}, `strain` with `clip` [0, 21], `sleep` with `performance_clip` [0, 100], `recovery`, `bands`, and `training_ranges` {min, p01, p99, max, n} per model part and input, for drift flags), *plus* the rules that turn them into daily scores (day grid, yesterday's strain, 7-day shortfall, gaps and their named reasons, clipping, rounding, bands, low-confidence flag), each with a worked example. The **parity fixtures** for 1b-1's Java test are in `backend/src/test/resources/parity/` (`adr0008`, `load`, `zones`), produced by the reference scorer `calibration/parity.py` (R-03; ADR 0008, Consequences).

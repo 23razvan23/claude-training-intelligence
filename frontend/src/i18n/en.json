@@ -77,6 +77,7 @@
       "FEATURE_VERSION": "Built on feature set {{featureVersion}}, which the app no longer computes. Press Recompute features and run a new calibration.",
       "SCHEMA_VERSION": "Old calibration format (before 0.6.0) that daily scoring can't read. Run a new calibration."
     },
+    "olderThanActive": "Older than the active version, so it can't replace it. Run a new calibration instead.",
     "activeContractIssue": "This active version uses an old format: activate a newer version before daily scoring starts.",
     "confirmActivate": "Activate {{version}}? It becomes the model for daily scores and for the live comparison with Whoop. The currently active version is retired."
   },

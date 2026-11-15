@@ -125,6 +125,8 @@ export interface ModelVersion {
   retiredAt?: string;
   /** Why the daily scoring could not use this version; absent when it can. */
   contractIssue?: 'FEATURE_VERSION' | 'SCHEMA_VERSION';
+  /** The ACTIVE version was created after this one, so this one can no longer be activated. */
+  olderThanActive: boolean;
   metrics: {
     strain?: ScoreMetrics;
     recovery?: ScoreMetrics & { agreement?: number; green_red_rate?: number };

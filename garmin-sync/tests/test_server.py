@@ -35,3 +35,36 @@ def test_unknown_path_is_404(server):
 def test_stub_adapter_refuses():
     with pytest.raises(SyncUnavailableError):
         NotConfiguredAdapter().fetch_day(date(2024, 1, 1))
+
+
+def test_log_lines_never_contain_query_strings(server, capsys):
+    # ADR 0011 D9: a secret placed in a URL by mistake must not reach the logs.
+    with pytest.raises(urllib.error.HTTPError):
+        urllib.request.urlopen(f"{server}/nope?token=fake-secret-value#frag")
+    with pytest.raises(urllib.error.HTTPError):
+        urllib.request.urlopen(f"{server}/health?password=fake-password")
+    with urllib.request.urlopen(f"{server}/health") as r:
+        r.read()
+    out = capsys.readouterr().out
+    assert "fake-secret-value" not in out
+    assert "fake-password" not in out
+    assert "GET /nope 404" in out
+    assert "GET /health 200" in out
+
+
+def test_malformed_request_logs_no_raw_line(server, capsys):
+    import socket
+
+    host, port = server.removeprefix("http://").split(":")
+    with socket.create_connection((host, int(port))) as s:
+        s.sendall(b"BOGUS /x?token=fake-secret-value HTTP/9.9\r\n\r\n")
+        s.recv(1024)
+    out = capsys.readouterr().out
+    assert "fake-secret-value" not in out
+
+
+def test_safe_request_summary():
+    from garmin_sync.server import safe_request_summary
+
+    assert safe_request_summary("POST", "/sync?x=1") == "POST /sync"
+    assert safe_request_summary(None, None) == "- -"

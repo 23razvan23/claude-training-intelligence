@@ -173,4 +173,4 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 **Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md).
 
-See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), daily scoring storage (0012), Today screen (0014).
+See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014).

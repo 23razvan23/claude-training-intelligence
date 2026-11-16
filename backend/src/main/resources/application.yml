@@ -101,6 +101,11 @@ app:
     yellow-percentiles: [25, 50]    # yellow: from your lower quarter to your median
     red-percentiles: [0, 25]        # red: up to your lower quarter (0 = from strain 0)
 
+  # Trends screen (stage 1b-2b, ADR 0015). Display only: nothing here changes a stored score.
+  trends:
+    history-days: 365   # 12 months: the longest range the screen offers
+    warmup-days: 90     # about three 28-day chronic windows, so the load lines are settled on the first visible day
+
 logging:
   level:
     root: INFO

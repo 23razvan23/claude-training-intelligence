@@ -107,7 +107,7 @@ No day is ever left out by hand. Every day in the window is counted in exactly o
 - **D3, m15's frozen marks:** filled in by V15 from m15's own stored marks. Its status is not changed.
 - **Whoop end:** 2027-02-19, no extension.
 
-## Assumptions (flagged for review)
+## Assumptions (confirmed by the coach on 2026-11-16)
 - **A1:** the 90-day minimum is counted on recovery days. The strain marks are judged at the same moment on the full-coverage strain days available, with their n shown.
 - **A2:** recovery marked lower confidence (ADR 0008 S8) is included in the recovery comparison, as in 1a.
 - **A3:** verdicts before the last Whoop day are interim; the final verdict uses the whole window.

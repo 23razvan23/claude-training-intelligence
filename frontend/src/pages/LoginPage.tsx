@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../api/client';
 import { useLogin } from '../api/hooks';
 
 export function LoginPage() {
@@ -31,7 +32,11 @@ export function LoginPage() {
             required
           />
         </label>
-        {login.isError && <p className="error">{t('login.failed')}</p>}
+        {login.isError && (
+          <p className="error">
+            {login.error instanceof ApiError && login.error.status === 429 ? t('login.tooMany') : t('login.failed')}
+          </p>
+        )}
         <button type="submit" disabled={login.isPending}>
           {t('login.submit')}
         </button>

@@ -5,12 +5,19 @@ import { BrowserRouter } from 'react-router-dom';
 import './i18n';
 import './styles.css';
 import { App } from './App';
+import { setUnauthorizedHandler } from './api/client';
 import { applyTheme, getTheme } from './theme';
 
 applyTheme(getTheme());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+});
+
+// A 401 from any call means the login is gone: forget everything and show the login page.
+setUnauthorizedHandler(() => {
+  queryClient.clear();
+  queryClient.setQueryData(['me'], null);
 });
 
 createRoot(document.getElementById('root')!).render(

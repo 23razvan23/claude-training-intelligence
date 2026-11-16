@@ -139,6 +139,24 @@ class HoldoutIT extends IntegrationTest {
     }
 
     @Test
+    void theDecisionReportDownloadsAsStaticHtml() throws Exception {
+        long a = athlete();
+        activate(candidate(a, "m-a", FROM));
+        score(a, "m-a", FROM, 75, 10.0);
+        whoop(a, FROM, 70, 9.5, true);
+        var res = mvc.perform(get("/api/athletes/" + a + "/holdout/report").with(user(coach)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse();
+        assertThat(res.getContentType()).startsWith("text/html");
+        assertThat(res.getHeader("Content-Disposition")).startsWith("attachment").contains("holdout-decision-m-a-");
+        assertThat(res.getHeader("Content-Security-Policy")).contains("default-src 'none'").contains("sandbox");
+        assertThat(res.getContentAsString()).contains("Not enough days yet: 1 of 90");
+
+        var athleteUser = users.findById(users.insert("ath-r" + System.nanoTime(), "x", Role.ATHLETE, a)).orElseThrow();
+        mvc.perform(get("/api/athletes/" + a + "/holdout/report").with(user(athleteUser))).andExpect(status().isForbidden());
+    }
+
+    @Test
     void onlyTheCoachMaySeeItAndNothingCanBeChanged() throws Exception {
         long a = athlete();
         activate(candidate(a, "m-a", FROM));

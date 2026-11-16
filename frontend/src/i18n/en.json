@@ -1,6 +1,6 @@
 {
   "app": { "name": "Training Intelligence", "short": "TI" },
-  "nav": { "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "holdout": "Holdout", "logout": "Log out" },
+  "nav": { "today": "Today", "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "holdout": "Holdout", "logout": "Log out" },
   "theme": { "toggle": "Switch theme", "light": "Light", "dark": "Dark", "system": "System" },
   "common": {
     "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "loading": "Loading…",
@@ -230,6 +230,86 @@
       "MISSING_WORKOUT_HR": "A workout without heart rate",
       "NO_ALL_DAY_HR": "No all-day heart rate",
       "NO_ZONE_MINUTES": "No heart-rate zone minutes"
+    }
+  },
+  "today": {
+    "title": "Today",
+    "subtitle": "{{date}}",
+    "noModel": "No active model yet. The coach calibrates and activates one on the Calibration tab.",
+    "noData": "No daily scores yet. After importing data, press Recompute features on the Calibration tab.",
+    "staleTitle": "No data for today yet",
+    "staleBody": "Last data from {{date}}. New scores appear after the next Whoop and Garmin import and Recompute features.",
+    "lastScored": "Last scored day: {{date}}",
+    "notToday": "This is not today's recovery.",
+    "recovery": "Recovery",
+    "recoveryOn": "Recovery on {{date}}",
+    "band": {
+      "GREEN": "Green",
+      "YELLOW": "Yellow",
+      "RED": "Red"
+    },
+    "notAvailable": "Recovery not available",
+    "notAvailableToday": "Recovery not available today",
+    "lowerConfidence": "Lower confidence",
+    "recoveryLowConf": "Lower confidence: the watch was worn for only part of the day before, so yesterday's strain is partial.",
+    "strainSoFar": "Strain so far",
+    "strain": "Strain",
+    "strainLowConf": "Lower confidence: the watch was worn for only part of this day.",
+    "strainMissing": "No strain: {{reason}}",
+    "target": "Target on a {{band}} day: {{low}}–{{high}}",
+    "targetBasis": "Your own range from {{n}} days in the last {{window}} (percentiles {{lowP}}–{{highP}}). A starting rule, not science; the planned session replaces it later.",
+    "targetBasisFromZero": "Your own range from {{n}} days in the last {{window}} (from 0 up to percentile {{highP}}). A starting rule, not science; the planned session replaces it later.",
+    "noTarget": "No target yet: not enough days with a full-coverage strain before this day.",
+    "noTargetNoBand": "No target without a recovery band.",
+    "sleepPerformance": "Sleep performance",
+    "sleepNeed": "Sleep need",
+    "sleepMissing": "No sleep recorded",
+    "hoursMinutes": "{{h}} h {{m}} min",
+    "contributions": "What moved recovery",
+    "contributionsHint": "Points added to or taken from the model's starting value.",
+    "needsRecompute": "New data was imported after these scores were computed: press Recompute features on the Calibration tab.",
+    "profileChanged": "HR max or resting HR changed since the model was calibrated: scores are flagged until the next calibration.",
+    "drift": "Some inputs are outside the range the model was trained on: read this score with care.",
+    "reasonWithDetail": "{{main}}: {{detail}}",
+    "reason": {
+      "NO_DAY_DATA": "No Garmin data for this day",
+      "NO_HRV": "No overnight HRV, or not enough nights yet for an HRV baseline",
+      "NO_RESTING_HR": "No resting heart rate",
+      "NO_RESPIRATION": "No breathing rate from sleep",
+      "NO_SLEEP": "No sleep recorded",
+      "NO_STRAIN_YESTERDAY": "Yesterday's strain is unknown",
+      "NO_GARMIN_CORE": "The night's core data is incomplete (for example a 0-minute sleep)",
+      "NO_SPO2": "No blood-oxygen reading",
+      "NO_BODY_BATTERY": "No Body Battery reading"
+    },
+    "yesterday": {
+      "NO_ALL_DAY_HR": "the watch recorded no all-day heart rate",
+      "MISSING_WORKOUT_HR": "a workout was recorded without heart rate",
+      "NO_DAY_DATA": "there is no Garmin data for that day",
+      "NO_ZONE_MINUTES": "heart-rate zone minutes are missing"
+    },
+    "strainReason": {
+      "NO_ALL_DAY_HR": "the watch recorded no all-day heart rate",
+      "MISSING_WORKOUT_HR": "a workout was recorded without heart rate",
+      "NO_DAY_DATA": "no Garmin data",
+      "NO_ZONE_MINUTES": "heart-rate zone minutes are missing"
+    },
+    "contrib": {
+      "hrvAbove": "HRV {{ms}} ms, {{pct}}% above your 30-day baseline ({{base}} ms)",
+      "hrvBelow": "HRV {{ms}} ms, {{pct}}% below your 30-day baseline ({{base}} ms)",
+      "hrvSame": "HRV {{ms}} ms, at your 30-day baseline",
+      "hrvPlain": "HRV compared with your 30-day baseline",
+      "rhrAbove": "Resting HR {{v}} bpm above your 30-day average",
+      "rhrBelow": "Resting HR {{v}} bpm below your 30-day average",
+      "rhrSame": "Resting HR at your 30-day average",
+      "respAbove": "Breathing rate {{v}} breaths/min above your 30-day average",
+      "respBelow": "Breathing rate {{v}} breaths/min below your 30-day average",
+      "respSame": "Breathing rate at your 30-day average",
+      "sleep": "Slept {{v}}% of your sleep need",
+      "prevStrain": "Yesterday's strain {{v}}",
+      "prevStrainTypical": "Yesterday's strain {{v}} (your usual {{typical}})",
+      "spo2": "Blood oxygen in sleep {{v}}%",
+      "bodyBattery": "Body Battery peak {{v}}"
     }
   }
 }

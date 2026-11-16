@@ -275,3 +275,63 @@ export interface HoldoutFeed {
   recomputeNeeded: boolean;
   whoopEnd: string;
 }
+
+// Today screen (stage 1b-2a, ADR 0014): GET /api/athletes/{id}/today
+export type TodayState = 'FRESH' | 'MISSING' | 'STALE' | 'NO_DATA' | 'NO_MODEL';
+export type Band = 'GREEN' | 'YELLOW' | 'RED';
+
+export interface TodayReason {
+  reason: string;
+  detail?: string | null;
+}
+
+export interface TodayContribution {
+  feature: string;
+  value?: number | null;
+  points?: number | null;
+  measured?: number | null;
+  baseline?: number | null;
+  percentVsBaseline?: number | null;
+  typical?: number | null;
+}
+
+export interface StrainTarget {
+  low: number;
+  high: number;
+  band: Band;
+  basisDays: number;
+  windowDays: number;
+  lowPercentile: number;
+  highPercentile: number;
+}
+
+export interface TodayDay {
+  date: string;
+  recoveryPct?: number | null;
+  band?: Band | null;
+  recoveryLowerConfidence: boolean;
+  recoveryReasons: TodayReason[];
+  strain?: number | null;
+  strainLowCoverage: boolean;
+  strainReason?: string | null;
+  strainTarget?: StrainTarget | null;
+  sleepPerformancePct?: number | null;
+  sleepNeedMin?: number | null;
+  sleepReason?: string | null;
+  contributions: TodayContribution[];
+  needsRecompute: boolean;
+  drift: boolean;
+  profileChanged: boolean;
+}
+
+export interface Today {
+  today: string;
+  timezone: string;
+  state: TodayState;
+  modelVersion?: string | null;
+  lastDataDate?: string | null;
+  /** Only ever today's row (date === today). */
+  day?: TodayDay | null;
+  /** The newest scored day before today, only when stale; always shown with its date. */
+  lastScored?: TodayDay | null;
+}

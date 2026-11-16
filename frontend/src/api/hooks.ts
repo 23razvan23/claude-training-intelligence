@@ -12,6 +12,7 @@ import type {
   Me,
   ModelVersion,
   RecomputeResult,
+  Today,
   UserView,
 } from './types';
 
@@ -136,6 +137,7 @@ export function useRecomputeFeatures(athleteId?: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['features', athleteId] });
       qc.invalidateQueries({ queryKey: ['holdout', athleteId] });
+      qc.invalidateQueries({ queryKey: ['today', athleteId] });
     },
   });
 }
@@ -198,5 +200,15 @@ export function useHoldoutFeed(athleteId?: number) {
     queryKey: ['holdout', athleteId, 'feed'],
     queryFn: () => api<HoldoutFeed>(`/api/athletes/${athleteId}/holdout/feed`),
     enabled: athleteId != null,
+  });
+}
+
+export function useToday(athleteId?: number) {
+  return useQuery({
+    queryKey: ['today', athleteId],
+    queryFn: () => api<Today>(`/api/athletes/${athleteId}/today`),
+    enabled: athleteId != null,
+    // The morning check: refresh when the phone comes back to the app.
+    refetchOnWindowFocus: true,
   });
 }

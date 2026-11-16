@@ -10,6 +10,9 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 public class TrainingApplication {
     public static void main(String[] args) {
+        if (args.length > 0 && app.training.metrics.ScoringCli.COMMAND.equals(args[0])) {
+            System.exit(app.training.metrics.ScoringCli.main(TrainingApplication.class, args));
+        }
         SpringApplication.run(TrainingApplication.class, args);
     }
 }

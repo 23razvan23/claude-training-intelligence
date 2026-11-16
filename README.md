@@ -66,6 +66,13 @@ Drag single activity `.fit` files under **FIT files**. A file that matches an al
 
 How it works: [ADR 0007](docs/adr/0007-module1-calibration.md). The targets are in `calibration/targets.json`.
 
+### 6. Daily scores (Phase 1b)
+Once a model is ACTIVE, **Recompute features** also computes the daily Recovery, Strain and Sleep scores from it. To rescore without recomputing features, for all days or a date range:
+```bash
+docker compose run --rm app score --athlete 1 --from 2026-11-01 --to 2026-11-15
+```
+`--from` and `--to` are optional. It runs next to the running app and prints a one-line summary. How the scores are computed: [ADR 0008](docs/adr/0008-scoring-contract.md); what is stored: [ADR 0012](docs/adr/0012-daily-scoring-storage.md).
+
 Personal exports never belong in git: `.gitignore` excludes `data/`, `*.zip`, `*.fit` and `.env`.
 
 ## Development

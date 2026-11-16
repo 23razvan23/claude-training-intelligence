@@ -79,7 +79,8 @@ class MetricsIT extends IntegrationTest {
         mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.load.fromStream").value(DAYS))
-                .andExpect(jsonPath("$.features.paired").value(DAYS));
+                .andExpect(jsonPath("$.features.paired").value(DAYS))
+                .andExpect(jsonPath("$.scores.skipped").value(org.hamcrest.Matchers.containsString("No ACTIVE model")));
 
         // Every Garmin run got a stream-based load; the FIT run is 120 s at HR 130-159.
         assertThat(count("SELECT count(*) FROM activity_load WHERE athlete_id = ? AND method = 'stream' AND trimp_banister > 0", a)).isEqualTo(DAYS);
@@ -137,6 +138,29 @@ class MetricsIT extends IntegrationTest {
         }
         mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf())).andExpect(status().isOk());
         assertThat(count("SELECT diag_whoop_only_workouts FROM day_features WHERE athlete_id = ? AND cycle_date = ?", a, FIRST)).isEqualTo(1);
+    }
+
+    @Test
+    void recomputeFeaturesAlsoRefreshesTheDailyScores() throws Exception {
+        long a = athlete(190);
+        importAll(a);
+        var coefficients = DailyScorerParityTest.asContract(new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(DailyScorerParityTest.resource("adr0008", "expected.json")).get("coefficients"));
+        long m = model(a, "m-hook", true, "f3", coefficients.toString());
+        jdbc.sql("UPDATE model_version SET status = 'ACTIVE' WHERE id = ?").param(m).update();
+
+        mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scores.modelVersion").value("m-hook"))
+                .andExpect(jsonPath("$.scores.days").value(DAYS))
+                .andExpect(jsonPath("$.scores.withStrain").value(DAYS));
+        assertThat(count("SELECT count(*) FROM derived_day_metrics WHERE athlete_id = ? AND model_version = 'm-hook'", a)).isEqualTo(DAYS);
+        // Recovery needs an HRV baseline (14 prior days) and yesterday's strain: none on day 1.
+        assertThat(count("SELECT count(*) FROM derived_day_metrics WHERE athlete_id = ? AND recovery_pct IS NOT NULL", a)).isEqualTo(DAYS - 14);
+
+        // Pressing it again replaces the rows rather than adding to them.
+        mvc.perform(post("/api/athletes/" + a + "/features/recompute").with(user(coach)).with(csrf())).andExpect(status().isOk());
+        assertThat(count("SELECT count(*) FROM derived_day_metrics WHERE athlete_id = ?", a)).isEqualTo(DAYS);
     }
 
     /** A model the scorer can use: the app's feature version and contract schema_version 2. */

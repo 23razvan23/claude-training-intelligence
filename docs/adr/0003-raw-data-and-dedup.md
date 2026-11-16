@@ -20,7 +20,7 @@
 - **Same workout, two files.** A Garmin activity appears in `summarizedActivities.json` and as a FIT file. Before inserting either, the importer looks for an existing GARMIN activity starting within **120 s [configurable: `app.import.activity-match-tolerance-seconds`]**. A FIT file attaches its stream to that activity; a summary is skipped as a duplicate. In a bulk export, summaries are read before FIT files, so the summary row wins and keeps Garmin's training load.
 - Whoop workouts are stored as `source = 'WHOOP'` activities (reference only). They are never merged with Garmin activities.
 - Each import batch runs in one transaction: it lands completely or not at all.
-- Derived tables (`derived_day_metrics`) carry `model_version` and can be dropped and recomputed. `adaptation_suggestion` carries `rules_version`.
+- Derived tables can be dropped and recomputed. Which version each carries: `day_features` → `feature_version`; `model_version` → the `feature_version` it was fitted on; `derived_day_metrics` → `model_version` **and** `feature_version` (V14, stage 1b-1; its scoring rules are fixed per model by ADR 0008); `adaptation_suggestion` → `rules_version`.
 
 ## Consequences
 - Corrections to raw data are new rows (for example in `subjective_log`, where the latest wins), never updates.

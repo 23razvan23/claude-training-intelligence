@@ -153,3 +153,114 @@ export interface ModelVersion {
     checks?: { strain_mae: boolean; strain_spearman?: boolean; recovery_band_agreement: boolean; recovery_green_red: boolean };
   };
 }
+
+// Live comparison with Whoop (stage 1b-3, ADR 0009 / ADR 0013). Rates are 0–1.
+export interface Rate {
+  k: number;
+  n: number;
+  value?: number;
+  low?: number;
+  high?: number;
+}
+
+export interface Stat {
+  n: number;
+  value?: number;
+}
+
+export interface RecoveryFigures {
+  n: number;
+  bandAgreement: Rate;
+  greenRed: Rate;
+  mae: Stat;
+  spearman: Stat;
+  lowerConfidence: number;
+  confusion: Record<string, Record<string, number>>;
+}
+
+export interface StrainFigures {
+  n: number;
+  mae: Stat;
+  spearman: Stat;
+}
+
+export type HoldoutScore = 'recovery' | 'strain' | 'sleepPerformance' | 'sleepNeed';
+
+export interface HoldoutFigures {
+  from: string;
+  to: string;
+  days: number;
+  recovery: RecoveryFigures;
+  strain: StrainFigures;
+  strainLowCoverage: StrainFigures;
+  sleepPerformanceMae: Stat;
+  sleepNeedMae: Stat;
+  groups: Record<HoldoutScore, Record<string, number>>;
+}
+
+export interface HoldoutSide {
+  bandAgreement: Rate;
+  greenRed: Rate;
+  recoveryMae: Stat;
+}
+
+export interface HoldoutMark {
+  key: string;
+  comparison: '>=' | '<=';
+  target: number;
+  value?: number;
+  n: number;
+  rate?: Rate;
+  met?: boolean;
+}
+
+export type HoldoutState = 'NOT_ENOUGH_DAYS_YET' | 'INTERIM' | 'FINAL' | 'NOT_ENOUGH_DAYS_BY_RULE';
+
+export interface HoldoutDay {
+  date: string;
+  recoveryGroup: string;
+  ourRecovery?: number;
+  ourBand?: string;
+  whoopRecovery?: number;
+  whoopBand?: string;
+  lowerConfidence: boolean;
+  strainGroup: string;
+  ourStrain?: number;
+  whoopStrain?: number;
+  lowCoverage: boolean;
+  sleepGroup: string;
+  ourSleepPerf?: number;
+  whoopSleepPerf?: number;
+  naiveRecovery?: number;
+  naiveBand?: string;
+}
+
+export interface HoldoutReport {
+  modelVersion: string;
+  status: string;
+  activatedAt?: string;
+  retiredAt?: string;
+  protocol: string;
+  source: string;
+  marks: Record<string, unknown>;
+  windowFrom: string;
+  windowTo?: string;
+  whoopEnd: string;
+  lastScoredDate?: string;
+  phase: 'RUNNING' | 'ENDED' | 'RETIRED';
+  verdict: { state: HoldoutState; overall?: 'PASS' | 'NOT_MET'; recoveryDays: number; minRecoveryDays: number; marks: HoldoutMark[] };
+  cumulative: HoldoutFigures;
+  rolling?: HoldoutFigures;
+  weeks: HoldoutFigures[];
+  naive: { n: number; skippedNoWhoopYesterday: number; ours: HoldoutSide; naive: HoldoutSide };
+  markers: { profileChangedDays: number; profile?: Record<string, number>; recomputeRuns: string[]; staleFeatureDays: number };
+  days: HoldoutDay[];
+}
+
+export interface HoldoutVersion {
+  version: string;
+  status: string;
+  activatedAt?: string;
+  retiredAt?: string;
+  windowFrom?: string;
+}

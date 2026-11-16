@@ -5,6 +5,8 @@ import type {
   AthleteInput,
   CoverageReport,
   FeatureSummary,
+  HoldoutReport,
+  HoldoutVersion,
   ImportBatch,
   Me,
   ModelVersion,
@@ -130,7 +132,10 @@ export function useRecomputeFeatures(athleteId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api<RecomputeResult>(`/api/athletes/${athleteId}/features/recompute`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['features', athleteId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['features', athleteId] });
+      qc.invalidateQueries({ queryKey: ['holdout', athleteId] });
+    },
   });
 }
 
@@ -159,6 +164,29 @@ export function useActivateModel(athleteId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (modelId: number) => api<ModelVersion>(`/api/models/${modelId}/activate`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['models', athleteId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['models', athleteId] });
+      qc.invalidateQueries({ queryKey: ['holdout', athleteId] });
+      qc.invalidateQueries({ queryKey: ['holdout-versions', athleteId] });
+    },
+  });
+}
+
+/** The live comparison with Whoop for the ACTIVE version, or for {@code version} (coach only). */
+export function useHoldout(athleteId?: number, version?: string) {
+  const q = version ? `?version=${encodeURIComponent(version)}` : '';
+  return useQuery({
+    queryKey: ['holdout', athleteId, version ?? null],
+    queryFn: () => api<HoldoutReport>(`/api/athletes/${athleteId}/holdout${q}`),
+    enabled: athleteId != null,
+    retry: false,
+  });
+}
+
+export function useHoldoutVersions(athleteId?: number) {
+  return useQuery({
+    queryKey: ['holdout-versions', athleteId],
+    queryFn: () => api<HoldoutVersion[]>(`/api/athletes/${athleteId}/holdout/versions`),
+    enabled: athleteId != null,
   });
 }

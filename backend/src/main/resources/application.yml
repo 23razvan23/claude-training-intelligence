@@ -84,6 +84,12 @@ app:
     holdout-min-recovery-days: 90
     # Confidence of the Wilson interval shown next to every rate: the conventional 95%.
     holdout-confidence: 0.95
+    # Last day of the coach's Whoop subscription (no extension, 2026-11-15). Not a sports-science
+    # number: after this day no Whoop data can arrive, so the comparison is final (ADR 0009 H6).
+    holdout-whoop-end: 2027-02-19
+    # Drift window on the Holdout view: the last 4 weeks (ADR 0009 H5 example). Display only, never
+    # used for the verdict.
+    holdout-rolling-days: 28
 
 logging:
   level:

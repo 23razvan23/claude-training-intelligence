@@ -70,11 +70,20 @@ public class UserController {
 
     @PostMapping("/me/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void changePassword(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody ChangePassword req) {
+    public void changePassword(
+            @AuthenticationPrincipal CurrentUser user,
+            @Valid @RequestBody ChangePassword req,
+            jakarta.servlet.http.HttpServletRequest request) {
         var current = users.findById(user.id()).orElseThrow();
         if (!encoder.matches(req.currentPassword(), current.passwordHash())) {
             throw ApiException.badRequest("Current password is wrong");
         }
-        users.updatePassword(user.id(), encoder.encode(req.newPassword()));
+        var changedAt = users.updatePassword(user.id(), encoder.encode(req.newPassword()));
+        // Other sessions of this user now fail the SessionGuard check; this one stays valid under a new id.
+        var session = request.getSession(false);
+        if (session != null) {
+            request.changeSessionId();
+            session.setAttribute(SessionGuard.LOGIN_AT, changedAt);
+        }
     }
 }

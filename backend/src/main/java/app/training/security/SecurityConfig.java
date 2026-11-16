@@ -35,18 +35,18 @@ public class SecurityConfig {
     /** Only with the web server: command-line runs (e.g. {@code score}) start without one. */
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, UserRepository users) throws Exception {
         http.authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/csrf").permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
-                        .requestMatchers("/api/openapi/**", "/api/docs/**", "/swagger-ui/**").permitAll()
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/api/**", "/swagger-ui/**").authenticated()
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
+                .addFilterAfter(new SessionGuard(users), org.springframework.security.web.context.SecurityContextHolderFilter.class)
                 .formLogin(f -> f.disable())
                 .httpBasic(b -> b.disable())
                 .logout(l -> l.disable());

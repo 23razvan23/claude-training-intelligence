@@ -54,6 +54,12 @@ The one-click decision report (stage 1b-3, PR 2) is a self-contained HTML file: 
 - The drift window is the last **28 days** of the window (`app.metrics.holdout-rolling-days`). It is shown, never used for the verdict.
 - Weeks run Monday to Sunday.
 
+### D9. Keeping it fed (stage 1b-3 PR 3)
+- Until the Garmin sync (stage 1b-4), the coach repeats one loop every week or two: a Whoop export and a Garmin account export, both imported, then Recompute features (coach decision 2026-11-16, route a). A Garmin day exported half-finished is replaced by a later export (ADR 0010).
+- `GET /api/athletes/{id}/holdout/feed` and the "Keeping it fed" panel on the Holdout view show the last finished Whoop day, the last Garmin day (raw daily summaries), the ACTIVE model's last scored day, and whether an import finished after the last Recompute features run. When Garmin is behind Whoop, the panel says that the days in between wait as "no score from us yet".
+- `HoldoutFeedIT` runs the loop twice on overlapping synthetic exports. Nothing is stored twice; the formerly unfinished Whoop day joins; the window grows; both runs are marked.
+- The last Whoop export is taken on 2027-02-19. Its unfinished cycle for that day is skipped, so the window normally ends on 2027-02-18.
+
 ## Consequences
-- `GET /api/athletes/{id}/holdout[?version=]` and `GET /api/athletes/{id}/holdout/versions` are coach-only and read-only. No endpoint edits the marks or leaves a day out (ADR 0009, Consequences).
+- `GET /api/athletes/{id}/holdout[?version=]`, `/holdout/versions`, `/holdout/report` and `/holdout/feed` are coach-only and read-only. No endpoint edits the marks or leaves a day out (ADR 0009, Consequences).
 - The rules are tested on synthetic days in `HoldoutEvaluatorTest` (H2–H8), `WilsonTest` (the H5 examples) and `HoldoutIT` (database, access, restart on activation, retired history, the log).

@@ -129,7 +129,7 @@ export function LineChart(props: {
         {series.map((s) => {
           const runs = segments(s.values, maxUnknownRun);
           const known = runs.reduce((a, run) => a + run.length, 0);
-          const dotAll = n <= 120 || s.line === false || s.bands != null;
+          const dotAll = n <= 40 || s.line === false || s.bands != null;
           return (
             <g key={s.id} data-series={s.id} data-runs={runs.length} data-known={known}>
               {s.line !== false &&
@@ -146,9 +146,10 @@ export function LineChart(props: {
                   ))}
               {runs.flat().map((p) => {
                 const isolated = runs.some((run) => run.length === 1 && run[0].index === p.index);
-                if (!dotAll && !isolated) return null;
-                const color = s.bands?.[p.index] ? BAND_COLOR[s.bands[p.index] as Band] : s.color;
                 const hollow = s.hollow?.[p.index];
+                // Lone points and lower-confidence days are always drawn, whatever the range.
+                if (!dotAll && !isolated && !hollow) return null;
+                const color = s.bands?.[p.index] ? BAND_COLOR[s.bands[p.index] as Band] : s.color;
                 return (
                   <circle
                     key={p.index}

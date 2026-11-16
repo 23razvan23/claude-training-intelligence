@@ -78,8 +78,9 @@ public class MetricsController {
      * Freezes a calibrated version as the athlete's ACTIVE model: the one daily scoring and
      * the live comparison with Whoop will use, from its activation time. Only versions that
      * met their targets and that the daily scoring can read qualify (ADR 0007 item 8).
-     * Activating the version that is already ACTIVE changes nothing, so its activation time
-     * (the start of the live comparison) cannot move by accident.
+     * Activation freezes the version's pass marks for the live comparison (ADR 0009).
+     * Activating the version that is already ACTIVE changes nothing, so neither its activation
+     * time nor its frozen pass marks can move by accident.
      */
     @PostMapping("/models/{id}/activate")
     @PreAuthorize("hasRole('COACH')")
@@ -108,7 +109,10 @@ public class MetricsController {
             throw conflict("This version was made by an older calibration (before 0.6.0) whose output the daily scoring "
                     + "can't read. Run a new calibration and activate that version.");
         }
-        repo.activate(m, user.id());
+        var holdoutTargets = repo.holdoutTargets(m).orElseThrow(() -> conflict(
+                "This version has no stored pass marks or test window, so the live comparison with Whoop "
+                        + "could not be judged. Run a new calibration and activate that version."));
+        repo.activate(m, user.id(), holdoutTargets);
         return repo.model(id).orElseThrow();
     }
 

@@ -78,6 +78,12 @@ app:
     # Personal baseline: trailing window, minimum valid days before z-scores are produced.
     baseline-window-days: 30
     baseline-min-days: 14
+    # Live holdout vs Whoop (ADR 0009), frozen into model_version.holdout_targets at activation.
+    # Compared recovery days needed before a pass mark may be called met: the most the
+    # coach's Whoop subscription (to 2027-02-19) can give with some days excluded (coach, 2026-11-15).
+    holdout-min-recovery-days: 90
+    # Confidence of the Wilson interval shown next to every rate: the conventional 95%.
+    holdout-confidence: 0.95
 
 logging:
   level:

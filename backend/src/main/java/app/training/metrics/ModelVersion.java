@@ -10,6 +10,8 @@ import java.time.LocalDate;
  * @param activatedAt when the coach activated it; null if never, or if it was already ACTIVE
  *     before activation times were recorded (V13)
  * @param retiredAt when it was replaced by another ACTIVE version; null if not (or before V13)
+ * @param holdoutTargets the pass marks and protocol values of the live comparison with Whoop,
+ *     frozen at activation (ADR 0009); null for a version never activated since V15
  * @param contractIssue why the daily scoring could not use this version, or null if it can
  * @param olderThanActive true when the athlete's ACTIVE version was created after this one
  *     (ties broken by id); such a version can no longer be activated
@@ -30,6 +32,7 @@ public record ModelVersion(
         Instant createdAt,
         Instant activatedAt,
         Instant retiredAt,
+        JsonNode holdoutTargets,
         ContractIssue contractIssue,
         boolean olderThanActive) {
 

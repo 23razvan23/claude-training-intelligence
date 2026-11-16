@@ -81,18 +81,46 @@ public class MetricsRepository {
     }
 
     /**
-     * Makes this version the athlete's ACTIVE one, recording when and by whom; any previous
-     * ACTIVE version is RETIRED with the same time as its retired_at. now() is the
-     * transaction's start time, so both rows carry exactly the same instant.
+     * The holdout targets to freeze at activation (ADR 0009): the pass marks this version was
+     * calibrated against (metrics.targets; the Java app can't read the calibration's
+     * targets.json), the low-coverage limit from its coefficients, and the protocol values in
+     * force now. Empty when the version has no stored pass marks or no test window, so the
+     * live comparison could not be judged.
      */
-    public void activate(ModelVersion m, long userId) {
+    public Optional<com.fasterxml.jackson.databind.node.ObjectNode> holdoutTargets(ModelVersion m) {
+        var targets = m.metrics() == null ? null : m.metrics().get("targets");
+        if (targets == null || !targets.isObject() || m.testTo() == null) {
+            return Optional.empty();
+        }
+        var t = ((com.fasterxml.jackson.databind.node.ObjectNode) targets).deepCopy();
+        var minMinutes = m.coefficients().path("strain").get("min_monitored_minutes");
+        t.set("strain_min_monitored_minutes", minMinutes == null ? json.nullNode() : minMinutes);
+        t.put("min_recovery_days", props.holdoutMinRecoveryDays());
+        t.put("confidence", props.holdoutConfidence());
+        t.put("interval", "wilson");
+        t.put("window_from", m.testTo().plusDays(1).toString());
+        t.put("protocol", "ADR 0009");
+        t.put("source", "activation");
+        return Optional.of(t);
+    }
+
+    /**
+     * Makes this version the athlete's ACTIVE one, recording when and by whom and freezing its
+     * holdout targets; any previous ACTIVE version is RETIRED with the same time as its
+     * retired_at. now() is the transaction's start time, so both rows carry exactly the same
+     * instant.
+     */
+    public void activate(ModelVersion m, long userId, com.fasterxml.jackson.databind.JsonNode holdoutTargets) {
         jdbc.sql("""
                 UPDATE model_version SET status = 'RETIRED', retired_at = now()
                 WHERE athlete_id = ? AND status = 'ACTIVE' AND id <> ?""")
                 .params(m.athleteId(), m.id())
                 .update();
-        jdbc.sql("UPDATE model_version SET status = 'ACTIVE', activated_at = now(), activated_by = ? WHERE id = ?")
-                .params(userId, m.id())
+        jdbc.sql("""
+                UPDATE model_version SET status = 'ACTIVE', activated_at = now(), activated_by = ?,
+                       holdout_targets = ?::jsonb
+                WHERE id = ?""")
+                .params(userId, holdoutTargets.toString(), m.id())
                 .update();
     }
 
@@ -103,6 +131,7 @@ public class MetricsRepository {
     private ModelVersion map(ResultSet rs, int row) throws SQLException {
         try {
             var coefficients = json.readTree(rs.getString("coefficients"));
+            var holdout = rs.getString("holdout_targets");
             return new ModelVersion(
                     rs.getLong("id"),
                     rs.getLong("athlete_id"),
@@ -119,6 +148,7 @@ public class MetricsRepository {
                     rs.getTimestamp("created_at").toInstant(),
                     instant(rs, "activated_at"),
                     instant(rs, "retired_at"),
+                    holdout == null ? null : json.readTree(holdout),
                     ModelVersion.contractIssue(rs.getString("feature_version"), coefficients, props.featureVersion()),
                     rs.getBoolean("older_than_active"));
         } catch (JsonProcessingException e) {

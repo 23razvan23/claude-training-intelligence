@@ -5,6 +5,7 @@ import type {
   AthleteInput,
   CoverageReport,
   FeatureSummary,
+  HoldoutFeed,
   HoldoutReport,
   HoldoutVersion,
   ImportBatch,
@@ -187,6 +188,15 @@ export function useHoldoutVersions(athleteId?: number) {
   return useQuery({
     queryKey: ['holdout-versions', athleteId],
     queryFn: () => api<HoldoutVersion[]>(`/api/athletes/${athleteId}/holdout/versions`),
+    enabled: athleteId != null,
+  });
+}
+
+/** What has arrived (last Whoop and Garmin days) and whether Recompute features is needed. */
+export function useHoldoutFeed(athleteId?: number) {
+  return useQuery({
+    queryKey: ['holdout', athleteId, 'feed'],
+    queryFn: () => api<HoldoutFeed>(`/api/athletes/${athleteId}/holdout/feed`),
     enabled: athleteId != null,
   });
 }

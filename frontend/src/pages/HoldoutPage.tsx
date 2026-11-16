@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useHoldout, useHoldoutVersions } from '../api/hooks';
+import { useHoldout, useHoldoutFeed, useHoldoutVersions } from '../api/hooks';
 import type { HoldoutFigures, HoldoutMark, HoldoutReport, HoldoutScore, HoldoutSide, Rate, Stat } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
 
@@ -65,6 +65,7 @@ export function HoldoutPage() {
           </a>
         )}
       </div>
+      <Feed athleteId={athleteId} />
       {isLoading && <p className="muted">{t('common.loading')}</p>}
       {error && <p className="warn">{error.message}</p>}
       {r && <Holdout r={r} />}
@@ -438,5 +439,35 @@ function Days({ r }: { r: HoldoutReport }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** What has arrived and what to do next: the loop the coach repeats until Whoop ends. */
+function Feed({ athleteId }: { athleteId: number }) {
+  const { t } = useTranslation();
+  const { data: f } = useHoldoutFeed(athleteId);
+  if (!f) return null;
+  const day = (d?: string) => d ?? '–';
+  const garminBehind = f.lastWhoopDay != null && f.lastGarminDay != null && f.lastGarminDay < f.lastWhoopDay;
+  return (
+    <details className="card" open={f.recomputeNeeded || undefined}>
+      <summary>
+        <strong>{t('holdout.feed.title')}</strong>{' '}
+        <span className="muted small">
+          {t('holdout.feed.summary', { whoop: day(f.lastWhoopDay), garmin: day(f.lastGarminDay), scored: day(f.lastScoredDay) })}
+        </span>
+      </summary>
+      <div className="stack small feed">
+        {f.recomputeNeeded && <p className="warn">{t('holdout.feed.recompute')}</p>}
+        {garminBehind && <p className="warn">{t('holdout.feed.garminBehind', { garmin: f.lastGarminDay, whoop: f.lastWhoopDay })}</p>}
+        <ol>
+          <li>{t('holdout.feed.step1')}</li>
+          <li>{t('holdout.feed.step2')}</li>
+          <li>{t('holdout.feed.step3')}</li>
+          <li>{t('holdout.feed.step4')}</li>
+        </ol>
+        <p className="muted">{t('holdout.feed.last', { end: f.whoopEnd })}</p>
+      </div>
+    </details>
   );
 }

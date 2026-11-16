@@ -264,3 +264,14 @@ export interface HoldoutVersion {
   retiredAt?: string;
   windowFrom?: string;
 }
+
+export interface HoldoutFeed {
+  lastWhoopDay?: string;
+  lastGarminDay?: string;
+  lastScoredDay?: string;
+  lastWhoopImport?: string;
+  lastGarminImport?: string;
+  lastRecompute?: string;
+  recomputeNeeded: boolean;
+  whoopEnd: string;
+}

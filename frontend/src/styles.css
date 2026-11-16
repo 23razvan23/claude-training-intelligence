@@ -185,3 +185,5 @@ a.button {
 }
 details > summary { cursor: pointer; }
 table.data .nowrap { white-space: nowrap; }
+.feed { margin-top: 0.5rem; }
+.feed ol { margin: 0; padding-left: 1.2rem; }

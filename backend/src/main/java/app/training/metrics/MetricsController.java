@@ -23,10 +23,13 @@ public class MetricsController {
     private final MetricsProperties props;
     private final AccessPolicy access;
     private final ScoringService scoring;
+    private final app.training.metrics.holdout.HoldoutRepository holdoutLog;
 
     public MetricsController(AthleteRepository athletes, ActivityLoadService loads, DayFeatureService features,
-                             MetricsRepository repo, MetricsProperties props, AccessPolicy access, ScoringService scoring) {
+                             MetricsRepository repo, MetricsProperties props, AccessPolicy access, ScoringService scoring,
+                             app.training.metrics.holdout.HoldoutRepository holdoutLog) {
         this.scoring = scoring;
+        this.holdoutLog = holdoutLog;
         this.athletes = athletes;
         this.loads = loads;
         this.features = features;
@@ -46,13 +49,17 @@ public class MetricsController {
     @PostMapping("/athletes/{athleteId}/features/recompute")
     @PreAuthorize("hasRole('COACH')")
     @Transactional
-    public RecomputeResult recompute(@PathVariable long athleteId) {
+    public RecomputeResult recompute(@PathVariable long athleteId, @AuthenticationPrincipal CurrentUser user) {
         var athlete = athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
         var load = loads.recompute(athlete);
         var p = loads.params(athlete, loads.restingHr(athlete));
         var bgParams = p == null ? null : p.withMaxGap(props.monitoringMaxGapSeconds());
         var days = features.recompute(athleteId, bgParams, java.time.ZoneId.of(athlete.timezone()));
-        return new RecomputeResult(load, days, scoring.recomputeIfPossible(athleteId));
+        var scores = scoring.recomputeIfPossible(athleteId);
+        // ADR 0009 H8: the live comparison marks every run inside its window (ADR 0013 D6).
+        holdoutLog.logRecompute(athleteId, user == null ? null : user.id(), props.featureVersion(), days.days(),
+                scores.modelVersion(), scores.days());
+        return new RecomputeResult(load, days, scores);
     }
 
     @GetMapping("/athletes/{athleteId}/features/summary")

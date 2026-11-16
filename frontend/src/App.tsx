@@ -10,6 +10,7 @@ import { CoveragePage } from './pages/CoveragePage';
 import { CalibrationPage } from './pages/CalibrationPage';
 import { HoldoutPage } from './pages/HoldoutPage';
 import { TodayPage } from './pages/TodayPage';
+import { TrendsPage } from './pages/TrendsPage';
 
 export function App() {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
+          <Route path="/trends" element={<TrendsPage />} />
           <Route path="/athletes" element={<AthletesPage />} />
           <Route path="/imports" element={<ImportsPage />} />
           <Route path="/coverage" element={<CoveragePage />} />

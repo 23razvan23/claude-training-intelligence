@@ -23,8 +23,8 @@
   },
   "imports": {
     "title": "Imports",
-    "whoop": { "title": "Whoop export", "hint": "The export ZIP, or its CSV files (physiological_cycles, sleeps, workouts, journal_entries). One-time: ground truth for calibration." },
-    "garmin": { "title": "Garmin account export", "hint": "The ZIP from Garmin Connect → Account → Export your data. Backfills history with FIT files." },
+    "whoop": { "title": "Whoop export", "hint": "The export ZIP, or its CSV files (physiological_cycles, sleeps, workouts, journal_entries). Re-import a new export every week or two until Whoop ends: it feeds the live comparison on the Holdout tab." },
+    "garmin": { "title": "Garmin account export", "hint": "The ZIP from Garmin Connect → Account → Export your data. Re-import a new export along with each Whoop export; a day exported half-finished is replaced by the newer version." },
     "fit": { "title": "FIT files", "hint": "Drag in activity .fit files. Fallback when sync breaks." },
     "choose": "Choose files", "drop": "or drop them here", "uploading": "Uploading…",
     "history": "Import history", "empty": "No imports yet.",
@@ -101,6 +101,17 @@
     "gaps": "Gaps in paired data", "noGaps": "No gaps.", "gapRow": "{{from}} – {{to}} ({{days}} days)"
   },
   "holdout": {
+    "feed": {
+      "title": "Keeping it fed",
+      "summary": "Last Whoop day {{whoop}} · last Garmin day {{garmin}} · last scored day {{scored}}",
+      "recompute": "New data was imported after the last Recompute features: press Calibration → Recompute features to score it.",
+      "garminBehind": "Garmin data ends on {{garmin}}, Whoop on {{whoop}}: the days in between wait as \"no score from us yet\" until the next Garmin export.",
+      "step1": "Every week or two, request both exports: the Whoop data export, and the Garmin account export (Garmin's email can take a few days).",
+      "step2": "Imports: upload each ZIP as it arrives, unchanged, in the order you requested them. Uploading the same file twice adds nothing.",
+      "step3": "Calibration: press Recompute features once both are in.",
+      "step4": "Come back here: the window grows to the last finished Whoop day. Today's Whoop day is not compared until a later export holds it finished.",
+      "last": "Whoop ends {{end}}. Take the last Whoop export that day, and a Garmin export after it; import both, press Recompute features, then download the decision report and keep it."
+    },
     "title": "Live comparison with Whoop",
     "intro": "Our scores next to Whoop's on days the active model has never seen, until the Whoop subscription ends. The rules (ADR 0009) were fixed before any of these days was looked at: the pass marks are frozen and no day can be left out by hand.",
     "version": "Model version",

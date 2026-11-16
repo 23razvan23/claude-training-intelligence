@@ -2,7 +2,7 @@
 
 A self-hosted training app for a running coach and the athletes he coaches. It turns Garmin data into Whoop-like Recovery, Strain and Sleep scores, builds periodized plans, and suggests day-by-day adaptations that the coach accepts or rejects. The full specification is in [SPEC.md](SPEC.md).
 
-**Status: Phase 1a done** (Garmin-derived Recovery and Strain calibrated against Whoop: PASS). Next: Phase 1b, daily scores and the Today screen. See [docs/PLAN.md](docs/PLAN.md).
+**Status: Phase 1a done** (Garmin-derived Recovery and Strain calibrated against Whoop: PASS). Phase 1b in progress: daily scores, and the live comparison with Whoop on unseen days (until the Whoop subscription ends on 2027-02-19). See [docs/PLAN.md](docs/PLAN.md).
 
 ## Quick start
 
@@ -32,7 +32,7 @@ API docs (OpenAPI): <http://localhost:8080/api/docs>. Raw spec: `/api/openapi`.
 
 Do this once per athlete. Pick the athlete in the top bar, then open **Imports**. Imports are idempotent, so uploading the same file twice adds nothing; the batch shows rows as "already present".
 
-### 1. Whoop export (one time, before cancelling Whoop)
+### 1. Whoop export (first import; then every week or two until Whoop ends, see section 7)
 1. Request a data export from the Whoop app's settings (menu names change between app versions). Whoop emails a link to a ZIP.
 2. Upload the ZIP as-is under **Whoop export**, or upload its CSV files (`physiological_cycles.csv`, `sleeps.csv`, `workouts.csv`, `journal_entries.csv`).
 
@@ -72,6 +72,18 @@ Once a model is ACTIVE, **Recompute features** also computes the daily Recovery,
 docker compose run --rm app score --athlete 1 --from 2026-11-01 --to 2026-11-15
 ```
 `--from` and `--to` are optional. It runs next to the running app and prints a one-line summary. How the scores are computed: [ADR 0008](docs/adr/0008-scoring-contract.md); what is stored: [ADR 0012](docs/adr/0012-daily-scoring-storage.md).
+
+### 7. Live comparison with Whoop (until 2027-02-19)
+The **Holdout** tab (coach) compares our scores with Whoop's on days the active model has never seen. Its rules are fixed in [ADR 0009](docs/adr/0009-live-holdout-protocol.md). It needs new data from both sides, so repeat this every week or two:
+1. Request a **Whoop** data export and a **Garmin** account export. Garmin's email can take a few days.
+2. Under **Imports**, upload each ZIP unchanged as it arrives, in the order you requested them.
+   - Uploading the same file twice adds nothing.
+   - A Whoop export taken during the day holds today's unfinished cycle. It is skipped, with a warning, and comes in finished with the next export.
+   - A Garmin day exported half-finished is replaced by the newer version from a later export ([ADR 0010](docs/adr/0010-raw-revisions.md)).
+3. Under **Calibration**, press **Recompute features**.
+4. Open **Holdout**. Its "Keeping it fed" panel shows the last Whoop, Garmin and scored days, and says when Recompute features is needed.
+
+**When Whoop ends:** take the last Whoop export on 2027-02-19 and a Garmin export after it. Import both, press Recompute features, then press **Download decision report** on the Holdout tab and keep the file. It states pass / not met / not enough days by the rule.
 
 Personal exports never belong in git: `.gitignore` excludes `data/`, `*.zip`, `*.fit` and `.env`.
 

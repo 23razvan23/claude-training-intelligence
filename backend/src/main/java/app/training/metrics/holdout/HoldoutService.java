@@ -89,6 +89,27 @@ public class HoldoutService {
                 props.holdoutRollingDays(), runs));
     }
 
+    /**
+     * What has arrived, so the coach knows what to import next (stage 1b-3 PR 3).
+     *
+     * @param lastScoredDay the ACTIVE model's last scored day (null without one)
+     * @param recomputeNeeded an import finished after the last Recompute features run (or there was none)
+     */
+    public record Feed(LocalDate lastWhoopDay, LocalDate lastGarminDay, LocalDate lastScoredDay, Instant lastWhoopImport,
+                       Instant lastGarminImport, Instant lastRecompute, boolean recomputeNeeded, LocalDate whoopEnd) {}
+
+    public Feed feed(long athleteId) {
+        athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
+        var f = repo.feed(athleteId);
+        LocalDate lastScored = models.active(athleteId)
+                .flatMap(m -> scores.days(athleteId, m.version(), null, null).stream().map(ScoringRepository.StoredDay::date)
+                        .max(java.util.Comparator.naturalOrder()))
+                .orElse(null);
+        boolean needed = f.lastImport() != null && (f.lastRecompute() == null || f.lastImport().isAfter(f.lastRecompute()));
+        return new Feed(f.lastWhoopDay(), f.lastGarminDay(), lastScored, f.lastWhoopImport(), f.lastGarminImport(),
+                f.lastRecompute(), needed, props.holdoutWhoopEnd());
+    }
+
     /** The decision report as a downloadable HTML file (ADR 0013 D7: built on request, never stored). */
     public record ReportFile(String filename, String html) {}
 

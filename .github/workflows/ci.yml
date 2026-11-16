@@ -43,6 +43,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
   python:
@@ -84,6 +85,13 @@ jobs:
       - uses: actions/checkout@v4
       - run: cp .env.example .env && docker compose config --quiet
       - run: sh -n deploy/backup/backup.sh
+      # The `images` job below lists the services by hand (one cache scope each); fail here if
+      # docker-compose.yml gains or loses a service that is not in that list.
+      - name: images job covers every compose service
+        run: |
+          expected="app backup calibration garmin-sync web"
+          actual=$(docker compose --profile tools config --services | grep -vx db | sort | tr '\n' ' ' | sed 's/ $//')
+          [ "$actual" = "$expected" ] || { echo "compose services with an image: [$actual]; images job covers: [$expected]" >&2; exit 1; }
 
   # R-08: the backup must fail loudly and its output must restore. Runs backup.sh inside the
   # real backup image (busybox sh) against a throwaway TimescaleDB with synthetic data.
@@ -92,3 +100,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sh deploy/backup/test-backup.sh
+
+  # A broken Dockerfile should fail the pull request, not the coach's `docker compose up --build`.
+  # Builds every image in docker-compose.yml, including the `tools` profile (calibration), without
+  # pushing. One cache scope per image, so a change in one image reuses the layers of the others.
+  images:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [app, web, garmin-sync, calibration, backup]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env   # compose refuses to parse without BACKUP_PASSPHRASE
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/bake-action@v6
+        env:
+          COMPOSE_PROFILES: tools   # makes the profile-gated calibration service a bake target
+        with:
+          files: docker-compose.yml
+          targets: ${{ matrix.service }}
+          set: |
+            *.cache-from=type=gha,scope=image-${{ matrix.service }}
+            *.cache-to=type=gha,scope=image-${{ matrix.service }},mode=max

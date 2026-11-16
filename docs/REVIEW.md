@@ -89,7 +89,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access) |
 | R-10 | Define how re-fetched Garmin days replace earlier partial ones (done) | P1 | design | M | – | 1b-3, 1b-4 |
 | R-11 | Decide how Garmin credentials are stored before writing sync code | P1 | security | S | – | 1b-4 |
-| R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI | P1 | test-gap | M | – | 1b-2, 1b-4 |
+| R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI (done) | P1 | test-gap | M | – | 1b-2, 1b-4 |
 | R-13 | Correct the Phase 2 tables before anything writes to them | P1 | design | M | – | 2-1, 2-3 |
 | R-14 | Build the local golden-file check the spec asks for | P2 | test-gap | M | 1b-1 | – |
 | R-15 | Bring documents back in line with the code | P2 | docs | S | – | – |
@@ -588,7 +588,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-12: Add timezone/DST tests, a frontend test runner and an image build to CI
 - **Priority / Type / Size:** P1 / test-gap / M
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED; **done 2026-11-16** (`DayAssignmentDstIT`, `CycleDateDstTest`, `DayGridDstTest`; Vitest + `src/pace.test.ts`; CI job `images`). All new backend cases passed on the first run: no day-assignment defect found, no production code changed. The scoring day grid is plain `LocalDate` stepping, so it needs only a small no-gap/no-duplicate test. The `images` job builds the five images as a matrix (one cache scope each, pull requests only); the `compose` job fails if a service is added to `docker-compose.yml` without being added to that matrix.
 - **Problem:** three gaps against SPEC "Engineering standards" that the next stages will lean on. (1) No test exercises a daylight-saving change or a non-default timezone for cycle assignment, although every day boundary depends on it; I found no defect by reading, but the 07:00-local scheduler (1b-4) and "today" (1b-2) add more such code. (2) The frontend has no test runner at all; 1b-2 adds logic with a safety meaning ("never show yesterday's recovery as today's"). (3) CI never builds the Docker images, so a broken Dockerfile reaches the coach's machine first (a stale image already cost one iteration, PLAN §3 row m5).
 - **Evidence:** no match for `DST`, `2026-03-29` or `2026-10-25` under `backend/src` or `calibration`; `frontend/package.json` has no `test` script; `ci.yml` job `compose` runs only `docker compose config --quiet` and `sh -n`.
 - **Why it matters:** a day-boundary slip is the one bug class that already invalidated a full calibration (m1); catching the next one in CI is cheap.
@@ -598,10 +598,10 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
   - CI: `docker compose build` for `app`, `web`, `garmin-sync`, `calibration`, `backup` (with layer caching), on pull requests.
 - **Out of scope:** end-to-end browser tests; property-based testing library (needed in stage 3-2, add it there); coverage thresholds.
 - **Acceptance criteria:**
-  - [ ] New backend tests pass (they should pass today; if one fails, stop and report it as a bug with the failing case).
-  - [ ] `npm test` exists and runs in CI.
-  - [ ] CI builds all five images.
-  - [ ] PLAN §7 lists the new commands.
+  - [x] New backend tests pass (they should pass today; if one fails, stop and report it as a bug with the failing case).
+  - [x] `npm test` exists and runs in CI.
+  - [x] CI builds all five images.
+  - [x] PLAN §7 lists the new commands.
 - **Verification:** `cd backend && ./gradlew build`; `cd frontend && npm run lint && npm run typecheck && npm test && npm run build`; CI green.
 - **Coach decision needed:** no.
 - **Opus prompt:**

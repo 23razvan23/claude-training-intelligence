@@ -8,7 +8,8 @@
   },
   "login": {
     "title": "Sign in", "username": "Username", "password": "Password", "submit": "Sign in",
-    "failed": "Wrong username or password."
+    "failed": "Wrong username or password.",
+    "tooMany": "Too many wrong tries. Wait a few minutes and try again."
   },
   "athletes": {
     "title": "Athletes", "new": "New athlete", "empty": "No athletes yet.",

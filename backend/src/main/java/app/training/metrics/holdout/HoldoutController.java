@@ -2,7 +2,12 @@ package app.training.metrics.holdout;
 
 import app.training.security.AccessPolicy;
 import app.training.security.CurrentUser;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +38,23 @@ public class HoldoutController {
                                           @AuthenticationPrincipal CurrentUser user) {
         access.requireAthlete(user, athleteId);
         return holdout.report(athleteId, version);
+    }
+
+    /**
+     * The decision report: self-contained HTML, downloaded as a file (ADR 0013 D7). Served with
+     * a CSP that forbids scripts and remote loads, like the calibration report.
+     */
+    @GetMapping("/report")
+    public ResponseEntity<String> decisionReport(@PathVariable long athleteId, @RequestParam(required = false) String version,
+                                                 @AuthenticationPrincipal CurrentUser user) {
+        access.requireAthlete(user, athleteId);
+        var file = holdout.decisionReport(athleteId, version);
+        return ResponseEntity.ok()
+                .contentType(new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(file.filename()).build().toString())
+                .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(file.html());
     }
 
     /** Every version that has (or had) a live comparison, newest first. */

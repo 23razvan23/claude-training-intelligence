@@ -46,7 +46,9 @@ Both are fixed, so the figures are the same as on the day it was retired (H1), a
 - `FEATURE_VERSION` and `day_features` are untouched.
 
 ### D7. The decision report is downloaded, not stored (coach, Q1)
-The one-click decision report (stage 1b-3, PR 2) is a self-contained HTML file. The app builds it from the same figures each time it's asked. The coach keeps the file taken after the last Whoop export.
+The one-click decision report (stage 1b-3, PR 2) is a self-contained HTML file: no scripts, no remote loads, served as a download with a no-script CSP (`GET /api/athletes/{id}/holdout/report[?version=]`). The backend builds it (`DecisionReport`) from the same figures as the page each time it's asked, so its wording is tested (`DecisionReportTest`). The coach keeps the file taken after the last Whoop export.
+- It is in English only: it's a record to keep, and the app's Romanian translation is still empty (PLAN backlog).
+- If the comparison has ended but the last Whoop day is more than a day before the subscription end, the report says to import the last export first.
 
 ### D8. Display settings
 - The drift window is the last **28 days** of the window (`app.metrics.holdout-rolling-days`). It is shown, never used for the verdict.

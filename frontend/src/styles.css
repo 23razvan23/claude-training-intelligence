@@ -167,3 +167,21 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .grid { grid-template-columns: 1fr; }
   .tile-value { font-size: 1.3rem; }
 }
+
+/* Holdout (stage 1b-3): wide tables scroll inside their card instead of the page, at phone width. */
+.table-scroll { overflow-x: auto; max-width: 100%; }
+table.data { width: 100%; }
+table.data th { text-align: left; font-weight: 600; color: var(--muted); padding: 0.2rem 0.6rem 0.2rem 0; white-space: nowrap; }
+table.data .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.data tr + tr td { border-top: 1px solid var(--border); }
+a.button {
+  display: inline-block;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  text-decoration: none;
+}
+details > summary { cursor: pointer; }
+table.data .nowrap { white-space: nowrap; }

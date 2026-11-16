@@ -8,6 +8,7 @@ import { AthletesPage } from './pages/AthletesPage';
 import { ImportsPage } from './pages/ImportsPage';
 import { CoveragePage } from './pages/CoveragePage';
 import { CalibrationPage } from './pages/CalibrationPage';
+import { HoldoutPage } from './pages/HoldoutPage';
 
 export function App() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export function App() {
           <Route path="/imports" element={<ImportsPage />} />
           <Route path="/coverage" element={<CoveragePage />} />
           <Route path="/calibration" element={<CalibrationPage />} />
+          <Route path="/holdout" element={me.role === 'COACH' ? <HoldoutPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

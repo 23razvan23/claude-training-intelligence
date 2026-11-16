@@ -51,6 +51,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </button>
       </header>
       <nav className="tabs">
+        <NavLink to="/today">{t('nav.today')}</NavLink>
         <NavLink to="/coverage">{t('nav.coverage')}</NavLink>
         <NavLink to="/imports">{t('nav.imports')}</NavLink>
         {me?.role === 'COACH' && <NavLink to="/calibration">{t('nav.calibration')}</NavLink>}

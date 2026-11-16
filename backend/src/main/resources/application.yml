@@ -90,6 +90,16 @@ app:
     # Drift window on the Holdout view: the last 4 weeks (ADR 0009 H5 example). Display only, never
     # used for the verdict.
     holdout-rolling-days: 28
+  # Today screen (stage 1b-2a, ADR 0014). Display only: nothing here changes a stored score.
+  today:
+    # Personal strain range shown next to today's strain: percentiles of the athlete's own strain on the
+    # full-coverage days of the last 4 weeks. A heuristic ("about your usual on green, less on yellow,
+    # little on red"), not established science; the planned session's strain replaces it in Phase 2.
+    strain-target-window-days: 28   # 4 weeks: recent enough to follow training blocks, long enough to be stable
+    strain-target-min-days: 14      # half the window: with fewer days the percentiles mean little, so no target
+    green-percentiles: [50, 75]     # green: from your median to your upper quarter
+    yellow-percentiles: [25, 50]    # yellow: from your lower quarter to your median
+    red-percentiles: [0, 25]        # red: up to your lower quarter (0 = from strain 0)
 
 logging:
   level:

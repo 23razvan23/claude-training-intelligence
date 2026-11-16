@@ -1,17 +1,26 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { useLogin } from '../api/hooks';
 
 export function LoginPage() {
   const { t } = useTranslation();
   const login = useLogin();
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    login.mutate({ username, password });
+    // Today is the landing page after every login (stage 1b-2a).
+    // The page unmounts as soon as the user is known, so navigate from the promise, not a mutate callback.
+    login
+      .mutateAsync({ username, password })
+      .then(() => navigate('/today', { replace: true }))
+      .catch(() => {
+        /* shown from login.error below */
+      });
   };
 
   return (

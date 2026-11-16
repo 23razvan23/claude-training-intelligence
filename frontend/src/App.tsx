@@ -9,6 +9,7 @@ import { ImportsPage } from './pages/ImportsPage';
 import { CoveragePage } from './pages/CoveragePage';
 import { CalibrationPage } from './pages/CalibrationPage';
 import { HoldoutPage } from './pages/HoldoutPage';
+import { TodayPage } from './pages/TodayPage';
 
 export function App() {
   const { t } = useTranslation();
@@ -21,7 +22,8 @@ export function App() {
     <AthleteProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={<Navigate to="/coverage" replace />} />
+          <Route path="/" element={<Navigate to="/today" replace />} />
+          <Route path="/today" element={<TodayPage />} />
           <Route path="/athletes" element={<AthletesPage />} />
           <Route path="/imports" element={<ImportsPage />} />
           <Route path="/coverage" element={<CoveragePage />} />

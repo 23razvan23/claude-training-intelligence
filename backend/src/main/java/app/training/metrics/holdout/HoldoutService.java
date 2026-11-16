@@ -89,6 +89,19 @@ public class HoldoutService {
                 props.holdoutRollingDays(), runs));
     }
 
+    /** The decision report as a downloadable HTML file (ADR 0013 D7: built on request, never stored). */
+    public record ReportFile(String filename, String html) {}
+
+    public ReportFile decisionReport(long athleteId, String version) {
+        var athlete = athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
+        var r = report(athleteId, version);
+        ZoneId zone = ZoneId.of(athlete.timezone());
+        Instant now = clock.instant();
+        String day = LocalDate.ofInstant(now, zone).toString();
+        String safeVersion = r.modelVersion().replaceAll("[^A-Za-z0-9._-]", "_");
+        return new ReportFile("holdout-decision-" + safeVersion + "-" + day + ".html", DecisionReport.render(r, athlete.name(), now, zone));
+    }
+
     /** A stored score, reduced to what the comparison reads (unrounded values, as calibration compares them). */
     static HoldoutEvaluator.OurDay ourDay(ScoringRepository.StoredDay d, ScoringContract c) {
         JsonNode q = d.dataQuality();

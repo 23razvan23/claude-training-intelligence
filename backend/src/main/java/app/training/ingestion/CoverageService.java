@@ -59,7 +59,7 @@ public class CoverageService {
                     SELECT min(d) AS lo, max(d) AS hi FROM (
                         SELECT cycle_date AS d FROM whoop_reference WHERE athlete_id = :a
                         UNION ALL SELECT calendar_date FROM daily_wellness WHERE athlete_id = :a AND source = 'GARMIN'
-                        UNION ALL SELECT cycle_date FROM sleep_session WHERE athlete_id = :a AND source = 'GARMIN'
+                        UNION ALL SELECT cycle_date FROM sleep_session_current WHERE athlete_id = :a AND source = 'GARMIN'
                     ) x""")
                     .param("a", athleteId)
                     .query((rs, i) -> new LocalDate[] {
@@ -79,7 +79,7 @@ public class CoverageService {
                 SELECT d::date AS day,
                        gw.resting_hr IS NOT NULL   AS g_rhr,
                        gw.hrv_rmssd_ms IS NOT NULL AS g_hrv,
-                       EXISTS (SELECT 1 FROM sleep_session s
+                       EXISTS (SELECT 1 FROM sleep_session_current s
                                WHERE s.athlete_id = :a AND s.source = 'GARMIN' AND NOT s.is_nap AND s.cycle_date = d::date) AS g_sleep,
                        (SELECT count(*) FROM activity_with_cycle ac
                         WHERE ac.athlete_id = :a AND ac.source = 'GARMIN' AND ac.cycle_date = d::date) AS g_acts,

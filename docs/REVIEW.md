@@ -87,7 +87,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-07 | Fix the live-holdout rules in writing before looking at holdout data (done) | P1 | design | S | R-04 | 1b-3 |
 | R-08 | Make the nightly backup fail loudly and prove it restores (done) | P1 | bug | S | – | – |
 | R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access) |
-| R-10 | Define how re-fetched Garmin days replace earlier partial ones | P1 | design | M | – | 1b-4 |
+| R-10 | Define how re-fetched Garmin days replace earlier partial ones (done) | P1 | design | M | – | 1b-3, 1b-4 |
 | R-11 | Decide how Garmin credentials are stored before writing sync code | P1 | security | S | – | 1b-4 |
 | R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI | P1 | test-gap | M | – | 1b-2, 1b-4 |
 | R-13 | Correct the Phase 2 tables before anything writes to them | P1 | design | M | – | 2-1, 2-3 |
@@ -509,7 +509,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-10: Define how re-fetched Garmin days replace earlier partial ones
 - **Priority / Type / Size:** P1 / design / M
-- **Status:** CONFIRMED (code paths); impact arrives with stage 1b-4
+- **Status:** CONFIRMED (code paths); **done 2026-11-16** (ADR 0010, V17, `RawRevisionsIT`). Brought forward from 1b-4: the coach feeds Garmin exports during the live holdout (route a). On the coach's data: 0 nights with two Garmin sleeps; 2026-11-09 was imported half-finished (18:47 the same day) and will be corrected by the next export.
 - **Problem:** raw tables are insert-once. That is right for a one-time export, but a 07:00 sync fetches a day that is still changing (resting HR, stress, Body Battery, sometimes a re-processed sleep). The first version is kept forever and later, better versions are dropped. Where a later version does get in under a different key, readers combine versions wrongly: two sleep rows for one night are added together, and the wellness view takes the maximum of each column rather than the newest.
 - **Evidence:**
   - `GarminExportImporter.java:263` daily summary key is the constant `"uds"` + date → the first fetch of a day wins (`RawWriter.java:56`).
@@ -520,10 +520,10 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 - **Proposed change:** an ADR (`0010-raw-revisions.md`) plus implementation before 1b-4 writes any sync code. Recommended rule: raw stays append-only, but a re-fetched day is a **new revision row**, and readers use the newest revision. Concretely: new migration adding `revision_of`/`fetched_at` semantics via `source_id` (e.g. `uds@<fetch date>` for synced summaries) or an explicit `revision INT` in the unique keys of `daily_wellness` and `sleep_session`; replace `daily_wellness_merged` (new migration) to take the newest non-null value per column by `ingested_at`; add a `sleep_session_current` view that keeps, per athlete/source/`cycle_date`, the newest revision of overlapping sleeps, and make `DayFeatureService`, `CoverageService` and `activity_with_cycle` read it. Sync should also re-fetch the previous 2 days [configurable] each morning. Alternative considered: `ON CONFLICT DO UPDATE` — rejected: breaks "raw data is sacred" (SPEC) and loses what a score was computed from.
 - **Out of scope:** the sync adapter itself; Whoop cycles (R-06); `monitoring_hr` and `activity_stream` (keyed by timestamp, already safe).
 - **Acceptance criteria:**
-  - [ ] Failing test first: two Garmin sleeps for the same night (second one starts 4 minutes later, 20 minutes longer) → `day_features.sleep_minutes` equals the second, not the sum.
-  - [ ] Test: two daily summaries for one date (resting HR 47 then 45) → features use 45.
-  - [ ] Test: re-importing the identical bulk export still inserts nothing and changes no feature (idempotency kept).
-  - [ ] ADR 0003 amended; ADR 0010 added.
+  - [x] Failing test first: two Garmin sleeps for the same night (second one starts 4 minutes later, 20 minutes longer) → `day_features.sleep_minutes` equals the second, not the sum.
+  - [x] Test: two daily summaries for one date (resting HR 47 then 45) → features use 45.
+  - [x] Test: re-importing the identical bulk export still inserts nothing and changes no feature (idempotency kept).
+  - [x] ADR 0003 amended; ADR 0010 added.
 - **Verification:** `cd backend && ./gradlew build`. Coach (checks whether overlapping exports already caused double nights): `docker compose exec db psql -U training -d training -c "SELECT count(*) AS nights_with_two_garmin_sleeps FROM (SELECT cycle_date FROM sleep_session WHERE athlete_id = 1 AND source = 'GARMIN' AND NOT is_nap GROUP BY cycle_date HAVING count(*) > 1) x;"` → expected 0 or a small number; a large number means this already affects current features and the item becomes P0.
 - **Coach decision needed:** no.
 - **Opus prompt:**

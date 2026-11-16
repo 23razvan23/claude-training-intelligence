@@ -48,6 +48,17 @@ public class RawWriter {
         else ctx.stats().duplicates(table, 1);
     }
 
+    /** The source id of a revision row (ADR 0010): the record's own id, then '@' and the import batch. */
+    static String revisionId(String sourceId, long batchId) {
+        return sourceId + "@" + batchId;
+    }
+
+    /**
+     * A daily wellness record. When the same record (source, id, day) is already stored, a
+     * Garmin record whose values differ from every stored version of it is kept as a revision
+     * (ADR 0010): the readers then use the newest. Identical values are a duplicate, so
+     * re-importing any export inserts nothing.
+     */
     public void wellness(Ctx ctx, Wellness w) {
         int n = jdbc.sql("""
                 INSERT INTO daily_wellness (athlete_id, source, source_id, calendar_date, resting_hr, hrv_rmssd_ms,
@@ -58,9 +69,54 @@ public class RawWriter {
                         w.hrvStatus(), w.respirationRate(), w.spo2Pct(), w.stressAvg(), w.bodyBatteryHigh(),
                         w.bodyBatteryLow(), ctx.batchId())
                 .update();
+        if (n == 0 && RawRows.GARMIN.equals(w.source())) {
+            // Values are cast to the column types first, so a value the column rounds is compared as stored.
+            n = jdbc.sql("""
+                    INSERT INTO daily_wellness (athlete_id, source, source_id, calendar_date, resting_hr, hrv_rmssd_ms,
+                        hrv_status, respiration_rate, spo2_pct, stress_avg, body_battery_high, body_battery_low, import_batch_id)
+                    SELECT v.* FROM (VALUES (CAST(:athlete AS BIGINT), CAST(:source AS TEXT), CAST(:revision AS TEXT),
+                        CAST(:day AS DATE), CAST(:rhr AS INT), CAST(:hrv AS NUMERIC(6, 1)), CAST(:status AS TEXT),
+                        CAST(:resp AS NUMERIC(4, 1)), CAST(:spo2 AS NUMERIC(4, 1)), CAST(:stress AS INT), CAST(:bbHigh AS INT),
+                        CAST(:bbLow AS INT), CAST(:batch AS BIGINT)))
+                        AS v (athlete_id, source, source_id, calendar_date, resting_hr, hrv_rmssd_ms, hrv_status,
+                              respiration_rate, spo2_pct, stress_avg, body_battery_high, body_battery_low, import_batch_id)
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM daily_wellness x
+                        WHERE x.athlete_id = v.athlete_id AND x.source = v.source AND x.calendar_date = v.calendar_date
+                          AND split_part(x.source_id, '@', 1) = :sourceId
+                          AND x.resting_hr IS NOT DISTINCT FROM v.resting_hr
+                          AND x.hrv_rmssd_ms IS NOT DISTINCT FROM v.hrv_rmssd_ms
+                          AND x.hrv_status IS NOT DISTINCT FROM v.hrv_status
+                          AND x.respiration_rate IS NOT DISTINCT FROM v.respiration_rate
+                          AND x.spo2_pct IS NOT DISTINCT FROM v.spo2_pct
+                          AND x.stress_avg IS NOT DISTINCT FROM v.stress_avg
+                          AND x.body_battery_high IS NOT DISTINCT FROM v.body_battery_high
+                          AND x.body_battery_low IS NOT DISTINCT FROM v.body_battery_low)
+                    ON CONFLICT DO NOTHING""")
+                    .param("athlete", ctx.athleteId())
+                    .param("source", w.source())
+                    .param("revision", revisionId(w.sourceId(), ctx.batchId()))
+                    .param("sourceId", w.sourceId())
+                    .param("day", w.calendarDate())
+                    .param("rhr", w.restingHr())
+                    .param("hrv", w.hrvRmssdMs())
+                    .param("status", w.hrvStatus())
+                    .param("resp", w.respirationRate())
+                    .param("spo2", w.spo2Pct())
+                    .param("stress", w.stressAvg())
+                    .param("bbHigh", w.bodyBatteryHigh())
+                    .param("bbLow", w.bodyBatteryLow())
+                    .param("batch", ctx.batchId())
+                    .update();
+        }
         count(ctx, "daily_wellness", n);
     }
 
+    /**
+     * A sleep record. A Garmin night whose values differ from every stored version of it is
+     * kept: under its own key when its start moved, otherwise as a revision (ADR 0010). The
+     * readers (view sleep_session_current) use the newest import's version of each night.
+     */
     public void sleep(Ctx ctx, Sleep s) {
         int n = jdbc.sql("""
                 INSERT INTO sleep_session (athlete_id, source, source_id, start_at, end_at, cycle_date, is_nap,
@@ -72,6 +128,56 @@ public class RawWriter {
                         s.nap(), s.deepS(), s.lightS(), s.remS(), s.awakeS(), s.sleepScore(), s.avgRespiration(),
                         s.avgSleepStress(), s.avgSpo2Pct(), s.lowestSpo2Pct(), ctx.batchId())
                 .update();
+        if (n == 0 && RawRows.GARMIN.equals(s.source())) {
+            n = jdbc.sql("""
+                    INSERT INTO sleep_session (athlete_id, source, source_id, start_at, end_at, cycle_date, is_nap,
+                        deep_s, light_s, rem_s, awake_s, sleep_score, avg_respiration, avg_sleep_stress,
+                        avg_spo2_pct, lowest_spo2_pct, import_batch_id)
+                    SELECT v.* FROM (VALUES (CAST(:athlete AS BIGINT), CAST(:source AS TEXT), CAST(:revision AS TEXT),
+                        CAST(:start AS TIMESTAMPTZ), CAST(:end AS TIMESTAMPTZ), CAST(:day AS DATE), CAST(:nap AS BOOLEAN),
+                        CAST(:deep AS INT), CAST(:light AS INT), CAST(:rem AS INT), CAST(:awake AS INT), CAST(:score AS INT),
+                        CAST(:resp AS NUMERIC(4, 1)), CAST(:stress AS NUMERIC(5, 2)), CAST(:spo2 AS NUMERIC(4, 1)),
+                        CAST(:lowSpo2 AS NUMERIC(4, 1)), CAST(:batch AS BIGINT)))
+                        AS v (athlete_id, source, source_id, start_at, end_at, cycle_date, is_nap, deep_s, light_s, rem_s,
+                              awake_s, sleep_score, avg_respiration, avg_sleep_stress, avg_spo2_pct, lowest_spo2_pct, import_batch_id)
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM sleep_session x
+                        WHERE x.athlete_id = v.athlete_id AND x.source = v.source
+                          AND split_part(x.source_id, '@', 1) = :sourceId
+                          AND x.start_at = v.start_at
+                          AND x.end_at = v.end_at
+                          AND x.cycle_date = v.cycle_date
+                          AND x.is_nap = v.is_nap
+                          AND x.deep_s IS NOT DISTINCT FROM v.deep_s
+                          AND x.light_s IS NOT DISTINCT FROM v.light_s
+                          AND x.rem_s IS NOT DISTINCT FROM v.rem_s
+                          AND x.awake_s IS NOT DISTINCT FROM v.awake_s
+                          AND x.sleep_score IS NOT DISTINCT FROM v.sleep_score
+                          AND x.avg_respiration IS NOT DISTINCT FROM v.avg_respiration
+                          AND x.avg_sleep_stress IS NOT DISTINCT FROM v.avg_sleep_stress
+                          AND x.avg_spo2_pct IS NOT DISTINCT FROM v.avg_spo2_pct
+                          AND x.lowest_spo2_pct IS NOT DISTINCT FROM v.lowest_spo2_pct)
+                    ON CONFLICT DO NOTHING""")
+                    .param("athlete", ctx.athleteId())
+                    .param("source", s.source())
+                    .param("revision", revisionId(s.sourceId(), ctx.batchId()))
+                    .param("sourceId", s.sourceId())
+                    .param("start", ts(s.startAt()))
+                    .param("end", ts(s.endAt()))
+                    .param("day", s.cycleDate())
+                    .param("nap", s.nap())
+                    .param("deep", s.deepS())
+                    .param("light", s.lightS())
+                    .param("rem", s.remS())
+                    .param("awake", s.awakeS())
+                    .param("score", s.sleepScore())
+                    .param("resp", s.avgRespiration())
+                    .param("stress", s.avgSleepStress())
+                    .param("spo2", s.avgSpo2Pct())
+                    .param("lowSpo2", s.lowestSpo2Pct())
+                    .param("batch", ctx.batchId())
+                    .update();
+        }
         count(ctx, "sleep_session", n);
     }
 

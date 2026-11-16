@@ -73,7 +73,7 @@ public class DayFeatureService {
                 }, athleteId);
         var sleepEnds = new ArrayList<Object[]>();
         template.query("""
-                SELECT extract(epoch FROM end_at)::bigint AS e, cycle_date FROM sleep_session
+                SELECT extract(epoch FROM end_at)::bigint AS e, cycle_date FROM sleep_session_current
                 WHERE athlete_id = ? AND source = 'GARMIN' AND NOT is_nap ORDER BY end_at""",
                 rs -> {
                     sleepEnds.add(new Object[] {rs.getLong("e"), rs.getObject("cycle_date", LocalDate.class)});
@@ -136,7 +136,7 @@ public class DayFeatureService {
                        sum(coalesce(deep_s, 0) + coalesce(light_s, 0) + coalesce(rem_s, 0)) / 60 AS minutes,
                        sum(deep_s) / 60 AS deep, sum(rem_s) / 60 AS rem, sum(light_s) / 60 AS light,
                        max(sleep_score) AS score, avg(avg_respiration) AS resp, avg(avg_spo2_pct) AS spo2
-                FROM sleep_session WHERE athlete_id = ? AND source = 'GARMIN' AND NOT is_nap
+                FROM sleep_session_current WHERE athlete_id = ? AND source = 'GARMIN' AND NOT is_nap
                 GROUP BY cycle_date""", rs -> {
             sleep.put(rs.getObject("cycle_date", LocalDate.class), new Sleep(
                     i(rs, "minutes"), i(rs, "deep"), i(rs, "rem"), i(rs, "light"), i(rs, "score"), d(rs, "resp"), d(rs, "spo2")));

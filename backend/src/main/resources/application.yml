@@ -101,6 +101,16 @@ app:
     yellow-percentiles: [25, 50]    # yellow: from your lower quarter to your median
     red-percentiles: [0, 25]        # red: up to your lower quarter (0 = from strain 0)
 
+  # Garmin daily sync (stage 1b-4, ADR 0011). Both secrets come from .env; empty values disable
+  # sync without stopping the app (ADR 0011 D10).
+  garmin:
+    token-key: ${GARMIN_TOKEN_KEY:}
+    sync-secret: ${GARMIN_SYNC_SECRET:}
+    sidecar-url: ${GARMIN_SYNC_URL:http://localhost:8090}
+    # A login can try several Garmin sign-in routes in turn; 60 s leaves room for that
+    # without leaving the Connect button hanging for minutes. [configurable]
+    sidecar-timeout-seconds: 60
+
 logging:
   level:
     root: INFO

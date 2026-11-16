@@ -335,3 +335,21 @@ export interface Today {
   /** The newest scored day before today, only when stale; always shown with its date. */
   lastScored?: TodayDay | null;
 }
+
+/** Garmin connection (ADR 0011). Never carries the token or anything from Garmin. */
+export type GarminState = 'NOT_CONFIGURED' | 'NOT_CONNECTED' | 'CONNECTED' | 'RECONNECT_NEEDED';
+
+export interface GarminStatus {
+  state: GarminState;
+  /** A stored credential exists, so Disconnect is offered even while sync is not configured. */
+  stored: boolean;
+  connectedAt?: string | null;
+  tokenRefreshedAt?: string | null;
+  /** A fixed code such as AUTH_REJECTED or KEY_CHANGED. */
+  lastError?: string | null;
+}
+
+export interface GarminConnectResult {
+  status: 'CONNECTED' | 'MFA_REQUIRED';
+  mfaId?: string | null;
+}

@@ -31,6 +31,11 @@ services:
       COACH_PASSWORD: ${COACH_PASSWORD:-}
       COACH_DISPLAY_NAME: ${COACH_DISPLAY_NAME:-Coach}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Garmin daily sync (ADR 0011). Empty is allowed: the app starts and only sync is off.
+      # Only the app gets the token key; the sidecar, database and backups never see it.
+      GARMIN_TOKEN_KEY: ${GARMIN_TOKEN_KEY:-}
+      GARMIN_SYNC_SECRET: ${GARMIN_SYNC_SECRET:-}
+      GARMIN_SYNC_URL: http://garmin-sync:8090
     volumes:
       - import-work:/var/lib/training-imports
 
@@ -42,11 +47,13 @@ services:
     ports:
       - "${WEB_PORT:-8080}:80"
 
-  # Garmin Connect sync sidecar. Phase 0 ships only the adapter interface and a
-  # health endpoint; real sync arrives in Phase 1.
+  # Garmin Connect sync sidecar (ADR 0011): stateless, keeps no token, reachable only from
+  # the Compose network (expose, never ports). Needs outbound HTTPS to Garmin.
   garmin-sync:
     build: ./garmin-sync
     restart: unless-stopped
+    environment:
+      GARMIN_SYNC_SECRET: ${GARMIN_SYNC_SECRET:-}
     expose:
       - "8090"
 

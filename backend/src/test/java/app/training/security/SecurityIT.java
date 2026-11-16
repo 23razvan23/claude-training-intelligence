@@ -52,6 +52,14 @@ class SecurityIT extends IntegrationTest {
     }
 
     @Test
+    void apiDescriptionPagesNeedALogin() throws Exception {
+        mvc.perform(get("/api/openapi")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/docs")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/openapi").with(user(athleteUserA))).andExpect(status().isOk());
+    }
+
+    @Test
     void athleteSeesOnlyThemselves() throws Exception {
         mvc.perform(get("/api/athletes").with(user(athleteUserA)))
                 .andExpect(status().isOk())

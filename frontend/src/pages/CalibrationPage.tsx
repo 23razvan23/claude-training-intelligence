@@ -35,6 +35,13 @@ export function CalibrationPage() {
         <p className="muted small">{t('calibration.featuresHint')}</p>
         {recompute.isError && <p className="error">{t('common.error', { message: recompute.error.message })}</p>}
         {r && <p className="small">{t('calibration.recomputed', { ...r.features, ...r.load })}</p>}
+        {r?.scores && !r.scores.skipped && (
+          <p className="small">
+            {t('calibration.scored', { ...r.scores, model: r.scores.modelVersion, lastDataDate: r.scores.lastDataDate ?? '–' })}
+          </p>
+        )}
+        {r?.scores?.skipped && <p className="warn small">{t('calibration.scoresSkipped', { reason: r.scores.skipped })}</p>}
+        {r?.scores?.profileChanged && <p className="warn small">{t('calibration.profileChanged')}</p>}
         {r?.load.sexAssumed && <p className="warn small">{t('calibration.sexAssumed')}</p>}
         {noLoad && <p className="warn small">{t('calibration.noHrMax')}</p>}
         {summary && summary.days === 0 && <p className="muted">{t('calibration.empty')}</p>}

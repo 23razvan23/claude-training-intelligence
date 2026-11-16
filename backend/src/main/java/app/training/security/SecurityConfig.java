@@ -32,7 +32,9 @@ import org.springframework.util.StringUtils;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    /** Only with the web server: command-line runs (e.g. {@code score}) start without one. */
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/csrf").permitAll()

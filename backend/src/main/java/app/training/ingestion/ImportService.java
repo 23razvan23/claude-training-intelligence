@@ -25,9 +25,12 @@ public class ImportService {
     private final AthleteRepository athletes;
     private final ImportRunner runner;
     private final Path workDir;
+    private final boolean commandLine;
 
     public ImportService(ImportBatchRepository batches, AthleteRepository athletes, ImportRunner runner,
-                         @Value("${app.import.work-dir}") String workDir) {
+                         @Value("${app.import.work-dir}") String workDir,
+                         @Value("${app.command-line:false}") boolean commandLine) {
+        this.commandLine = commandLine;
         this.batches = batches;
         this.athletes = athletes;
         this.runner = runner;
@@ -36,6 +39,10 @@ public class ImportService {
 
     @EventListener(ApplicationReadyEvent.class)
     void onStartup() throws IOException {
+        if (commandLine) {
+            // A command-line run (e.g. scoring) next to the running app must not touch its imports.
+            return;
+        }
         Files.createDirectories(workDir);
         batches.failInterrupted();
     }

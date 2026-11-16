@@ -57,6 +57,13 @@ public class HoldoutController {
                 .body(file.html());
     }
 
+    /** What has arrived (last Whoop and Garmin days, last imports) and whether Recompute features is needed. */
+    @GetMapping("/feed")
+    public HoldoutService.Feed feed(@PathVariable long athleteId, @AuthenticationPrincipal CurrentUser user) {
+        access.requireAthlete(user, athleteId);
+        return holdout.feed(athleteId);
+    }
+
     /** Every version that has (or had) a live comparison, newest first. */
     @GetMapping("/versions")
     public List<HoldoutService.VersionSummary> versions(@PathVariable long athleteId, @AuthenticationPrincipal CurrentUser user) {

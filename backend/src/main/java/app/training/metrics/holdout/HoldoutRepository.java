@@ -50,6 +50,35 @@ public class HoldoutRepository {
                 .list();
     }
 
+    /** What has arrived so far, for the "keep it fed" status on the Holdout view (stage 1b-3 PR 3). */
+    public record FeedRow(LocalDate lastWhoopDay, LocalDate lastGarminDay, Instant lastWhoopImport, Instant lastGarminImport,
+                          Instant lastImport, Instant lastRecompute) {}
+
+    public FeedRow feed(long athleteId) {
+        return jdbc.sql("""
+                SELECT (SELECT max(cycle_date) FROM whoop_reference WHERE athlete_id = :a AND cycle_end IS NOT NULL) AS last_whoop_day,
+                       (SELECT max(calendar_date) FROM daily_wellness WHERE athlete_id = :a AND source = 'GARMIN') AS last_garmin_day,
+                       (SELECT max(finished_at) FROM import_batch WHERE athlete_id = :a AND status = 'SUCCEEDED'
+                            AND kind = 'WHOOP_EXPORT') AS last_whoop_import,
+                       (SELECT max(finished_at) FROM import_batch WHERE athlete_id = :a AND status = 'SUCCEEDED'
+                            AND kind IN ('GARMIN_EXPORT', 'GARMIN_SYNC', 'FIT_UPLOAD')) AS last_garmin_import,
+                       (SELECT max(finished_at) FROM import_batch WHERE athlete_id = :a AND status = 'SUCCEEDED') AS last_import,
+                       (SELECT max(ran_at) FROM feature_recompute_log WHERE athlete_id = :a) AS last_recompute""")
+                .param("a", athleteId)
+                .query((rs, i) -> new FeedRow(
+                        rs.getObject("last_whoop_day", LocalDate.class),
+                        rs.getObject("last_garmin_day", LocalDate.class),
+                        instant(rs.getTimestamp("last_whoop_import")),
+                        instant(rs.getTimestamp("last_garmin_import")),
+                        instant(rs.getTimestamp("last_import")),
+                        instant(rs.getTimestamp("last_recompute"))))
+                .single();
+    }
+
+    private static Instant instant(java.sql.Timestamp t) {
+        return t == null ? null : t.toInstant();
+    }
+
     /** Records one Recompute features run (ADR 0013 D6). */
     public void logRecompute(long athleteId, Long userId, String featureVersion, int featureDays, String scoredModelVersion, int scoredDays) {
         jdbc.sql("""

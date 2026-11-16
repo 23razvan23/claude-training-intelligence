@@ -141,26 +141,41 @@ and works on my data after my next Whoop import.
 ## Stage 1b-4: Garmin daily sync
 
 ```text
-Stage 1b-4: Garmin daily sync (Phase 1b). Ask for my consent before storing my Garmin login.
+Stage 1b-4: Garmin daily sync (Phase 1b). My consent is recorded in ADR 0011 (option a: I type
+my Garmin password once; only a renewable token is kept, encrypted).
+
+Read first: docs/adr/0011-garmin-credentials.md (credentials, tokens only) and
+docs/adr/0010-raw-revisions.md (a re-fetched day is a new revision). Prerequisites, all done:
+R-10 (raw revisions), R-11 (credentials ADR and consent), R-12 (timezone tests).
 
 Goal: today's scores are ready by 08:00 local time without manual imports (SPEC.md Phase 1
 "done when").
 
 Scope:
 - Implement garmin-sync/garmin_sync/adapter.py with garminconnect/garth (unofficial API: isolate
-  it, retry with backoff, alert on failure). It fetches daily summary, sleep, HRV, activities
-  (plus FIT files) and all-day HR, and hands them to the backend through the existing import
-  path (same raw tables, same dedup, idempotent).
-- Credentials and tokens are encrypted at rest (key from .env, never logged). Add a settings
-  form for me to enter them, and a "disconnect" option.
+  it, pin versions, retry with backoff, alert on failure). It fetches daily summary, sleep, HRV,
+  activities (plus FIT files) and all-day HR, and hands them to the backend through the existing
+  import path (same raw tables, same dedup, idempotent). A day fetched again becomes a revision
+  row (ADR 0010). Each morning also re-fetch the previous 2 days [configurable].
+- Credentials: follow ADR 0011 exactly. Tokens only, never the password at rest; AES-256-GCM in
+  the Java app with GARMIN_TOKEN_KEY; the garmin_credential table (migration in this stage,
+  next free V number); a stateless sidecar with the X-Sync-Secret header (GARMIN_SYNC_SECRET);
+  MFA code in the same Connect form; RECONNECT_NEEDED when Garmin rejects the token; Disconnect
+  deletes the row; key rotation = reconnect; the startup check (sync disabled, app still starts,
+  when a key is missing or invalid); nothing secret in URLs or logs (ADR 0011 D9). Add both
+  variables to docker-compose.yml as ${VAR:-}. Tests use fake values only.
 - Schedule: default 07:00 local [configurable], plus a "Sync now" button. After a sync:
   recompute features and scores for the affected days.
 - A "last sync" indicator and a stale-data banner (1b-2) driven by real sync status. Manual FIT
-  and export upload remain as the fallback.
-- Network: the sidecar needs outbound access to Garmin from my machine. Document it in the README.
+  and export upload remain as the fallback (ADR 0011 D11).
+- Network: the sidecar needs outbound access to Garmin from my machine. Document it in the
+  README, with the ADR 0011 notes: connect from the Mac itself (no HTTPS yet), keep .env away
+  from backup copies, how to disconnect.
 
-Done when: a test with a mocked Garmin API passes; on my machine a morning sync produces today's
-scores; if a sync fails, the UI says so.
+Done when: a test with a mocked Garmin API passes; a second sync of the same morning changes no
+score; a later sync of the same day updates the inputs and the score, and the earlier inputs are
+still in the raw tables; on my machine a morning sync produces today's scores; if a sync fails,
+or Garmin needs me to reconnect, the UI says so.
 
 At the end of 1b-4, Phase 1 is complete: stop and give me the phase summary and demo steps.
 ```

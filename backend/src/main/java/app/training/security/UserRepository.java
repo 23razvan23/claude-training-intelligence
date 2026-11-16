@@ -41,8 +41,27 @@ public class UserRepository {
                 .single();
     }
 
-    public void updatePassword(long id, String passwordHash) {
-        jdbc.sql("UPDATE app_user SET password_hash = ? WHERE id = ?").params(passwordHash, id).update();
+    /** What a session must still match: the user exists, is enabled, and when the password last changed. */
+    public record CredentialState(boolean enabled, java.time.Instant passwordChangedAt) {}
+
+    public Optional<CredentialState> credentialState(long id) {
+        return jdbc.sql("SELECT enabled, password_changed_at FROM app_user WHERE id = ?")
+                .param(id)
+                .query((rs, row) -> {
+                    var ts = rs.getTimestamp("password_changed_at");
+                    return new CredentialState(rs.getBoolean("enabled"), ts == null ? null : ts.toInstant());
+                })
+                .optional();
+    }
+
+    /** Stores the new hash and returns the database's change time, which the changing session adopts as its login time. */
+    public java.time.Instant updatePassword(long id, String passwordHash) {
+        return jdbc.sql("""
+                UPDATE app_user SET password_hash = ?, password_changed_at = clock_timestamp()
+                WHERE id = ? RETURNING password_changed_at""")
+                .params(passwordHash, id)
+                .query((rs, row) -> rs.getTimestamp("password_changed_at").toInstant())
+                .single();
     }
 
     public boolean delete(long id) {

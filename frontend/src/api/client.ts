@@ -9,6 +9,13 @@ export class ApiError extends Error {
   }
 }
 
+// Called when the server says the session is over (removed login, changed password, expiry).
+let onUnauthorized: (() => void) | undefined;
+
+export function setUnauthorizedHandler(handler: (() => void) | undefined) {
+  onUnauthorized = handler;
+}
+
 function xsrfToken(): string | undefined {
   return document.cookie
     .split('; ')
@@ -36,6 +43,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
   const res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+  // A wrong password on the login form is also 401, but that is not a lost session.
+  if (res.status === 401 && path !== '/api/auth/login' && path !== '/api/auth/me') onUnauthorized?.();
   if (!res.ok) {
     let message = res.statusText;
     try {

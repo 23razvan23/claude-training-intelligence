@@ -86,7 +86,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-06 | Stop freezing unfinished Whoop cycles on import (done) | P1 | bug | S | – | 1b-3 |
 | R-07 | Fix the live-holdout rules in writing before looking at holdout data (done) | P1 | design | S | R-04 | 1b-3 |
 | R-08 | Make the nightly backup fail loudly and prove it restores (done) | P1 | bug | S | – | – |
-| R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access) |
+| R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access); done |
 | R-10 | Define how re-fetched Garmin days replace earlier partial ones (done) | P1 | design | M | – | 1b-3, 1b-4 |
 | R-11 | Decide how Garmin credentials are stored before writing sync code | P1 | security | S | – | 1b-4 |
 | R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI (done) | P1 | test-gap | M | – | 1b-2, 1b-4 |
@@ -472,18 +472,18 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-09: End sessions when a login is removed or its password changes
 - **Priority / Type / Size:** P1 / security / S
-- **Status:** CONFIRMED (by reading; no test exists either way)
+- **Status:** CONFIRMED (by reading; no test exists either way); **done 2026-11-16** (ADR 0005, V18, `LoginFlowIT`, `SecurityIT`).
 - **Problem:** a session keeps a copy of the user in memory for 30 days and is never checked against the database again. Deleting an athlete's login, or changing a password, does not end existing sessions. ADR 0005 says "revocation is just session invalidation", but no code invalidates anything. Two smaller points in the same area: the API description pages are public, and login attempts are unlimited.
 - **Evidence:** `application.yml:27` `timeout: 30d`; `SecurityConfig.java:55-57` (`HttpSessionSecurityContextRepository`, principal stored in the session); `UserRepository.java:48` and `UserController.java` `delete`/`changePassword` touch only the table; `SecurityConfig.java:40` `permitAll` for `/api/openapi/**`, `/api/docs/**`.
 - **Why it matters:** from stage 1b-2 athletes get their own Today screen. A removed athlete (or a phone that was lost) keeps reading health data for up to a month. Low risk on a home network today; real once the app is reachable from outside.
 - **Proposed change:** add a small filter (or a `SecurityContextRepository` wrapper) that, per request, reloads the user by id and rejects the session when the user is missing, disabled, or its `password_changed_at` is newer than the session's login time. New migration: `app_user.password_changed_at TIMESTAMPTZ`. `changePassword` rotates the current session id and updates the column. Require authentication for the OpenAPI/Swagger paths. Add a simple in-memory per-username/IP delay after 5 failed logins [configurable; rationale: slows guessing without locking the only coach account].
 - **Out of scope:** JWT, 2FA, TLS setup (PLAN backlog), role model changes.
 - **Acceptance criteria:**
-  - [ ] Failing test first (`LoginFlowIT`): log in as an athlete, delete the login as coach, the athlete's next request returns 401 (today: 200).
-  - [ ] Test: after a password change, a second existing session of that user gets 401; the session that made the change keeps working.
-  - [ ] Test: anonymous `GET /api/openapi` → 401.
-  - [ ] Test: the 6th wrong password within the window is delayed/rejected, and a correct login works after the window.
-  - [ ] ADR 0005 updated.
+  - [x] Failing test first (`LoginFlowIT`): log in as an athlete, delete the login as coach, the athlete's next request returns 401 (today: 200).
+  - [x] Test: after a password change, a second existing session of that user gets 401; the session that made the change keeps working.
+  - [x] Test: anonymous `GET /api/openapi` → 401.
+  - [x] Test: the 6th wrong password within the window is delayed/rejected, and a correct login works after the window.
+  - [x] ADR 0005 updated.
 - **Verification:** `cd backend && ./gradlew build`.
 - **Coach decision needed:** no.
 - **Opus prompt:**

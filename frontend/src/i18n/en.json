@@ -110,8 +110,8 @@
       "missing": "Garmin had no data for: {{list}}",
       "nothingKept": "Nothing from this check was saved.",
       "fieldSearch": "Where Garmin keeps the precise sleep values",
-      "fieldSearchHint": "For each sleep value, the fields of Garmin's answer that equal what your export stored, and on how many nights. Only field names are shown. Send this table to Claude.",
-      "field": "Field in Garmin's answer", "matches": "Nights that match", "noField": "no field matches"
+      "fieldSearchHint": "For each sleep value, the fields of Garmin's answer closest to what your export stored: on how many nights they match exactly, and how far off they are on average. Only field names and differences are shown. Send this table to Claude.",
+      "field": "Field in Garmin's answer", "matches": "Nights that match", "meanDiff": "Average difference", "noField": "no field found"
     },
     "errors": {
       "AUTH_FAILED": "Garmin did not accept that e-mail and password.",

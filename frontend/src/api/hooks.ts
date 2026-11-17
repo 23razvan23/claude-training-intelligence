@@ -8,6 +8,7 @@ import type {
   GarminCheckReport,
   GarminConnectResult,
   GarminSyncRun,
+  GarminSyncStatus,
   GarminStatus,
   HoldoutFeed,
   HoldoutReport,
@@ -270,7 +271,7 @@ export function useGarminRuns(athleteId?: number, enabled = true) {
       if (runs[0]?.status === 'SUCCEEDED' || runs[0]?.status === 'FAILED') {
         const prev = qc.getQueryData<GarminSyncRun[]>(['garmin-runs', athleteId]);
         if (prev?.[0]?.id === runs[0].id && prev[0].status === 'RUNNING') {
-          for (const key of ['today', 'imports', 'holdout', 'features', 'garmin', 'coverage']) {
+          for (const key of ['today', 'imports', 'holdout', 'features', 'garmin', 'coverage', 'garmin-sync-status']) {
             qc.invalidateQueries({ queryKey: [key, athleteId] });
           }
         }
@@ -289,7 +290,19 @@ export function useGarminSyncNow(athleteId?: number) {
     onSuccess: (run) => {
       qc.setQueryData<GarminSyncRun[]>(['garmin-runs', athleteId], (old) => [run, ...(old ?? []).filter((r) => r.id !== run.id)]);
       qc.invalidateQueries({ queryKey: ['imports', athleteId] });
+      qc.invalidateQueries({ queryKey: ['garmin-sync-status', athleteId] });
     },
+  });
+}
+
+/** The "Last sync" line (Today and Imports); readable by an athlete for their own data. */
+export function useGarminSyncStatus(athleteId?: number) {
+  return useQuery({
+    queryKey: ['garmin-sync-status', athleteId],
+    queryFn: () => api<GarminSyncStatus>(`/api/athletes/${athleteId}/garmin/sync/status`),
+    enabled: athleteId != null,
+    refetchOnWindowFocus: true,
+    retry: false,
   });
 }
 

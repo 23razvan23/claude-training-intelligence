@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { useToday } from '../api/hooks';
-import type { Band, StrainTarget, Today, TodayDay } from '../api/types';
+import { useGarminSyncStatus, useToday } from '../api/hooks';
+import type { Band, GarminSyncStatus, StrainTarget, Today, TodayDay } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
+import { LastSync, SyncBanner } from '../components/LastSync';
+import { syncNotice } from '../sync';
 import { describeContribution, describeReason, formatDay, formatMinutes, formatPoints } from '../today';
 
 // The 30-second morning check (stage 1b-2a, ADR 0014). It only shows stored scores; it never computes one.
@@ -13,17 +15,21 @@ export function TodayPage() {
   const { t } = useTranslation();
   const { athleteId } = useAthleteSelection();
   const { data, error, isLoading } = useToday(athleteId);
+  // The sync line is extra information: if it can't be read, Today still shows.
+  const { data: sync } = useGarminSyncStatus(athleteId);
 
   if (athleteId == null) return <p className="muted">{t('common.selectAthlete')}</p>;
   if (isLoading) return <p className="muted">{t('common.loading')}</p>;
   if (error) return <p className="warn">{t('common.error', { message: error.message })}</p>;
   if (!data) return null;
-  return <TodayView data={data} />;
+  return <TodayView data={data} sync={sync} />;
 }
 
-export function TodayView({ data }: { data: Today }) {
+export function TodayView({ data, sync }: { data: Today; sync?: GarminSyncStatus | null }) {
   const { t, i18n } = useTranslation();
   const day = (iso: string) => formatDay(iso, i18n.language);
+  const notice = syncNotice(data, sync);
+  const synced = sync?.connection === 'CONNECTED';
 
   return (
     <section className="stack today" data-state={data.state}>
@@ -34,15 +40,22 @@ export function TodayView({ data }: { data: Today }) {
         </span>
       </div>
 
+      <LastSync sync={sync} />
+      {notice?.kind === 'reconnect' && <SyncBanner notice={notice} />}
+
       {data.state === 'NO_MODEL' && <p className="card muted">{t('today.noModel')}</p>}
       {data.state === 'NO_DATA' && <p className="card muted">{t('today.noData')}</p>}
+      {data.state === 'NO_DATA' && notice && notice.kind !== 'reconnect' && <SyncBanner notice={notice} />}
 
       {data.state === 'STALE' && (
         <>
           <div className="banner" role="status" data-testid="stale-banner">
             <strong>{t('today.staleTitle')}</strong>
-            <span>{t('today.staleBody', { date: data.lastDataDate ? day(data.lastDataDate) : '–' })}</span>
+            <span>
+              {t(synced ? 'today.staleBodySynced' : 'today.staleBody', { date: data.lastDataDate ? day(data.lastDataDate) : '–' })}
+            </span>
           </div>
+          {notice && notice.kind !== 'reconnect' && <SyncBanner notice={notice} />}
           {data.lastScored && (
             <article className="stack past" data-testid="last-scored" aria-label={t('today.lastScored', { date: day(data.lastScored.date) })}>
               <h2>

@@ -253,7 +253,10 @@ export interface HoldoutReport {
   rolling?: HoldoutFigures;
   weeks: HoldoutFigures[];
   naive: { n: number; skippedNoWhoopYesterday: number; ours: HoldoutSide; naive: HoldoutSide };
-  markers: { profileChangedDays: number; profile?: Record<string, number>; recomputeRuns: string[]; staleFeatureDays: number };
+  markers: { profileChangedDays: number; profile?: Record<string, number>; recomputeRuns: string[]; staleFeatureDays: number;
+    /** Days that would be compared but were scored from a synced night (ADR 0015 D13). */
+    waitingForExportDays: number;
+  };
   days: HoldoutDay[];
 }
 
@@ -402,6 +405,21 @@ export interface GarminSyncRun {
   recomputed: boolean;
   /** Parts Garmin had no data for, e.g. "hrv:2026-11-17". */
   missing: string[];
+}
+
+/** The "Last sync" line and the Today banner (ADR 0015 D9). Fixed codes and times only. */
+export interface GarminSyncStatus {
+  connection: 'NOT_CONFIGURED' | 'NOT_CONNECTED' | 'CONNECTED' | 'RECONNECT_NEEDED';
+  lastSuccessAt?: string | null;
+  lastSuccessThrough?: string | null;
+  latestStatus?: GarminSyncRun['status'] | null;
+  latestErrorCode?: string | null;
+  latestAt?: string | null;
+  nextRetryAt?: string | null;
+  latestTrigger?: GarminSyncRun['trigger'] | null;
+  morningEnabled: boolean;
+  /** "07:00:00", in the athlete's timezone. */
+  morningTime: string;
 }
 
 /** "Check against export": what a sync would add or change on days already imported. Nothing is kept. */

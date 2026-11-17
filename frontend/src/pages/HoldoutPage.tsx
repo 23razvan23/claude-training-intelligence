@@ -107,6 +107,11 @@ function Holdout({ r }: { r: HoldoutReport }) {
         )}
         {noScoreYet > 0 && <p className="warn small">{t('holdout.noScoreYet', { count: noScoreYet, last: r.lastScoredDate ?? '–' })}</p>}
         {r.markers.staleFeatureDays > 0 && <p className="warn small">{t('holdout.stale', { count: r.markers.staleFeatureDays })}</p>}
+        {r.markers.waitingForExportDays > 0 && (
+          <p className="warn small" data-testid="waiting-for-export">
+            {t('holdout.waitingForExport', { count: r.markers.waitingForExportDays })}
+          </p>
+        )}
       </div>
 
       <div className="card stack">

@@ -108,6 +108,15 @@ describe('Today: fresh', () => {
     await screen.findByTestId('today-recovery');
     expect(screen.queryByTestId('strain-lowconf')).not.toBeInTheDocument();
     expect(screen.queryByTestId('recovery-lowconf')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('recovery-live-breathing')).not.toBeInTheDocument();
+  });
+
+  it("marks recovery approximate when the night's breathing rate came from Garmin's live data", async () => {
+    mockToday({ today: TODAY, timezone: 'Europe/Bucharest', state: 'FRESH', lastDataDate: TODAY, day: day({ liveBreathing: true }) });
+    renderPage();
+    expect(await screen.findByTestId('recovery-live-breathing')).toHaveTextContent(
+      "Approximate: breathing rate from Garmin's live data, so recovery may read a few points high.",
+    );
   });
 });
 

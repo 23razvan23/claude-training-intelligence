@@ -72,7 +72,28 @@ public class TodayService {
         } catch (RuntimeException e) {
             contract = null; // the "usual" values are then left out; the scores are still shown
         }
-        return TodayView.build(today, zone.getId(), model.version(), rows, lnRmssd, rmssd, contract, props,
+        var view = TodayView.build(today, zone.getId(), model.version(), rows, lnRmssd, rmssd, contract, props,
                 metrics.baselineWindowDays(), metrics.baselineMinDays());
+        return markLiveBreathing(athleteId, view);
+    }
+
+    /**
+     * Marks the shown day when its night's breathing rate came from Garmin's live data (a synced
+     * night, not an exported one): recovery is then approximate until the next export (ADR 0015 D12).
+     */
+    TodayView.Today markLiveBreathing(long athleteId, TodayView.Today view) {
+        TodayView.Day shown = view.day() != null ? view.day() : view.lastScored();
+        if (shown == null) return view;
+        boolean live = jdbc.sql("""
+                SELECT EXISTS (SELECT 1 FROM sleep_session_current s JOIN import_batch b ON b.id = s.import_batch_id
+                               WHERE s.athlete_id = ? AND s.source = 'GARMIN' AND NOT s.is_nap AND s.cycle_date = ?
+                                 AND s.avg_respiration IS NOT NULL AND b.kind = 'GARMIN_SYNC')""")
+                .params(athleteId, shown.date()).query(Boolean.class).single();
+        if (!live) return view;
+        return view.day() != null
+                ? new TodayView.Today(view.today(), view.timezone(), view.state(), view.modelVersion(), view.lastDataDate(),
+                        view.day().withLiveBreathing(true), view.lastScored())
+                : new TodayView.Today(view.today(), view.timezone(), view.state(), view.modelVersion(), view.lastDataDate(),
+                        view.day(), view.lastScored().withLiveBreathing(true));
     }
 }

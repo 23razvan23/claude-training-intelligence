@@ -355,10 +355,9 @@ class GarminSyncIT extends GarminTestBase {
                         .content("{\"from\":\"" + FIRST + "\",\"to\":\"" + FIRST.plusDays(4) + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.differencesUsedByScores").value(0))
-                // Sleep stress is left empty (no precise source known, no score reads it), so each night
-                // differs in that one unused column only.
-                .andExpect(jsonPath("$.differences[?(@.table == 'sleep_session')].column").value(
-                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("avg_sleep_stress"))))
+                // Exported nights win (ADR 0015 D12): a synced night is not even written, so no sleep difference.
+                .andExpect(jsonPath("$.differences[?(@.table == 'sleep_session')]").isEmpty())
+                .andExpect(jsonPath("$.tables.sleep_session.inserted").value(0))
                 .andExpect(jsonPath("$.differences[?(@.usedByScores == true)]").isEmpty())
                 .andExpect(jsonPath("$.tables.activity.inserted").value(0))
                 .andExpect(jsonPath("$.tables.monitoring_hr.inserted").value(0))
@@ -381,30 +380,70 @@ class GarminSyncIT extends GarminTestBase {
                         .content("{\"from\":\"" + FIRST + "\",\"to\":\"" + FIRST.plusDays(2) + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].nights").value(3))
-                .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].candidates[0].path").value("averageRespiration"))
+                .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].candidates[0].path")
+                        .value("dailySleepDTO.averageRespirationValue"))
                 .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].candidates[0].matches").value(3))
                 .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_spo2_pct')].candidates[0].path")
-                        .value("wellnessSpO2SleepSummaryDTO.averageSPO2"));
+                        .value("dailySleepDTO.averageSpO2Value"));
     }
 
-    /** Bug of 2026-11-17 (ADR 0015 D11): the summary's whole numbers must never be stored. */
+    /** The coach's choice (ADR 0015 D12): without a precise field, Garmin's live sleep values are stored. */
     @Test
-    void aLiveAnswerWithOnlyRoundedAveragesStoresNoneRatherThanRoundedOnes() throws Exception {
+    void aSyncedNightStoresGarminsLiveSleepValues() throws Exception {
         long a = athlete();
         connect(a);
         garminReturns(GarminApiFixtures.payload(FIRST, 0, 1, TOKENS, day -> {
-            var answer = (com.fasterxml.jackson.databind.node.ObjectNode) day.get("sleep");
-            answer.remove("averageRespiration");
-            answer.remove("wellnessSpO2SleepSummaryDTO");
+            var dto = (com.fasterxml.jackson.databind.node.ObjectNode) day.get("sleep").get("dailySleepDTO");
+            dto.put("averageRespirationValue", 13.0).put("averageSpO2Value", 96.0);
+            ((com.fasterxml.jackson.databind.node.ObjectNode) day.get("sleep")).remove("wellnessSpO2SleepSummaryDTO");
         }).toString());
         assertThat(sync.runNow(a, Trigger.MANUAL, FIRST).status()).isEqualTo(Status.SUCCEEDED);
         var row = jdbc.sql("SELECT deep_s, sleep_score, avg_respiration, avg_spo2_pct, lowest_spo2_pct FROM sleep_session WHERE athlete_id = ?")
                 .param(a).query().singleRow();
         assertThat(row.get("deep_s")).isEqualTo(6000);
         assertThat(row.get("sleep_score")).isEqualTo(81);
-        assertThat(row.get("avg_respiration")).isNull();
-        assertThat(row.get("avg_spo2_pct")).isNull();
+        assertThat((BigDecimal) row.get("avg_respiration")).isEqualByComparingTo("13.0");
+        assertThat((BigDecimal) row.get("avg_spo2_pct")).isEqualByComparingTo("96.0");
         assertThat((BigDecimal) row.get("lowest_spo2_pct")).isEqualByComparingTo("86.0");
+    }
+
+    /** ADR 0015 D12: a sync never replaces a night already imported from an export. */
+    @Test
+    void anExportedNightAlwaysWinsOverASyncedOne() throws Exception {
+        long a = athlete();
+        importExport(a, 3);
+        connect(a);
+        long nightsBefore = count("SELECT count(*) FROM sleep_session WHERE athlete_id = ?", a);
+        // Garmin's live values differ from the export (as on the coach's data).
+        garminReturns(GarminApiFixtures.payload(FIRST, 0, 3, TOKENS, day ->
+                ((com.fasterxml.jackson.databind.node.ObjectNode) day.get("sleep").get("dailySleepDTO")).put("averageRespirationValue", 12.0))
+                .toString());
+        var run = sync.runNow(a, Trigger.MANUAL, FIRST.plusDays(2));
+        assertThat(run.status()).isEqualTo(Status.SUCCEEDED);
+        assertThat(count("SELECT count(*) FROM sleep_session WHERE athlete_id = ?", a)).isEqualTo(nightsBefore);
+        assertThat(count("SELECT count(*) FROM sleep_session_current WHERE athlete_id = ? AND avg_respiration = 12.5", a)).isEqualTo(3);
+        var stats = jdbc.sql("SELECT stats::text FROM import_batch WHERE id = ?").param(run.importBatchId()).query(String.class).single();
+        assertThat(stats).contains("\"sleep_session\"");
+
+        // A night not in the export is synced as usual.
+        garminReturns(GarminApiFixtures.payload(FIRST, 3, 1, TOKENS).toString());
+        sync.runNow(a, Trigger.MANUAL, FIRST.plusDays(3));
+        assertThat(count("SELECT count(*) FROM sleep_session WHERE athlete_id = ?", a)).isEqualTo(nightsBefore + 1);
+    }
+
+    /** ADR 0015 D12: Today says when the shown day's breathing rate came from Garmin's live data. */
+    @Test
+    void todayMarksADayScoredWithLiveBreathing() throws Exception {
+        long a = exportedAndScored();
+        mvc.perform(get("/api/athletes/" + a + "/today").with(user(coach)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastScored.liveBreathing").value(false));
+        garminReturns(GarminApiFixtures.payload(FIRST, EXPORTED, 3, TOKENS).toString());
+        sync.runNow(a, Trigger.MORNING, TODAY);
+        mvc.perform(get("/api/athletes/" + a + "/today").with(user(coach)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastScored.date").value(TODAY.toString()))
+                .andExpect(jsonPath("$.lastScored.liveBreathing").value(true));
     }
 
     @Test

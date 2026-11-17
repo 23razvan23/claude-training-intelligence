@@ -322,6 +322,8 @@ export interface TodayDay {
   needsRecompute: boolean;
   drift: boolean;
   profileChanged: boolean;
+  /** The night came from a Garmin sync: breathing rate is Garmin's live value, so recovery is approximate (ADR 0015 D12). */
+  liveBreathing?: boolean;
 }
 
 export interface Today {

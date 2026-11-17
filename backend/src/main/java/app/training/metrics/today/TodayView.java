@@ -64,7 +64,19 @@ public final class TodayView {
     public record Day(LocalDate date, Integer recoveryPct, String band, boolean recoveryLowerConfidence, List<Reason> recoveryReasons,
                       BigDecimal strain, boolean strainLowCoverage, String strainReason, StrainTarget strainTarget,
                       Integer sleepPerformancePct, Integer sleepNeedMin, String sleepReason,
-                      List<Contribution> contributions, boolean needsRecompute, boolean drift, boolean profileChanged) {}
+                      List<Contribution> contributions, boolean needsRecompute, boolean drift, boolean profileChanged,
+                      boolean liveBreathing) {
+
+        /**
+         * The same day, marked as scored with Garmin's live (approximate) breathing rate: the night came
+         * from a sync, not an export (ADR 0015 D12). Display only; the score is what it is.
+         */
+        public Day withLiveBreathing(boolean live) {
+            return new Day(date, recoveryPct, band, recoveryLowerConfidence, recoveryReasons, strain, strainLowCoverage, strainReason,
+                    strainTarget, sleepPerformancePct, sleepNeedMin, sleepReason, contributions, needsRecompute, drift, profileChanged,
+                    live);
+        }
+    }
 
     /** No ACTIVE model, or no scored days yet. */
     public static Today empty(LocalDate today, String timezone, String modelVersion) {
@@ -105,7 +117,7 @@ public final class TodayView {
                 r.strain(), lowCoverage, text(q, "strain_reason"), target,
                 r.sleepPerformancePct(), r.sleepNeedMin(), text(q, "sleep_performance_reason"),
                 r.recoveryPct() == null ? List.of() : contributions(r, lnRmssd, rmssd, contract, baselineWindowDays, baselineMinDays),
-                q.path("stale").asBoolean(false), q.path("drift").size() > 0, q.path("profile_changed").asBoolean(false));
+                q.path("stale").asBoolean(false), q.path("drift").size() > 0, q.path("profile_changed").asBoolean(false), false);
     }
 
     private static String text(JsonNode q, String key) {

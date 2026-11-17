@@ -181,6 +181,17 @@ public class RawWriter {
         count(ctx, "sleep_session", n);
     }
 
+    /** Whether a version of this Garmin night (source id = its calendarDate) came from a Garmin account export. */
+    public boolean hasExportedSleep(long athleteId, String sleepSourceId) {
+        return jdbc.sql("""
+                SELECT EXISTS (SELECT 1 FROM sleep_session s JOIN import_batch b ON b.id = s.import_batch_id
+                               WHERE s.athlete_id = ? AND s.source = 'GARMIN' AND split_part(s.source_id, '@', 1) = ?
+                                 AND b.kind = 'GARMIN_EXPORT')""")
+                .params(athleteId, sleepSourceId)
+                .query(Boolean.class)
+                .single();
+    }
+
     /** Inserts the activity unless it exists; returns its id either way. */
     public long activity(Ctx ctx, Activity a) {
         Optional<Long> inserted = jdbc.sql("""

@@ -113,6 +113,8 @@ The app can sign in to Garmin Connect as you and fetch each day's data itself ([
 2. Press **Sync now**. It fetches today and the 2 days before, imports them like an export, and then recomputes features and scores by itself. The card shows the last sync and its result. Running it twice adds nothing the second time. If Garmin is unavailable, it tries again after 10 and 30 minutes.
 3. Each sync appears under **Import history** as "Garmin sync".
 
+**Synced mornings are approximate for breathing rate.** Garmin's live data rounds the night's breathing rate, so on a synced morning recovery may read a few points high, and Today says so. Your next Garmin export brings the precise value: import it (with each Whoop export, section 7), press Recompute features, and those days are rescored. A synced night never replaces one already imported from an export.
+
 **If Garmin needs you to connect again** (it stopped accepting the token, or you changed `GARMIN_TOKEN_KEY`), the card says so and shows the form again. Sync pauses until you do; imports keep working.
 
 **Disconnect** deletes the stored token from the app. Garmin cannot be told to cancel that token from here. To be thorough, also sign out of other devices in your Garmin account's security settings, or change your Garmin password.

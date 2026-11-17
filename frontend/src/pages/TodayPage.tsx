@@ -82,6 +82,11 @@ function DayCard({ d, isToday }: { d: TodayDay; isToday: boolean }) {
                   {t('today.recoveryLowConf')}
                 </span>
               )}
+              {d.liveBreathing && (
+                <span className="lowconf" data-testid="recovery-live-breathing">
+                  {t('today.liveBreathing')}
+                </span>
+              )}
             </div>
           </div>
         ) : (

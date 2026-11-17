@@ -56,46 +56,34 @@ final class GarminApiShapes {
      * The live sleep answer → sleepData record. The nightly fields (times, stages, score) come from
      * its summary, dailySleepDTO; timestamps stay epoch ms, which the importer reads.
      *
-     * <p>Bug found on the coach's data (2026-11-17, ADR 0015 D11): dailySleepDTO gives breathing
-     * rate, SpO2 and sleep stress as whole numbers, while the export keeps decimals (12.4 vs 12.0).
-     * So the precise values are taken from the rest of the answer, from fields with the export's
-     * own names ({@link #PRECISE_RESPIRATION}, an object holding {@code averageSPO2}, like the
-     * export's spo2SleepSummary). When none is there, the value is left out (the day then shows
-     * the input as missing) rather than stored rounded, which would move recovery silently.
-     * The whole-number values are never used.
+     * <p>Breathing rate, SpO2 and sleep stress (ADR 0015 D11, D12): Garmin's live answer does not
+     * hold the export's precise values (checked on the coach's data: the closest live field is
+     * 0.45 breaths/min and 0.3 % SpO2 off on average). A field with the export's own name is used
+     * when present; otherwise the summary's live value is stored, as the coach chose (option B,
+     * 2026-11-17): recovery every morning, marked approximate on Today, and replaced by the precise
+     * value when the next Garmin export is imported. A night already imported from an export is
+     * never replaced by a synced one (GarminExportImporter.importSync).
      */
     static ObjectNode sleep(JsonNode live) {
         JsonNode dto = live.path("dailySleepDTO").isObject() ? live.get("dailySleepDTO") : live;
         ObjectNode o = dto.deepCopy();
-        for (String rounded : ROUNDED_SLEEP_FIELDS) o.remove(rounded);
-        if (!o.hasNonNull("averageRespiration")) {
-            JsonNode r = findNumber(live, PRECISE_RESPIRATION, dto);
-            if (r != null) o.set("averageRespiration", r);
-        }
+        JsonNode precise = findNumber(live, PRECISE_RESPIRATION, null);
+        if (precise != null) o.set("averageRespiration", precise);
+        else copyFirst(dto, o, "averageRespiration", "averageRespirationValue");
         if (!o.has("spo2SleepSummary")) {
-            JsonNode spo2 = findObjectWith(live, "averageSPO2", dto);
-            if (spo2 != null) {
-                ObjectNode s = F.objectNode();
-                copy(spo2, "averageSPO2", s, "averageSPO2");
-                copy(spo2, "lowestSPO2", s, "lowestSPO2");
-                o.set("spo2SleepSummary", s);
-            } else if (dto.hasNonNull("lowestSpO2Value")) {
-                // The lowest reading is a whole number on both sides, so the summary's is exact.
-                o.set("spo2SleepSummary", F.objectNode().set("lowestSPO2", dto.get("lowestSpO2Value")));
-            }
+            ObjectNode s = F.objectNode();
+            JsonNode summary = findObjectWith(live, "averageSPO2", dto);
+            if (summary != null) copy(summary, "averageSPO2", s, "averageSPO2");
+            else copyFirst(dto, s, "averageSPO2", "averageSpO2Value", "avgSpO2");
+            copyFirst(dto, s, "lowestSPO2", "lowestSpO2Value");
+            if (!s.has("lowestSPO2") && summary != null) copy(summary, "lowestSPO2", s, "lowestSPO2");
+            if (!s.isEmpty()) o.set("spo2SleepSummary", s);
         }
-        // avgSleepStress: no score reads it; kept only from a precise source elsewhere in the answer.
-        JsonNode stress = findNumber(live, "avgSleepStress", dto);
-        if (stress != null) o.set("avgSleepStress", stress);
         return o;
     }
 
     /** The export's name for the night's average breathing rate. */
     static final String PRECISE_RESPIRATION = "averageRespiration";
-
-    /** Summary fields Garmin rounds to whole numbers (or computes otherwise); never stored. */
-    static final java.util.List<String> ROUNDED_SLEEP_FIELDS = java.util.List.of(
-            "averageRespirationValue", "averageSpO2Value", "avgSpO2", "avgSleepStress");
 
     /** The first numeric field {@code key} anywhere in {@code root}, outside {@code skip}. */
     static JsonNode findNumber(JsonNode root, String key, JsonNode skip) {

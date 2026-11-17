@@ -2,6 +2,11 @@
 
 - Status: accepted (Phase 1a)
 
+## Current state (updated 2026-11-17; the decisions below keep their history)
+- Feature version **f3**, scoring contract **schema_version 2** (ADR 0008). Strain is the load form: Edwards workout load plus background load (the zones form lost the 10% rule).
+- ACTIVE model **m15-20261115** (activated 2026-11-15 19:47:54 UTC), calibrated on 2026-01-19 → 2026-09-09 and tested on 2026-09-10 → 2026-11-08: recovery bands 88%, no green-vs-red flips, strain MAE 1.91, Spearman 0.82.
+- The live holdout runs until 2027-02-19 under ADR 0009; no feature or activation change without the coach's go.
+
 ## Context
 The goal is Garmin-derived Recovery, Strain and Sleep scores that agree with Whoop closely enough to make the same training decisions, proven on held-out data (SPEC.md, Module 1). Fitting happens in Python; daily scoring (Phase 1b) happens in Java.
 

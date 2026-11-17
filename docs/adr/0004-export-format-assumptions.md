@@ -1,6 +1,6 @@
 # ADR 0004: Export formats assumed without real files
 
-- Status: **Garmin: verified against the coach's real export on 2026-11-09** (list contents pending one more inspector run, see below). **Whoop: provisional until the real export is inspected.**
+- Status: **Garmin: verified against the coach's real export on 2026-11-09**; the list contents were verified with a second inspector run (see below). **Whoop: verified against the coach's real export on 2026-11-10** (see the Whoop section).
 - Decided with the coach: no real export files were available in Phase 0, so the parsers follow the publicly documented layouts.
 
 ## How to verify
@@ -24,7 +24,7 @@ Headers match case-insensitively, ignoring punctuation. Times are local, as `yyy
 ## Garmin Connect account export (one ZIP)
 
 ### Verified on the real export (2026-11-09)
-The export covered 2024-11 → 2026-11, with 1,360 activities, ~720 nights and 21,451 FIT files.
+The export covered about 2024-09/11 → 2026-11 (the start month is not settled: PLAN §4 says 2024-09, this ADR said 2024-11; to be confirmed from the stored data), with 1,360 activities, ~720 nights and 21,451 FIT files.
 - **Units:** activity `duration` is in ms (mean ≈ 37 min); `distance` and `elevationGain` are in cm (mean ≈ 4.4 km); `startTimeGmt` is epoch ms. All file patterns matched.
 - **Resting HR:** `restingHeartRate` in UDSFile is smoothed (range 44–57). `currentDayRestingHeartRate` (41–63) is the day's own value. The importer reads `currentDayRestingHeartRate`, falling back to `restingHeartRate`.
 - **Activity dates:** `startTimeLocal` holds local wall-clock time encoded as epoch ms. The activity's `calendar_date` is taken from it, so travel is handled correctly.

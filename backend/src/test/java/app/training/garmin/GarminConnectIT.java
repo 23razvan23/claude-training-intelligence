@@ -9,15 +9,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import app.training.IntegrationTest;
 import app.training.security.CurrentUser;
 import app.training.security.Role;
 import app.training.security.UserRepository;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,8 +22,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -36,31 +30,9 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
-class GarminConnectIT extends IntegrationTest {
-    static final FakeSidecar SIDECAR = new FakeSidecar();
-    static final String KEY;
-
-    static {
-        byte[] k = new byte[32];
-        new SecureRandom().nextBytes(k);
-        KEY = Base64.getEncoder().encodeToString(k);
-    }
-
+class GarminConnectIT extends GarminTestBase {
     static final String TOKENS = "{\\\"di_token\\\":\\\"fake-access\\\",\\\"di_refresh_token\\\":\\\"fake-refresh\\\"}";
     static final String CONNECT = "{\"username\":\"test-user@example.invalid\",\"password\":\"test-password\"}";
-
-    @DynamicPropertySource
-    static void garmin(DynamicPropertyRegistry r) {
-        r.add("app.garmin.token-key", () -> KEY);
-        r.add("app.garmin.sync-secret", () -> "test-sync-secret");
-        r.add("app.garmin.sidecar-url", SIDECAR::url);
-        r.add("app.garmin.sidecar-timeout-seconds", () -> 5);
-    }
-
-    @AfterAll
-    static void stop() {
-        SIDECAR.close();
-    }
 
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;

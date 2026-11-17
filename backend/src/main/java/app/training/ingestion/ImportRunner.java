@@ -101,7 +101,7 @@ public class ImportRunner {
                                 progress.step();
                             }
                         }
-                        case GARMIN_SYNC -> throw new UnsupportedOperationException("Garmin sync arrives in Phase 1");
+                        case GARMIN_SYNC -> throw new IllegalArgumentException("A Garmin sync is imported with runSync");
                     }
                 } catch (IOException e) {
                     throw new java.io.UncheckedIOException(e);
@@ -123,6 +123,56 @@ public class ImportRunner {
                 }
             }
         }
+    }
+
+    /** A sync import that failed; the batch is already marked FAILED with the same fixed message. */
+    public static final class SyncImportFailed extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        SyncImportFailed(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Imports one Garmin sync fetch as batch {@code batchId}, in one transaction like any import
+     * (ADR 0006), through the export's own record handlers (ADR 0015 D5). Runs on the caller's
+     * thread: the sync waits for it before recomputing.
+     */
+    public ImportStats runSync(long batchId, long athleteId, com.fasterxml.jackson.databind.JsonNode payload) {
+        var stats = new ImportStats();
+        try {
+            batches.markRunning(batchId);
+            var progress = progressFor(batchId);
+            var ctx = new RawWriter.Ctx(athleteId, batchId, stats, progress);
+            var zone = athletes.zoneOf(athleteId);
+            tx.executeWithoutResult(status -> garmin.importSync(ctx, payload, zone));
+            progress.flush();
+            batches.markFinished(batchId, stats);
+            log.info("Import batch {} (GARMIN_SYNC) finished: {} rows inserted", batchId, stats.insertedTotal());
+            return stats;
+        } catch (RuntimeException e) {
+            log.warn("Import batch {} (GARMIN_SYNC) failed: {}", batchId, e.toString());
+            String message = safeMessage(e);
+            batches.markFailed(batchId, message, stats);
+            throw new SyncImportFailed(message);
+        }
+    }
+
+    /**
+     * A dry run of a sync import (the "Check against export", ADR 0015 D5): the batch and every
+     * row are written inside one transaction that is always rolled back, after {@code inspect}
+     * has looked at what this batch would add. Nothing remains in the database.
+     */
+    public <T> T dryRunSync(long athleteId, com.fasterxml.jackson.databind.JsonNode payload,
+                            java.util.function.BiFunction<Long, ImportStats, T> inspect) {
+        return tx.execute(status -> {
+            status.setRollbackOnly();
+            var stats = new ImportStats();
+            long batchId = batches.create(athleteId, ImportKind.GARMIN_SYNC, "check (not kept)", null, null);
+            garmin.importSync(new RawWriter.Ctx(athleteId, batchId, stats), payload, athletes.zoneOf(athleteId));
+            return inspect.apply(batchId, stats);
+        });
     }
 
     private static String safeMessage(Throwable e) {

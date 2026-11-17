@@ -111,6 +111,82 @@ public class GarminExportImporter {
         }
     }
 
+    /**
+     * One morning's fetch from the Garmin sync sidecar (ADR 0015 D5): the live responses are
+     * turned into export records ({@link GarminApiShapes}) and written by the same handlers, in
+     * the same order (wellness and sleep, then activity summaries, then FIT files), so a synced
+     * day lands as exactly the rows an export of that day would give.
+     */
+    public void importSync(RawWriter.Ctx ctx, JsonNode payload, ZoneId zone) {
+        var progress = ctx.progress();
+        progress.phase("wellness", null);
+        for (JsonNode day : iter(payload.get("days"))) {
+            record(ctx, "daily summary", () -> {
+                if (day.path("summary").isObject()) dailySummary(ctx, GarminApiShapes.dailySummary(day.get("summary")));
+            });
+            record(ctx, "HRV", () -> {
+                if (day.path("hrv").isObject()) healthStatus(ctx, GarminApiShapes.healthStatus(day.get("hrv")));
+            });
+            record(ctx, "sleep", () -> {
+                if (day.path("sleep").isObject() && day.get("sleep").hasNonNull(SLEEP_START_GMT)) {
+                    sleep(ctx, GarminApiShapes.sleep(day.get("sleep")), zone);
+                }
+            });
+            progress.step();
+        }
+        progress.phase("activities", null);
+        for (JsonNode a : iter(payload.get("activities"))) {
+            record(ctx, "activity", () -> {
+                if (a.path("summary").isObject()) activitySummary(ctx, GarminApiShapes.activity(a.get("summary")), zone);
+            });
+            progress.step();
+        }
+        progress.phase("fit", null);
+        for (JsonNode a : iter(payload.get("activities"))) {
+            fitArchive(ctx, "activity_" + a.path("summary").path("activityId").asText("?"), a.get("fit"), zone);
+        }
+        for (JsonNode day : iter(payload.get("days"))) {
+            fitArchive(ctx, "wellness_" + day.path("date").asText("?"), day.get("wellnessFit"), zone);
+        }
+    }
+
+    /** A base64 download from Garmin: a ZIP of FIT files (what Garmin serves) or a single FIT file. */
+    private void fitArchive(RawWriter.Ctx ctx, String label, JsonNode base64, ZoneId zone) {
+        if (base64 == null || !base64.isTextual() || base64.asText().isEmpty()) return;
+        byte[] bytes;
+        try {
+            bytes = java.util.Base64.getDecoder().decode(base64.asText());
+        } catch (IllegalArgumentException e) {
+            ctx.stats().warn(label + ": not valid base64, skipped");
+            return;
+        }
+        if (bytes.length >= 2 && bytes[0] == 'P' && bytes[1] == 'K') {
+            try (var zin = new ZipInputStream(new java.io.ByteArrayInputStream(bytes))) {
+                ZipEntry e;
+                while ((e = zin.getNextEntry()) != null) {
+                    if (!e.isDirectory() && FIT.matcher(e.getName()).matches()) {
+                        fit(ctx, label + "/" + e.getName(), zin.readAllBytes(), zone);
+                        ctx.progress().step();
+                    }
+                }
+            } catch (IOException e) {
+                ctx.stats().warn(label + ": not a readable ZIP, skipped");
+            }
+        } else {
+            fit(ctx, label + ".fit", bytes, zone);
+            ctx.progress().step();
+        }
+    }
+
+    /** Runs one record's handler; a broken record is skipped with a warning, like a bad export entry. */
+    private static void record(RawWriter.Ctx ctx, String what, Runnable handler) {
+        try {
+            handler.run();
+        } catch (RuntimeException ex) {
+            ctx.stats().warn("Garmin sync: skipped a " + what + " record: " + ex.getMessage());
+        }
+    }
+
     /** One FIT file, from a bulk export or a manual upload. Non-activity FIT files are skipped. */
     public void fit(RawWriter.Ctx ctx, String name, byte[] bytes, ZoneId zone) {
         FitActivityParser.Parsed parsed;

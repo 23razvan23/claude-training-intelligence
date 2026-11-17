@@ -3,6 +3,8 @@
 - GET /health: no secret needed; says nothing about any account.
 - POST /auth/login {username, password} and POST /auth/mfa {mfaId, code}: need the
   X-Sync-Secret header (ADR 0011 D4). They answer with the token bundle or a fixed error code.
+- POST /sync/days {tokens, dates}: the days' data and the (possibly refreshed) token bundle
+  (ADR 0015 D5). Same header, same fixed error codes.
 
 The sidecar is internal to the Compose network (`expose`, never `ports`). It keeps no token.
 """
@@ -12,14 +14,18 @@ from __future__ import annotations
 import hmac
 import json
 import os
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .adapter import GarminAdapter, NotConfiguredAdapter
+from .adapter import GarminAdapter, GarminConnectAdapter, NotConfiguredAdapter
 from .auth import GarminAuth, GarminError, mfa_store_from_env, real_client_factory
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 SECRET_HEADER = "X-Sync-Secret"
-MAX_BODY_BYTES = 64 * 1024  # a login or MFA body is a few hundred bytes; refuse anything large
+MAX_BODY_BYTES = 64 * 1024  # a login, MFA or sync request is a few KB; refuse anything large
+# [configurable] At most 31 days per request: a month is the longest range the app asks for (the
+# export check); more would keep the sidecar busy for minutes and look like scraping to Garmin.
+MAX_DAYS = 31
 
 
 def safe_request_summary(method: str | None, path: str | None) -> str:
@@ -39,11 +45,11 @@ class BadRequestError(Exception):
     pass
 
 
-def _strings(body: dict, *names: str) -> list[str]:
+def _strings(body: dict, *names: str, max_len: int = 1024) -> list[str]:
     values = []
     for n in names:
         v = body.get(n)
-        if not isinstance(v, str) or not v.strip() or len(v) > 1024:
+        if not isinstance(v, str) or not v.strip() or len(v) > max_len:
             raise BadRequestError(n)
         values.append(v)
     return values
@@ -65,7 +71,7 @@ def make_handler(adapter: GarminAdapter, auth: GarminAuth | None = None, secret:
                 self._json(404, {"error": "NOT_FOUND"})
 
         def do_POST(self) -> None:  # noqa: N802
-            routes = {"/auth/login": self._login, "/auth/mfa": self._mfa}
+            routes = {"/auth/login": self._login, "/auth/mfa": self._mfa, "/sync/days": self._sync_days}
             route = routes.get(self.path)
             if route is None:
                 self._json(404, {"error": "NOT_FOUND"})
@@ -76,7 +82,7 @@ def make_handler(adapter: GarminAdapter, auth: GarminAuth | None = None, secret:
             if not secret_matches(secret, self.headers.get(SECRET_HEADER)):
                 self._json(401, {"error": "BAD_SECRET"})
                 return
-            if auth is None:
+            if auth is None or (route == self._sync_days and isinstance(adapter, NotConfiguredAdapter)):
                 self._json(503, {"error": "NOT_CONFIGURED"})
                 return
             try:
@@ -96,6 +102,19 @@ def make_handler(adapter: GarminAdapter, auth: GarminAuth | None = None, secret:
         def _mfa(self, body: dict) -> dict:
             mfa_id, code = _strings(body, "mfaId", "code")
             return auth.resume(mfa_id, code.strip()).to_json()
+
+        def _sync_days(self, body: dict) -> dict:
+            (tokens,) = _strings(body, "tokens", max_len=16 * 1024)
+            raw = body.get("dates")
+            if not isinstance(raw, list) or not 0 < len(raw) <= MAX_DAYS:
+                raise BadRequestError("dates")
+            try:
+                days = sorted({date.fromisoformat(d) for d in raw if isinstance(d, str)})
+            except ValueError:
+                raise BadRequestError("dates") from None
+            if len(days) != len(raw):
+                raise BadRequestError("dates")
+            return adapter.fetch_days(tokens, days)
 
         def _body(self) -> dict:
             try:
@@ -142,7 +161,7 @@ def main() -> None:
         print("garmin-sync: GARMIN_SYNC_SECRET is not set; refusing every request except /health", flush=True)
     port = int(os.environ.get("PORT", "8090"))
     auth = GarminAuth(real_client_factory, mfa_store_from_env())
-    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(NotConfiguredAdapter(), auth, secret))
+    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(GarminConnectAdapter(), auth, secret))
     print(f"garmin-sync {VERSION} listening on :{port}", flush=True)
     server.serve_forever()
 

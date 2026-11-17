@@ -11,7 +11,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /** Base for tests against a real TimescaleDB (Testcontainers), shared across the test run. */
-@SpringBootTest(properties = {"app.bootstrap.coach-username=", "app.bootstrap.coach-password="})
+@SpringBootTest(properties = {"app.bootstrap.coach-username=", "app.bootstrap.coach-password=",
+        "app.garmin.sync.scheduler-enabled=false"})
 @Import(IntegrationTest.Containers.class)
 public abstract class IntegrationTest {
 

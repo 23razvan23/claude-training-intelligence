@@ -39,3 +39,20 @@ def test_exception_names_used_by_classify():
         "GarminConnectConnectionError",
     ):
         assert hasattr(garminconnect, name)
+
+
+def test_fetch_methods_the_adapter_calls():
+    from garmin_sync.adapter import _original_format
+
+    g = real_client_factory(None, None)
+    for name in (
+        "get_user_summary",
+        "get_sleep_data",
+        "get_hrv_data",
+        "download",
+        "get_activities_by_date",
+        "download_activity",
+    ):
+        assert callable(getattr(g, name)), name
+    assert _original_format(g) is garminconnect.Garmin.ActivityDownloadFormat.ORIGINAL
+    assert hasattr(garminconnect, "GarminConnectNotFoundError")

@@ -17,28 +17,19 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 public class MetricsController {
     private final AthleteRepository athletes;
-    private final ActivityLoadService loads;
-    private final DayFeatureService features;
     private final MetricsRepository repo;
     private final MetricsProperties props;
     private final AccessPolicy access;
-    private final ScoringService scoring;
-    private final app.training.metrics.holdout.HoldoutRepository holdoutLog;
+    private final FeatureRecomputeService recompute;
 
-    public MetricsController(AthleteRepository athletes, ActivityLoadService loads, DayFeatureService features,
-                             MetricsRepository repo, MetricsProperties props, AccessPolicy access, ScoringService scoring,
-                             app.training.metrics.holdout.HoldoutRepository holdoutLog) {
-        this.scoring = scoring;
-        this.holdoutLog = holdoutLog;
+    public MetricsController(AthleteRepository athletes, MetricsRepository repo, MetricsProperties props, AccessPolicy access,
+                             FeatureRecomputeService recompute) {
+        this.recompute = recompute;
         this.athletes = athletes;
-        this.loads = loads;
-        this.features = features;
         this.repo = repo;
         this.props = props;
         this.access = access;
     }
-
-    public record RecomputeResult(ActivityLoadService.Outcome load, DayFeatureService.Outcome features, ScoringService.Outcome scores) {}
 
     /**
      * Recomputes activity loads and day features for the athlete's whole history, then the daily
@@ -48,18 +39,8 @@ public class MetricsController {
      */
     @PostMapping("/athletes/{athleteId}/features/recompute")
     @PreAuthorize("hasRole('COACH')")
-    @Transactional
-    public RecomputeResult recompute(@PathVariable long athleteId, @AuthenticationPrincipal CurrentUser user) {
-        var athlete = athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
-        var load = loads.recompute(athlete);
-        var p = loads.params(athlete, loads.restingHr(athlete));
-        var bgParams = p == null ? null : p.withMaxGap(props.monitoringMaxGapSeconds());
-        var days = features.recompute(athleteId, bgParams, java.time.ZoneId.of(athlete.timezone()));
-        var scores = scoring.recomputeIfPossible(athleteId);
-        // ADR 0009 H8: the live comparison marks every run inside its window (ADR 0013 D6).
-        holdoutLog.logRecompute(athleteId, user == null ? null : user.id(), props.featureVersion(), days.days(),
-                scores.modelVersion(), scores.days());
-        return new RecomputeResult(load, days, scores);
+    public FeatureRecomputeService.RecomputeResult recompute(@PathVariable long athleteId, @AuthenticationPrincipal CurrentUser user) {
+        return recompute.recompute(athleteId, user == null ? null : user.id(), FeatureRecomputeService.SOURCE_MANUAL);
     }
 
     @GetMapping("/athletes/{athleteId}/features/summary")

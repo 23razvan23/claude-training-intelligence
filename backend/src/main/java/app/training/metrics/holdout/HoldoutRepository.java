@@ -38,11 +38,15 @@ public class HoldoutRepository {
                 .list();
     }
 
-    /** When Recompute features ran for the athlete between the two instants (either may be null: open). */
+    /**
+     * When the coach pressed Recompute features for the athlete between the two instants (either
+     * may be null: open). Runs after a Garmin sync are left out: a morning sync recomputes every
+     * day, and marking each would bury the coach's own runs (ADR 0015 D8).
+     */
     public List<Instant> recomputeRuns(long athleteId, Instant from, Instant to) {
         return jdbc.sql("""
                 SELECT ran_at FROM feature_recompute_log
-                WHERE athlete_id = ? AND ran_at >= coalesce(?::timestamptz, '-infinity'::timestamptz)
+                WHERE athlete_id = ? AND source = 'manual' AND ran_at >= coalesce(?::timestamptz, '-infinity'::timestamptz)
                   AND ran_at <= coalesce(?::timestamptz, 'infinity'::timestamptz)
                 ORDER BY ran_at""")
                 .params(athleteId, from == null ? null : java.sql.Timestamp.from(from), to == null ? null : java.sql.Timestamp.from(to))
@@ -79,12 +83,13 @@ public class HoldoutRepository {
         return t == null ? null : t.toInstant();
     }
 
-    /** Records one Recompute features run (ADR 0013 D6). */
-    public void logRecompute(long athleteId, Long userId, String featureVersion, int featureDays, String scoredModelVersion, int scoredDays) {
+    /** Records one Recompute features run (ADR 0013 D6); {@code source} is 'manual' or 'garmin-sync' (ADR 0015 D8). */
+    public void logRecompute(long athleteId, Long userId, String source, String featureVersion, int featureDays,
+                             String scoredModelVersion, int scoredDays) {
         jdbc.sql("""
-                INSERT INTO feature_recompute_log (athlete_id, ran_by, feature_version, feature_days, scored_model_version, scored_days)
-                VALUES (?, ?, ?, ?, ?, ?)""")
-                .params(athleteId, userId, featureVersion, featureDays, scoredModelVersion, scoredDays)
+                INSERT INTO feature_recompute_log (athlete_id, ran_by, source, feature_version, feature_days, scored_model_version, scored_days)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""")
+                .params(athleteId, userId, source, featureVersion, featureDays, scoredModelVersion, scoredDays)
                 .update();
     }
 }

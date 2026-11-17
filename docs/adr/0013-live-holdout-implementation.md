@@ -29,6 +29,8 @@ Recovery, strain, sleep performance and sleep need each put every window day int
 
 Lower-confidence recovery stays in `COMPARED`, and its count is shown (A2).
 
+A day that would be compared but was scored from a synced night goes to `WAITS_FOR_EXPORT` instead, for every score (ADR 0015 D13).
+
 ### D4. Retired versions are recalculated, not copied
 A retired version's comparison uses:
 - only its own score rows, which are never rewritten after retirement (ADR 0012 D3);

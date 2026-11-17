@@ -102,6 +102,7 @@ The **Holdout** tab (coach) compares our scores with Whoop's on days the active 
    - A Whoop export taken during the day holds today's unfinished cycle. It is skipped, with a warning, and comes in finished with the next export.
    - A Garmin day exported half-finished is replaced by the newer version from a later export ([ADR 0010](docs/adr/0010-raw-revisions.md)).
 3. Under **Calibration**, press **Recompute features**.
+   - With the Garmin daily sync on (section 8), keep doing the Garmin export anyway: compared days scored from a synced night wait for it.
 4. Open **Holdout**. Its "Keeping it fed" panel shows the last Whoop, Garmin and scored days, and says when Recompute features is needed.
 
 **When Whoop ends:** take the last Whoop export on 2027-02-19 and a Garmin export after it. Import both, press Recompute features, then press **Download decision report** on the Holdout tab and keep the file. It states pass / not met / not enough days by the rule.
@@ -128,7 +129,15 @@ The app can sign in to Garmin Connect as you and fetch each day's data itself ([
 2. Press **Sync now**. It fetches today and the 2 days before, imports them like an export, and then recomputes features and scores by itself. The card shows the last sync and its result. Running it twice adds nothing the second time. If Garmin is unavailable, it tries again after 10 and 30 minutes.
 3. Each sync appears under **Import history** as "Garmin sync".
 
-**Synced mornings are approximate for breathing rate.** Garmin's live data rounds the night's breathing rate, so on a synced morning recovery may read a few points high, and Today says so. Your next Garmin export brings the precise value: import it (with each Whoop export, section 7), press Recompute features, and those days are rescored. A synced night never replaces one already imported from an export.
+**The morning sync.** Once connected, the app syncs by itself every morning at **07:00** (Bucharest time, or the athlete's timezone): it fetches today and the 2 days before, then recomputes features and scores. If the Mac was asleep at 07:00, the sync starts within a minute of the Mac waking up, the same day, once. Today and Imports show **Last sync**; if today's data is missing, Today says why: the sync failed (and whether it tries again), Garmin needs you to connect again, or Garmin had no data for today yet (open the Garmin Connect app so the watch uploads the night, then press **Sync now**).
+
+**Wake the Mac at 06:55 every day** so the 07:00 sync runs before you check (one Terminal command; it asks for your Mac password):
+```bash
+sudo pmset repeat wakeorpoweron MTWRFSU 06:55:00
+```
+Check it with `pmset -g sched`; remove it with `sudo pmset repeat cancel`. Docker Desktop must be running (set it to start when you log in). A scheduled wake is most reliable with the Mac plugged in. If the Mac doesn't wake, nothing breaks: the sync runs when you open it.
+
+**Synced mornings are approximate for breathing rate.** Garmin's live data rounds the night's breathing rate, so on a synced morning recovery may read a few points high, and Today says so. Your next Garmin export brings the precise value: import it (with each Whoop export, section 7), press Recompute features, and those days are rescored. A synced night never replaces one already imported from an export. On the **Holdout** tab, a compared day scored from a synced night does not count toward the pass marks until then: the page says "N compared days wait for a Garmin export" ([ADR 0015 D13](docs/adr/0015-garmin-daily-sync.md)).
 
 **If Garmin needs you to connect again** (it stopped accepting the token, or you changed `GARMIN_TOKEN_KEY`), the card says so and shows the form again. Sync pauses until you do; imports keep working.
 

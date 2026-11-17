@@ -1,6 +1,6 @@
 {
   "app": { "name": "Training Intelligence", "short": "TI" },
-  "nav": { "today": "Today", "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "holdout": "Holdout", "logout": "Log out" },
+  "nav": { "today": "Today", "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "holdout": "Holdout", "trends": "Trends", "logout": "Log out" },
   "theme": { "toggle": "Switch theme", "light": "Light", "dark": "Dark", "system": "System" },
   "common": {
     "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "loading": "Loading…",
@@ -307,6 +307,30 @@
       "MISSING_WORKOUT_HR": "A workout without heart rate",
       "NO_ALL_DAY_HR": "No all-day heart rate",
       "NO_ZONE_MINUTES": "No heart-rate zone minutes"
+    }
+  },
+  "trends": {
+    "title": "Trends", "range": "Range",
+    "ranges": { "4w": "4 weeks", "3m": "3 months", "12m": "12 months" },
+    "noData": "No data",
+    "gapsNote": "A day without data is a gap in the line. It is never drawn as zero and never filled in. Tap or drag a chart to read a day; with a keyboard, use the arrow keys.",
+    "chartHelp": "Tap or drag to read a day.",
+    "hrv": { "title": "HRV (overnight)" },
+    "hrvFrom": "Overnight HRV exists only from {{date}}; earlier days are blank, not zero.",
+    "hrvNone": "No overnight HRV has been recorded yet.",
+    "hrvStartLabel": "HRV starts",
+    "rhr": { "title": "Resting heart rate" }, "bpm": "bpm",
+    "recovery": { "title": "Recovery" },
+    "band": { "GREEN": "Green", "YELLOW": "Yellow", "RED": "Red" },
+    "strain": { "title": "Strain", "lowCovHelp": "the watch was worn for less than 10 hours, so this day's strain is partial." },
+    "lowerConfidence": "lower confidence",
+    "sleepPerf": { "title": "Sleep performance" },
+    "sleepDur": { "title": "Sleep duration vs need", "slept": "Slept", "need": "Need" },
+    "load": {
+      "title": "Training load: acute vs chronic", "acute": "Acute ({{days}} d)", "chronic": "Chronic ({{days}} d)",
+      "notEnough": "Not enough days yet: the chronic line needs {{days}} days with data.",
+      "ratio": "Acute ÷ chronic: {{value}} on {{date}}. One signal, not a verdict.",
+      "note": "Both lines are exponentially weighted averages of your daily training load (Edwards heart-rate load), not of the 0–21 strain score. A rest day counts as 0; a day with no data is skipped, not counted as 0. The 7 and 28 day windows are conventional choices, not proven thresholds."
     }
   },
   "today": {

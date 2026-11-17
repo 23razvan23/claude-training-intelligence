@@ -15,6 +15,8 @@
   --band-green: #15803d;
   --band-yellow: #a16207;
   --band-red: #b91c1c;
+  --chart-a: #0f766e;
+  --chart-b: #2563eb;
   --radius: 10px;
   color-scheme: light;
 }
@@ -36,6 +38,8 @@
     --band-green: #4ade80;
     --band-yellow: #facc15;
     --band-red: #f87171;
+    --chart-a: #2dd4bf;
+    --chart-b: #60a5fa;
     color-scheme: dark;
   }
 }
@@ -56,6 +60,8 @@
   --band-green: #4ade80;
   --band-yellow: #facc15;
   --band-red: #f87171;
+  --chart-a: #2dd4bf;
+  --chart-b: #60a5fa;
   color-scheme: dark;
 }
 
@@ -106,7 +112,7 @@ td { padding: 0.2rem 0.6rem 0.2rem 0; vertical-align: middle; }
 @media (min-width: 421px) { .brand-short { display: none; } }
 .brand { font-weight: 700; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .athlete-switcher { width: auto; max-width: 12rem; min-width: 0; flex-shrink: 1; padding: 0.3rem 0.4rem; }
-.tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; overflow-x: auto; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
 .tabs a { padding: 0.5rem 0.75rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
 .tabs a.active { color: var(--text); border-bottom-color: var(--accent); }
 .content { min-width: 0; }
@@ -234,3 +240,24 @@ table.data .nowrap { white-space: nowrap; }
 .points.up { color: var(--band-green); }
 .points.down { color: var(--band-red); }
 .notes { margin: 0; padding-left: 1.2rem; color: var(--warn); }
+
+/* Trends (stage 1b-2b): SVG charts that scale to the card; the page never scrolls sideways. */
+.range-switch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.range-switch button { border: 0; border-radius: 0; background: var(--surface); color: var(--muted); padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+.range-switch button.active { background: var(--accent); color: var(--accent-text); }
+.chart { margin: 0; }
+.chart-title { font-weight: 600; margin-bottom: 0.15rem; }
+.chart-readout { display: flex; flex-wrap: wrap; gap: 0.1rem 0.75rem; margin: 0 0 0.25rem; font-size: 0.85rem; font-variant-numeric: tabular-nums; min-height: 1.3rem; }
+.chart-readout time { color: var(--muted); }
+.chart-svg { display: block; width: 100%; height: auto; touch-action: pan-y; user-select: none; }
+.chart-svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-tick { fill: var(--muted); font-size: 10px; }
+.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { stroke-width: 1.5; }
+.chart-marker { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-cursor { stroke: var(--text); stroke-width: 1; opacity: 0.35; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.5rem; margin: 0.4rem 0 0; }
+.swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; }
+.swatch.hollow { background: var(--surface); border: 2px solid var(--muted); }
+.ratio { margin: 0.5rem 0 0; font-weight: 600; }

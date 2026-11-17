@@ -17,6 +17,7 @@ import type {
   ModelVersion,
   RecomputeResult,
   Today,
+  Trends,
   UserView,
 } from './types';
 
@@ -142,6 +143,7 @@ export function useRecomputeFeatures(athleteId?: number) {
       qc.invalidateQueries({ queryKey: ['features', athleteId] });
       qc.invalidateQueries({ queryKey: ['holdout', athleteId] });
       qc.invalidateQueries({ queryKey: ['today', athleteId] });
+      qc.invalidateQueries({ queryKey: ['trends', athleteId] });
     },
   });
 }
@@ -214,6 +216,14 @@ export function useToday(athleteId?: number) {
     enabled: athleteId != null,
     // The morning check: refresh when the phone comes back to the app.
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useTrends(athleteId?: number) {
+  return useQuery({
+    queryKey: ['trends', athleteId],
+    queryFn: () => api<Trends>(`/api/athletes/${athleteId}/trends`),
+    enabled: athleteId != null,
   });
 }
 

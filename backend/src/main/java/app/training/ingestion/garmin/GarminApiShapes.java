@@ -52,17 +52,76 @@ final class GarminApiShapes {
         return o;
     }
 
-    /** Nightly sleep (dailySleepDTO) → sleepData record. Timestamps stay epoch ms, which the importer reads. */
-    static ObjectNode sleep(JsonNode dto) {
+    /**
+     * The live sleep answer → sleepData record. The nightly fields (times, stages, score) come from
+     * its summary, dailySleepDTO; timestamps stay epoch ms, which the importer reads.
+     *
+     * <p>Bug found on the coach's data (2026-11-17, ADR 0015 D11): dailySleepDTO gives breathing
+     * rate, SpO2 and sleep stress as whole numbers, while the export keeps decimals (12.4 vs 12.0).
+     * So the precise values are taken from the rest of the answer, from fields with the export's
+     * own names ({@link #PRECISE_RESPIRATION}, an object holding {@code averageSPO2}, like the
+     * export's spo2SleepSummary). When none is there, the value is left out (the day then shows
+     * the input as missing) rather than stored rounded, which would move recovery silently.
+     * The whole-number values are never used.
+     */
+    static ObjectNode sleep(JsonNode live) {
+        JsonNode dto = live.path("dailySleepDTO").isObject() ? live.get("dailySleepDTO") : live;
         ObjectNode o = dto.deepCopy();
-        if (!o.hasNonNull("averageRespiration")) copyFirst(dto, o, "averageRespiration", "averageRespirationValue");
-        if (!o.has("spo2SleepSummary")) {
-            ObjectNode s = F.objectNode();
-            copyFirst(dto, s, "averageSPO2", "averageSpO2Value", "avgSpO2");
-            copyFirst(dto, s, "lowestSPO2", "lowestSpO2Value", "lowestSpO2");
-            if (!s.isEmpty()) o.set("spo2SleepSummary", s);
+        for (String rounded : ROUNDED_SLEEP_FIELDS) o.remove(rounded);
+        if (!o.hasNonNull("averageRespiration")) {
+            JsonNode r = findNumber(live, PRECISE_RESPIRATION, dto);
+            if (r != null) o.set("averageRespiration", r);
         }
+        if (!o.has("spo2SleepSummary")) {
+            JsonNode spo2 = findObjectWith(live, "averageSPO2", dto);
+            if (spo2 != null) {
+                ObjectNode s = F.objectNode();
+                copy(spo2, "averageSPO2", s, "averageSPO2");
+                copy(spo2, "lowestSPO2", s, "lowestSPO2");
+                o.set("spo2SleepSummary", s);
+            } else if (dto.hasNonNull("lowestSpO2Value")) {
+                // The lowest reading is a whole number on both sides, so the summary's is exact.
+                o.set("spo2SleepSummary", F.objectNode().set("lowestSPO2", dto.get("lowestSpO2Value")));
+            }
+        }
+        // avgSleepStress: no score reads it; kept only from a precise source elsewhere in the answer.
+        JsonNode stress = findNumber(live, "avgSleepStress", dto);
+        if (stress != null) o.set("avgSleepStress", stress);
         return o;
+    }
+
+    /** The export's name for the night's average breathing rate. */
+    static final String PRECISE_RESPIRATION = "averageRespiration";
+
+    /** Summary fields Garmin rounds to whole numbers (or computes otherwise); never stored. */
+    static final java.util.List<String> ROUNDED_SLEEP_FIELDS = java.util.List.of(
+            "averageRespirationValue", "averageSpO2Value", "avgSpO2", "avgSleepStress");
+
+    /** The first numeric field {@code key} anywhere in {@code root}, outside {@code skip}. */
+    static JsonNode findNumber(JsonNode root, String key, JsonNode skip) {
+        if (root == null || root == skip) return null;
+        if (root.isObject()) {
+            JsonNode v = root.get(key);
+            if (v != null && v.isNumber()) return v;
+            for (var it = root.elements(); it.hasNext(); ) {
+                JsonNode found = findNumber(it.next(), key, skip);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    /** The first object anywhere in {@code root} (outside {@code skip}) with a numeric {@code key}. */
+    static JsonNode findObjectWith(JsonNode root, String key, JsonNode skip) {
+        if (root == null || root == skip) return null;
+        if (root.isObject()) {
+            if (root.path(key).isNumber()) return root;
+            for (var it = root.elements(); it.hasNext(); ) {
+                JsonNode found = findObjectWith(it.next(), key, skip);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     /**

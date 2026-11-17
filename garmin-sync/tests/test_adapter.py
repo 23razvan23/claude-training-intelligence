@@ -112,7 +112,8 @@ def test_fetches_each_day_and_returns_refreshed_tokens():
     assert [d["date"] for d in out["days"]] == ["2026-11-15", "2026-11-16"]
     day = out["days"][0]
     assert day["summary"]["restingHeartRate"] == 47
-    assert day["sleep"] == {"calendarDate": "2026-11-15", "deepSleepSeconds": 3600}  # trimmed to the summary
+    assert day["sleep"]["dailySleepDTO"] == {"calendarDate": "2026-11-15", "deepSleepSeconds": 3600}
+    assert len(day["sleep"]["sleepLevels"]) == 500  # the whole answer: precise values live outside the summary
     assert day["hrv"] == {"calendarDate": "2026-11-15", "lastNightAvg": 52}
     assert base64.b64decode(day["wellnessFit"]) == b"PK-fake-wellness-zip"
     assert WELLNESS_FIT_PATH.format(day="2026-11-16") in fake.calls

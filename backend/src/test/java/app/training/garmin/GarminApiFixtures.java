@@ -49,14 +49,19 @@ final class GarminApiFixtures {
                     .put("totalSteps", 9000);
             Instant sleepStart = d.minusDays(1).atTime(23, 0).atZone(Fixtures.ZONE).toInstant();
             Instant sleepEnd = d.atTime(7, 0).atZone(Fixtures.ZONE).toInstant();
-            ObjectNode sleep = day.putObject("sleep")
+            // The whole live sleep answer: a summary with whole numbers, the precise values beside it.
+            ObjectNode answer = day.putObject("sleep");
+            answer.putObject("wellnessSpO2SleepSummaryDTO").put("averageSPO2", 96.2).put("lowestSPO2", 86.0).put("averageHR", 50.0);
+            answer.put("averageRespiration", 12.5);
+            answer.putArray("sleepLevels").addObject().put("activityLevel", 1.0);
+            ObjectNode sleep = answer.putObject("dailySleepDTO")
                     .put("calendarDate", d.toString())
                     .put("sleepStartTimestampGMT", sleepStart.toEpochMilli())
                     .put("sleepEndTimestampGMT", sleepEnd.toEpochMilli())
                     .put("deepSleepSeconds", 6000).put("lightSleepSeconds", 12000)
                     .put("remSleepSeconds", 7200).put("awakeSleepSeconds", 3600)
-                    .put("averageRespirationValue", 12.5).put("avgSleepStress", 17.25)
-                    .put("averageSpO2Value", 96.2).put("lowestSpO2Value", 86.0);
+                    .put("averageRespirationValue", 13.0).put("avgSleepStress", 18.0)
+                    .put("averageSpO2Value", 96.0).put("lowestSpO2Value", 86.0);
             sleep.putObject("sleepScores").putObject("overall").put("value", 81);
             day.putObject("hrv").put("calendarDate", d.toString()).put("lastNightAvg", 60.0 + i % 5).put("status", "BALANCED");
 

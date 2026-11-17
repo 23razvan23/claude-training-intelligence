@@ -85,8 +85,10 @@ class GarminConnectAdapter(GarminAdapter):
                 {
                     "date": ds,
                     "summary": summary if isinstance(summary, dict) else None,
-                    # Only the nightly summary: the per-minute arrays are large and unused.
-                    "sleep": (sleep or {}).get("dailySleepDTO") if isinstance(sleep, dict) else None,
+                    # The whole sleep answer: its summary (dailySleepDTO) rounds breathing rate, SpO2 and
+                    # sleep stress to whole numbers, so the app reads the precise values from the rest of
+                    # it (ADR 0015 D11). A few hundred KB per night.
+                    "sleep": sleep if isinstance(sleep, dict) else None,
                     "hrv": (hrv or {}).get("hrvSummary") if isinstance(hrv, dict) else None,
                     "wellnessFit": _b64(wellness),
                 }

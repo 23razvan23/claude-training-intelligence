@@ -420,4 +420,6 @@ export interface GarminCheckReport {
   differencesUsedByScores: number;
   missing: string[];
   warnings: string[];
+  /** Where in Garmin's live sleep answer the stored export values are: field paths and counts, never values. */
+  sleepFieldSearch?: { column: string; nights: number; candidates: { path: string; matches: number }[] }[];
 }

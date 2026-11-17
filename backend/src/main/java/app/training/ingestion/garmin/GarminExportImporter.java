@@ -128,8 +128,10 @@ public class GarminExportImporter {
                 if (day.path("hrv").isObject()) healthStatus(ctx, GarminApiShapes.healthStatus(day.get("hrv")));
             });
             record(ctx, "sleep", () -> {
-                if (day.path("sleep").isObject() && day.get("sleep").hasNonNull(SLEEP_START_GMT)) {
-                    sleep(ctx, GarminApiShapes.sleep(day.get("sleep")), zone);
+                if (day.path("sleep").isObject()) {
+                    var night = GarminApiShapes.sleep(day.get("sleep"));
+                    // A day without a recorded night: Garmin answers with an empty summary.
+                    if (night.hasNonNull(SLEEP_START_GMT)) sleep(ctx, night, zone);
                 }
             });
             progress.step();

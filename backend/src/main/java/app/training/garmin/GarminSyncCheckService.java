@@ -46,8 +46,13 @@ public class GarminSyncCheckService {
      */
     public record Difference(String table, LocalDate day, String record, String column, boolean usedByScores, String outcome) {}
 
+    /**
+     * @param sleepFieldSearch where in Garmin's live sleep answer the stored export values are (D11):
+     *     field paths and match counts, never values
+     */
     public record Report(LocalDate from, LocalDate to, Map<String, ImportStats.Counter> tables, List<Difference> differences,
-                         int differencesUsedByScores, List<String> missing, List<String> warnings) {}
+                         int differencesUsedByScores, List<String> missing, List<String> warnings,
+                         List<SleepFieldSearch.Result> sleepFieldSearch) {}
 
     private final GarminSyncService sync;
     private final SidecarClient sidecar;
@@ -88,7 +93,8 @@ public class GarminSyncCheckService {
             diffs.addAll(differences("daily_wellness", "calendar_date", batchId));
             diffs.addAll(differences("sleep_session", "cycle_date", batchId));
             int used = (int) diffs.stream().filter(Difference::usedByScores).count();
-            return new Report(from, to, stats.counters(), diffs, used, missing, stats.warnings());
+            return new Report(from, to, stats.counters(), diffs, used, missing, stats.warnings(),
+                    sleepFieldSearch(athleteId, batchId, payload));
         });
     }
 
@@ -121,6 +127,33 @@ public class GarminSyncCheckService {
             }
         });
         return out;
+    }
+
+    /** The stored export values of the fetched nights (not this batch's), and the search over the live answers. */
+    private List<SleepFieldSearch.Result> sleepFieldSearch(long athleteId, long batchId, JsonNode payload) {
+        var answers = new java.util.LinkedHashMap<String, JsonNode>();
+        for (JsonNode day : payload.path("days")) {
+            JsonNode answer = day.get("sleep");
+            if (answer == null || !answer.isObject()) continue;
+            String night = answer.path("dailySleepDTO").path("calendarDate").asText(day.path("date").asText(""));
+            if (!night.isEmpty()) answers.put(night, answer);
+        }
+        var stored = new java.util.HashMap<String, Map<String, BigDecimal>>();
+        if (answers.isEmpty()) return SleepFieldSearch.search(answers, stored);
+        jdbc.sql("""
+                SELECT DISTINCT ON (split_part(source_id, '@', 1)) split_part(source_id, '@', 1) AS night,
+                       avg_respiration, avg_spo2_pct, lowest_spo2_pct, avg_sleep_stress
+                FROM sleep_session
+                WHERE athlete_id = :a AND source = 'GARMIN' AND NOT is_nap AND import_batch_id IS DISTINCT FROM :b
+                  AND split_part(source_id, '@', 1) IN (:nights)
+                ORDER BY split_part(source_id, '@', 1), ingested_at DESC, id DESC""")
+                .param("a", athleteId).param("b", batchId).param("nights", List.copyOf(answers.keySet()))
+                .query(rs -> {
+                    var values = new java.util.HashMap<String, BigDecimal>();
+                    for (String c : SleepFieldSearch.COLUMNS.keySet()) values.put(c, rs.getBigDecimal(c));
+                    stored.put(rs.getString("night"), values);
+                });
+        return SleepFieldSearch.search(answers, stored);
     }
 
     static boolean same(Object a, Object b) {

@@ -108,7 +108,10 @@
       },
       "newRowsHint": "Rows the sync would add on days your export already covers mean one side has data the other lacks.",
       "missing": "Garmin had no data for: {{list}}",
-      "nothingKept": "Nothing from this check was saved."
+      "nothingKept": "Nothing from this check was saved.",
+      "fieldSearch": "Where Garmin keeps the precise sleep values",
+      "fieldSearchHint": "For each sleep value, the fields of Garmin's answer that equal what your export stored, and on how many nights. Only field names are shown. Send this table to Claude.",
+      "field": "Field in Garmin's answer", "matches": "Nights that match", "noField": "no field matches"
     },
     "errors": {
       "AUTH_FAILED": "Garmin did not accept that e-mail and password.",

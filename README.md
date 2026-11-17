@@ -109,6 +109,7 @@ The app can sign in to Garmin Connect as you and fetch each day's data itself ([
 
 **Check, then sync:**
 1. Under the Garmin card, open **Check against export**. Pick about a week your last Garmin export covers fully (not its last day, which was exported half-finished) and press **Check**. Nothing is saved. It should say the sync matches your export in everything the scores use. If it lists differences, send Claude the table and column names it shows (it never shows values).
+   The check also lists **where Garmin keeps the precise sleep values** (field names and how many nights match, never values). Send that table to Claude too.
 2. Press **Sync now**. It fetches today and the 2 days before, imports them like an export, and then recomputes features and scores by itself. The card shows the last sync and its result. Running it twice adds nothing the second time. If Garmin is unavailable, it tries again after 10 and 30 minutes.
 3. Each sync appears under **Import history** as "Garmin sync".
 

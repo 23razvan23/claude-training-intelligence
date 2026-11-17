@@ -53,8 +53,10 @@ class GarminApiShapesTest {
         var s = GarminApiShapes.sleep(JSON.readTree("""
                 {"calendarDate": "2026-11-17", "sleepStartTimestampGMT": 1763330400000, "averageRespirationValue": 13.0,
                  "avgSpO2": 95.5, "lowestSpO2Value": 88.0}"""));
-        assertThat(s.get("averageRespiration").asDouble()).isEqualTo(13.0);
-        assertThat(s.at("/spo2SleepSummary/averageSPO2").asDouble()).isEqualTo(95.5);
+        // No precise source in this answer: the summary's whole numbers are not used (ADR 0015 D11).
+        assertThat(s.has("averageRespiration")).isFalse();
+        assertThat(s.has("averageRespirationValue")).isFalse();
+        assertThat(s.at("/spo2SleepSummary/averageSPO2").isMissingNode()).isTrue();
         assertThat(s.at("/spo2SleepSummary/lowestSPO2").asDouble()).isEqualTo(88.0);
         assertThat(GarminExportImporter.gmt(s.get("sleepStartTimestampGMT").asText()))
                 .isEqualTo(java.time.Instant.ofEpochMilli(1763330400000L));
@@ -64,6 +66,29 @@ class GarminApiShapesTest {
         assertThat(h.at("/metrics/0/value").asInt()).isEqualTo(51);
         assertThat(h.at("/metrics/0/status").isMissingNode()).isTrue();
         assertThat(GarminApiShapes.healthStatus(JSON.readTree("{\"calendarDate\": \"2026-11-17\"}")).get("metrics")).isEmpty();
+    }
+
+    /**
+     * Bug found on the coach's data (2026-11-17): the live dailySleepDTO gives breathing rate,
+     * SpO2 and sleep stress rounded to whole numbers (12.4 became 12.0), while the export keeps
+     * the decimals. The precise values must come from the rest of the live sleep response.
+     */
+    @Test
+    void sleepTakesThePreciseAveragesNotTheRoundedSummary() throws Exception {
+        var s = GarminApiShapes.sleep(JSON.readTree("""
+                {"dailySleepDTO": {"calendarDate": "2026-11-15", "sleepStartTimestampGMT": 1763150400000,
+                                   "sleepEndTimestampGMT": 1763179200000, "deepSleepSeconds": 6000,
+                                   "averageRespirationValue": 12.0, "averageSpO2Value": 97.0, "lowestSpO2Value": 85.0,
+                                   "avgSleepStress": 16.0},
+                 "wellnessSpO2SleepSummaryDTO": {"averageSPO2": 96.8, "lowestSPO2": 85.0, "averageHR": 51.0},
+                 "wellnessEpochRespirationAveragesList": [{"respirationAverageValue": 12.4}],
+                 "averageRespiration": 12.4,
+                 "sleepLevels": [{"activityLevel": 1.0}]}"""));
+        assertThat(s.get("deepSleepSeconds").asInt()).isEqualTo(6000);
+        assertThat(s.get("calendarDate").asText()).isEqualTo("2026-11-15");
+        assertThat(s.get("averageRespiration").asDouble()).isEqualTo(12.4);
+        assertThat(s.at("/spo2SleepSummary/averageSPO2").asDouble()).isEqualTo(96.8);
+        assertThat(s.at("/spo2SleepSummary/lowestSPO2").asDouble()).isEqualTo(85.0);
     }
 
     @Test

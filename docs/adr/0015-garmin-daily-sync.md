@@ -78,8 +78,20 @@ At **07:00 in the athlete's timezone** [configurable: an hour of slack before 08
 - **Cleanup, V21:** deletes every sleep row written by a Garmin sync before this fix (all came from the rounded summary). An exported night (15 and 16 Nov) then counts with its export version again; a night only synced (17 Nov) returns with the next sync. Activities, heart rate and daily summaries from those syncs matched the export and stay. Without this, a corrected sync of an exported night would equal the stored export version and be skipped as a duplicate (ADR 0010 D1), leaving the rounded row the newest. Like V12, it removes rows that should never have been stored. After the update the coach presses Recompute features once.
 - **Holdout:** the affected days (15–17 Nov) had no Whoop data imported yet, so no compared day ever used the rounded values. Feature definitions, `FEATURE_VERSION` and scoring are unchanged.
 
+### D12. Synced nights use Garmin's live breathing rate and SpO2; exported nights always win (coach, option B, 2026-11-17)
+- **Evidence (search v2, 7–12 Nov):** no field of the live sleep answer, and no average of its lists (also over the time asleep), equals the export's breathing rate or average SpO2. The closest are `dailySleepDTO.averageRespirationValue` (0.52 breaths/min off on average; an epoch-list mean 0.45) and `dailySleepDTO.averageSpO2Value` (0.32 % off). On those nights the live breathing rate ran lower than the export's.
+- **Cost, with m15's coefficients:** points = weight × (sign × x − center) / scale. Breathing (`resp_dev`): 2.774 / 0.402 ≈ 6.9 recovery points per breath/min, so about **3 points off on average, up to about 6**, tending to read **high** (a lower breathing rate raises recovery). Average SpO2 is not a recovery term in m15, so it costs nothing today.
+- **Options put to the coach:** (A) leave breathing rate and SpO2 empty on synced nights (exact, but no morning recovery until an export); **(B) chosen: use the live values, with a clear note**; (C) drop the inputs on synced days (a scoring change, frozen during the holdout).
+- **Implementation:**
+  - `GarminApiShapes.sleep` uses a field with the export's name when present, otherwise the summary's live value (breathing rate, average and lowest SpO2, sleep stress).
+  - **An exported night always wins:** `importSync` skips a synced night when a version of it came from a Garmin export (`RawWriter.hasExportedSleep`), counted as skipped. The reverse is automatic: a later export's version differs from the synced one, so it is stored as the newest (ADR 0010) and the day is rescored at the next recompute. So a synced night never hides an exported one, which was the 15 Nov problem.
+  - **Today says so** (display only): `TodayService` marks the shown day `liveBreathing` when its current night came from a sync, and Today shows "Approximate: breathing rate from Garmin's live data, so recovery may read a few points high. The precise value arrives with your next Garmin export."
+- **Holdout:** unaffected in practice. The coach imports a Garmin export with every Whoop export (README section 7), so compared days are rescored with the export's breathing rate before the comparison. Scoring rules and features are unchanged (ADR 0008, 0009 H8).
+- **Check against export:** an exported night is now skipped by the dry run too, so the check shows no sleep differences on exported days; the field search (D11) still runs on Garmin's answer.
+
 ## Consequences
 - After PR 1 merges, the coach adds `GARMIN_TOKEN_KEY` and `GARMIN_SYNC_SECRET` to `.env` and connects (README section 8).
 - After PR 2 merges, the coach runs Check against export on days covered by the last export, reports the result, and only then uses Sync now.
-- After the D11 fix merges: update, press Recompute features, run Check against export again and send its field-search table; Sync now waits until the translation is pinned to the confirmed fields.
+- After the D11 fix merges: update, press Recompute features, run Check against export again and send its field-search table.
+- After D12 merges: Sync now may be used. Synced mornings show the "approximate" note until the next Garmin export.
 - A library update is a deliberate PR that changes `requirements.txt` and passes `test_library_contract.py`.

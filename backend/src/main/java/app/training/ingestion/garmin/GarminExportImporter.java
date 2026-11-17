@@ -131,7 +131,15 @@ public class GarminExportImporter {
                 if (day.path("sleep").isObject()) {
                     var night = GarminApiShapes.sleep(day.get("sleep"));
                     // A day without a recorded night: Garmin answers with an empty summary.
-                    if (night.hasNonNull(SLEEP_START_GMT)) sleep(ctx, night, zone);
+                    if (!night.hasNonNull(SLEEP_START_GMT)) return;
+                    // An exported night always wins (ADR 0015 D12): the export has the precise breathing
+                    // rate and SpO2; a synced version would otherwise become the newest and hide it.
+                    LocalDate nightDate = date(night.get(SLEEP_DATE));
+                    if (nightDate != null && writer.hasExportedSleep(ctx.athleteId(), nightDate.toString())) {
+                        ctx.stats().skipped("sleep_session", 1);
+                        return;
+                    }
+                    sleep(ctx, night, zone);
                 }
             });
             progress.step();

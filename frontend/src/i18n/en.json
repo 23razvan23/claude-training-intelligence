@@ -339,6 +339,7 @@
   "today": {
     "title": "Today",
     "subtitle": "{{date}}",
+    "liveBreathing": "Approximate: breathing rate from Garmin's live data, so recovery may read a few points high. The precise value arrives with your next Garmin export.",
     "noModel": "No active model yet. The coach calibrates and activates one on the Calibration tab.",
     "noData": "No daily scores yet. After importing data, press Recompute features on the Calibration tab.",
     "staleTitle": "No data for today yet",

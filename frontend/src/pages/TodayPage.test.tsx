@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n';
-import type { Today, TodayDay } from '../api/types';
+import type { GarminSyncStatus, Today, TodayDay } from '../api/types';
 import { formatDay } from '../today';
 import { TodayPage } from './TodayPage';
 
@@ -38,12 +38,17 @@ function day(over: Partial<TodayDay> = {}): TodayDay {
   };
 }
 
-function mockToday(body: Today) {
+const NOT_CONNECTED: GarminSyncStatus = { connection: 'NOT_CONNECTED', morningEnabled: true, morningTime: '07:00:00' };
+
+function mockToday(body: Today, sync: GarminSyncStatus | null = NOT_CONNECTED) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
+      const json = (b: unknown, status = 200) =>
+        new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
+      if (url === '/api/athletes/1/garmin/sync/status') return sync ? json(sync) : json({ message: 'boom' }, 500);
       expect(url).toBe('/api/athletes/1/today');
-      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return json(body);
     }),
   );
 }
@@ -211,5 +216,93 @@ describe('Today: no model, no data', () => {
     mockToday({ today: TODAY, timezone: 'Europe/Bucharest', state: 'NO_DATA', modelVersion: 'm-test' });
     renderPage();
     expect(await screen.findByText(/No daily scores yet/)).toBeInTheDocument();
+  });
+});
+
+describe('Today: Garmin sync (ADR 0015 D9)', () => {
+  const yesterday = '2026-11-15';
+  const stale: Today = {
+    today: TODAY,
+    timezone: 'Europe/Bucharest',
+    state: 'STALE',
+    lastDataDate: yesterday,
+    lastScored: day({ date: yesterday }),
+  };
+  const connected = (over: Partial<GarminSyncStatus> = {}): GarminSyncStatus => ({
+    connection: 'CONNECTED',
+    lastSuccessAt: '2026-11-16T05:01:00Z',
+    lastSuccessThrough: TODAY,
+    latestStatus: 'SUCCEEDED',
+    latestAt: '2026-11-16T05:01:00Z',
+    morningEnabled: true,
+    morningTime: '07:00:00',
+    ...over,
+  });
+
+  it('shows the last sync and the morning time', async () => {
+    mockToday({ today: TODAY, timezone: 'Europe/Bucharest', state: 'FRESH', lastDataDate: TODAY, day: day() }, connected());
+    renderPage();
+    const line = await screen.findByTestId('last-sync');
+    expect(line).toHaveTextContent('Last sync:');
+    expect(line).toHaveTextContent('Garmin syncs every morning at 07:00');
+    // Today's data is there: no sync banner.
+    expect(screen.queryByTestId('sync-banner')).not.toBeInTheDocument();
+  });
+
+  it('says "sync failed" with the reason when the last sync failed', async () => {
+    mockToday(stale, connected({ latestStatus: 'FAILED', latestErrorCode: 'GARMIN_UNAVAILABLE', latestAt: '2026-11-16T05:31:00Z' }));
+    renderPage();
+    const banner = await screen.findByTestId('sync-banner');
+    expect(banner).toHaveAttribute('data-kind', 'failed');
+    expect(banner).toHaveTextContent('Sync failed');
+    expect(banner).toHaveTextContent('Garmin could not be reached.');
+    expect(screen.getByTestId('stale-banner')).toHaveTextContent('No data for today yet');
+  });
+
+  it('says when a failed sync tries again', async () => {
+    mockToday(stale, connected({ latestStatus: 'RETRY_WAIT', latestErrorCode: 'RATE_LIMITED', nextRetryAt: '2026-11-16T05:10:00Z' }));
+    renderPage();
+    const banner = await screen.findByTestId('sync-banner');
+    expect(banner).toHaveAttribute('data-kind', 'retrying');
+    expect(banner).toHaveTextContent('trying again at');
+    expect(banner).toHaveTextContent('Garmin is limiting requests.');
+  });
+
+  it('says "Garmin needs you to connect again", even on a day with data', async () => {
+    mockToday(
+      { today: TODAY, timezone: 'Europe/Bucharest', state: 'FRESH', lastDataDate: TODAY, day: day() },
+      connected({ connection: 'RECONNECT_NEEDED', latestStatus: 'FAILED', latestErrorCode: 'AUTH_REJECTED' }),
+    );
+    renderPage();
+    const banner = await screen.findByTestId('sync-banner');
+    expect(banner).toHaveAttribute('data-kind', 'reconnect');
+    expect(banner).toHaveTextContent('Garmin needs you to connect again');
+    expect(screen.getByTestId('today-recovery')).toBeInTheDocument();
+  });
+
+  it('says "no data yet" when the sync worked but Garmin had nothing for today', async () => {
+    mockToday(stale, connected());
+    renderPage();
+    const banner = await screen.findByTestId('sync-banner');
+    expect(banner).toHaveAttribute('data-kind', 'noData');
+    expect(banner).toHaveTextContent('but Garmin had no data for today yet');
+    expect(screen.getByTestId('stale-banner')).toHaveTextContent("today's scores appear after the next successful sync");
+    // Still never yesterday as today.
+    expect(screen.queryByTestId('today-card')).not.toBeInTheDocument();
+  });
+
+  it('keeps the export wording and shows no sync line when Garmin is not connected', async () => {
+    mockToday(stale);
+    renderPage();
+    expect(await screen.findByTestId('stale-banner')).toHaveTextContent('after the next Whoop and Garmin import');
+    expect(screen.queryByTestId('last-sync')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sync-banner')).not.toBeInTheDocument();
+  });
+
+  it('still shows Today when the sync status cannot be read', async () => {
+    mockToday(stale, null);
+    renderPage();
+    expect(await screen.findByTestId('stale-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('sync-banner')).not.toBeInTheDocument();
   });
 });

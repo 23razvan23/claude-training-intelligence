@@ -34,6 +34,8 @@ public final class DecisionReport {
             Map.entry(HoldoutEvaluator.COMPARED_LOW_COVERAGE, "Compared, low coverage (under the all-day HR minimum; no mark)"),
             Map.entry(HoldoutEvaluator.NO_WHOOP, "No Whoop score that day"),
             Map.entry(HoldoutEvaluator.NO_SCORE_YET, "No score from us yet (after our last data day: press Recompute features)"),
+            Map.entry(HoldoutEvaluator.WAITS_FOR_EXPORT,
+                    "Waits for a Garmin export (scored with Garmin's live breathing rate; counted once an exported night is scored)"),
             Map.entry("NO_DAY_DATA", "No Garmin data that day"),
             Map.entry("NO_GARMIN_CORE", "Missing resting HR, overnight HRV or sleep"),
             Map.entry("NO_HRV", "No overnight HRV"),
@@ -133,6 +135,12 @@ public final class DecisionReport {
         b.append("</tbody></table>");
 
         b.append("<h2>Days left out, by reason</h2>");
+        int waiting = r.markers().waitingForExportDays();
+        if (waiting > 0) {
+            b.append("<p class='wait'>").append(waiting).append(waiting == 1 ? " compared day waits" : " compared days wait")
+                    .append(" for a Garmin export: scored from a synced night (Garmin's live breathing rate), so not counted ")
+                    .append("until an exported night replaces it and Recompute features runs (ADR 0015 D13).</p>");
+        }
         groups(b, r.cumulative().groups());
 
         b.append("<h2>Markers</h2><ul>");

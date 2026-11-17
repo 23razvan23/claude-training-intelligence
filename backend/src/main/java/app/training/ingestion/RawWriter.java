@@ -115,7 +115,9 @@ public class RawWriter {
     /**
      * A sleep record. A Garmin night whose values differ from every stored version of it is
      * kept: under its own key when its start moved, otherwise as a revision (ADR 0010). The
-     * readers (view sleep_session_current) use the newest import's version of each night.
+     * readers (view sleep_session_current) use the newest import's version of each night. An
+     * exported night that equals only synced versions is kept too (ADR 0015 D13): the values are
+     * the same, but the Holdout must know the night now comes from an export.
      */
     public void sleep(Ctx ctx, Sleep s) {
         int n = jdbc.sql("""
@@ -156,7 +158,12 @@ public class RawWriter {
                           AND x.avg_respiration IS NOT DISTINCT FROM v.avg_respiration
                           AND x.avg_sleep_stress IS NOT DISTINCT FROM v.avg_sleep_stress
                           AND x.avg_spo2_pct IS NOT DISTINCT FROM v.avg_spo2_pct
-                          AND x.lowest_spo2_pct IS NOT DISTINCT FROM v.lowest_spo2_pct)
+                          AND x.lowest_spo2_pct IS NOT DISTINCT FROM v.lowest_spo2_pct
+                          -- An exported night equal to a synced version is still the export's: kept, so the
+                          -- night is known to come from an export (ADR 0015 D13). Same values, same features.
+                          AND NOT (
+                              (SELECT kind FROM import_batch WHERE id = v.import_batch_id) = 'GARMIN_EXPORT'
+                              AND (SELECT kind FROM import_batch WHERE id = x.import_batch_id) IS NOT DISTINCT FROM 'GARMIN_SYNC'))
                     ON CONFLICT DO NOTHING""")
                     .param("athlete", ctx.athleteId())
                     .param("source", s.source())

@@ -18,6 +18,7 @@ When `RawWriter` meets a **Garmin** daily wellness or sleep record that is alrea
 - Values are compared after being cast to the column types, so a value the database rounds (e.g. respiration to one decimal) is compared as stored.
 - A record identical to any stored version is a duplicate. So re-importing the same export, or an older one, inserts nothing.
 - A sleep whose start moved is already a new row under its own key (the key includes the start time). Its values are new, so nothing more is needed.
+- Exception (ADR 0015 D13, 2026-11-17): an exported Garmin night that equals only versions stored by a Garmin sync is still stored, as the export's revision, so the night is known to come from an export. Same values, so no feature changes.
 - Not covered: Whoop rows (unfinished cycles are not imported at all, ADR 0003/R-06); activities and their streams; all-day heart rate (keyed by timestamp, so new samples simply add up).
 
 ### D2. Readers use the newest version

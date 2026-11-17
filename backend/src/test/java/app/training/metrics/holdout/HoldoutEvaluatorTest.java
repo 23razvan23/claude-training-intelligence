@@ -137,6 +137,41 @@ class HoldoutEvaluatorTest {
         assertThatThrownBy(() -> Marks.of(null)).isInstanceOf(IllegalArgumentException.class);
     }
 
+    // ---------------------------------------------------------------- ADR 0015 D13 synced nights wait for an export
+
+    @Test
+    void aDayScoredFromASyncedNightWaitsForAnExportForEveryScore() {
+        var ours = oursDays(FROM, 10);
+        // Day 3 has a blank recovery for another reason: it keeps that reason, it doesn't "wait".
+        ours = replace(ours, FROM.plusDays(3), o -> new OurDay(o.date(), null, null, null, "NO_HRV", false, o.strain(), o.strainShown(),
+                o.strainReason(), o.monitoredMinutes(), o.sleepPerf(), o.sleepPerfPct(), o.sleepPerfReason(), o.sleepNeed(), false, null, false));
+        var synced = java.util.Set.of(FROM.plusDays(3), FROM.plusDays(8), FROM.plusDays(9));
+        var base = input(ours, whoopDays(FROM.minusDays(1), 11), RUNNING, "ACTIVE");
+        var in = new Input(base.modelVersion(), base.status(), base.activatedAt(), base.retiredAt(), base.frozen(), base.marks(),
+                base.greenMin(), base.redMax(), base.ours(), base.whoop(), base.whoopEnd(), base.today(), base.rollingDays(),
+                base.recomputeRuns(), synced);
+        var r = HoldoutEvaluator.evaluate(in);
+        var g = r.cumulative().groups();
+        assertThat(g.get("recovery")).containsEntry(HoldoutEvaluator.WAITS_FOR_EXPORT, 2).containsEntry("NO_HRV", 1)
+                .containsEntry(HoldoutEvaluator.COMPARED, 7);
+        assertThat(g.get("strain")).containsEntry(HoldoutEvaluator.WAITS_FOR_EXPORT, 3).containsEntry(HoldoutEvaluator.COMPARED, 7);
+        assertThat(g.get("sleepPerformance")).containsEntry(HoldoutEvaluator.WAITS_FOR_EXPORT, 3);
+        assertThat(g.get("sleepNeed")).containsEntry(HoldoutEvaluator.WAITS_FOR_EXPORT, 3);
+        assertThat(r.cumulative().recovery().n()).isEqualTo(7);
+        assertThat(r.cumulative().strain().n()).isEqualTo(7);
+        assertThat(r.verdict().recoveryDays()).isEqualTo(7);
+        // The naive baseline is computed on the same days as ours.
+        assertThat(r.naive().n() + r.naive().skippedNoWhoopYesterday()).isEqualTo(7);
+        assertThat(r.markers().waitingForExportDays()).isEqualTo(3);
+        assertThat(r.days().get(8).recoveryGroup()).isEqualTo(HoldoutEvaluator.WAITS_FOR_EXPORT);
+        assertThat(DecisionReport.groupLabel(HoldoutEvaluator.WAITS_FOR_EXPORT)).startsWith("Waits for a Garmin export");
+
+        // Once the exported nights are scored, the same days count again.
+        var exported = HoldoutEvaluator.evaluate(base);
+        assertThat(exported.cumulative().recovery().n()).isEqualTo(9);
+        assertThat(exported.markers().waitingForExportDays()).isZero();
+    }
+
     // ---------------------------------------------------------------- H4 every day counted once
 
     @Test

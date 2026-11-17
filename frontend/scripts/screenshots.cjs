@@ -99,6 +99,27 @@ const scenarios = {
   },
 };
 
+// Garmin sync states on Today (ADR 0015 D9): the same stale day, three different reasons.
+const synced = (over) => ({
+  connection: 'CONNECTED',
+  lastSuccessAt: '2026-11-15T05:01:00Z',
+  lastSuccessThrough: '2026-11-15',
+  latestStatus: 'SUCCEEDED',
+  latestAt: '2026-11-15T05:01:00Z',
+  morningEnabled: true,
+  morningTime: '07:00:00',
+  ...over,
+});
+const syncStatus = {
+  fresh: synced({ lastSuccessAt: `${TODAY}T05:01:00Z`, latestAt: `${TODAY}T05:01:00Z` }),
+  'sync-failed': synced({ latestStatus: 'FAILED', latestErrorCode: 'GARMIN_UNAVAILABLE', latestAt: `${TODAY}T05:41:00Z` }),
+  'sync-reconnect': synced({ connection: 'RECONNECT_NEEDED', latestStatus: 'FAILED', latestErrorCode: 'AUTH_REJECTED' }),
+  'sync-nodata': synced({ lastSuccessAt: `${TODAY}T05:01:00Z`, latestAt: `${TODAY}T05:01:00Z` }),
+};
+scenarios['sync-failed'] = scenarios.stale;
+scenarios['sync-reconnect'] = scenarios.stale;
+scenarios['sync-nodata'] = scenarios.stale;
+
 (async () => {
   const browser = await chromium.launch();
   for (const scheme of ['light', 'dark']) {
@@ -111,6 +132,7 @@ const scenarios = {
         if (url === '/api/auth/me') return json({ username: 'coach', role: 'COACH', athleteId: 1 });
         if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
         if (url === '/api/athletes/1/today') return json(body);
+        if (url === '/api/athletes/1/garmin/sync/status' && syncStatus[name]) return json(syncStatus[name]);
         if (url === '/api/athletes/1/trends') return json(trendsBody());
         return route.fulfill({ status: 404, body: '' });
       });

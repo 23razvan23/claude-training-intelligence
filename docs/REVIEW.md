@@ -90,7 +90,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-10 | Define how re-fetched Garmin days replace earlier partial ones (done) | P1 | design | M | – | 1b-3, 1b-4 |
 | R-11 | Decide how Garmin credentials are stored before writing sync code (done) | P1 | security | S | – | 1b-4 |
 | R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI (done) | P1 | test-gap | M | – | 1b-2, 1b-4 |
-| R-13 | Correct the Phase 2 tables before anything writes to them | P1 | design | M | – | 2-1, 2-3 |
+| R-13 | Correct the Phase 2 tables before anything writes to them (done) | P1 | design | M | – | 2-1, 2-3 |
 | R-14 | Build the local golden-file check the spec asks for (done) | P2 | test-gap | M | 1b-1 | – |
 | R-15 | Bring documents back in line with the code | P2 | docs | S | – | – |
 
@@ -628,7 +628,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-13: Correct the Phase 2 tables before anything writes to them
 - **Priority / Type / Size:** P1 / design / M
-- **Status:** CONFIRMED
+- **Status:** DONE (2026-11-17): ADR 0018 (not 0012, which was taken by daily scoring), migration V22. The coach confirmed all six Phase 2 tables were empty. Coach decisions: `dedup_key` leaves the inputs out (P1); "latest wins" scope is session, else activity, else the whole day (P2). JSON columns are named `signals` / `settings` (`values` is an SQL keyword). Tests: `Phase2SchemaIT`, `Phase2SchemaMigrationIT` (builds a database to V21 with Phase 1 data, then migrates). PLAN §5 (stage 2-0, settings store in 2-2, 2-5 UI only) and PROMPTS 2-1/2-2/2-3/2-5 updated.
 - **Problem:** the planning tables were laid down in Phase 0 "so later phases only add columns". Read against SPEC Module 3 and stages 2-1 to 2-5, several shapes will force rework once rows exist:
   1. `planned_session` has both `demand` (KEY/SUPPORTING/EASY) and `is_key`: two sources of truth for the guardrail "protect key sessions".
   2. `adaptation_suggestion` points at one session; a SWAP involves two. There is no key preventing the same suggestion being inserted again each time the morning run repeats (SPEC: "every step is idempotent").
@@ -649,9 +649,9 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
   - rule: Phase 2 inputs are computed in the `adaptation` module from `activity_with_cycle` + `activity_load` + `derived_day_metrics`, never by adding columns to `day_features` while the holdout runs.
 - **Out of scope:** any Phase 2 behaviour (forms, signals, rules); UI.
 - **Acceptance criteria:**
-  - [ ] Failing test first: inserting the same pending suggestion twice violates the unique index (today: two rows).
-  - [ ] Migration applies on a database at V11 (and later) with data in the Phase 1 tables; an IT proves it.
-  - [ ] ADR 0012 lists each change with its reason; PLAN §5 and PROMPTS 2-1/2-2/2-3/2-5 updated (see §4).
+  - [x] Failing test first: inserting the same pending suggestion twice violates the unique index (today: two rows).
+  - [x] Migration applies on a database at V11 (and later) with data in the Phase 1 tables; an IT proves it.
+  - [x] ADR 0012 lists each change with its reason; PLAN §5 and PROMPTS 2-1/2-2/2-3/2-5 updated (see §4).
 - **Verification:** `cd backend && ./gradlew build`. Coach (confirms the tables are still empty, so nothing is lost): `docker compose exec db psql -U training -d training -c "SELECT (SELECT count(*) FROM plan) AS plans, (SELECT count(*) FROM planned_session) AS sessions, (SELECT count(*) FROM adaptation_suggestion) AS suggestions, (SELECT count(*) FROM subjective_log) AS checkins;"` → all 0.
 - **Coach decision needed:** no.
 - **Opus prompt:**

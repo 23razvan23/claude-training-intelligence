@@ -177,6 +177,7 @@ function CheckResult({ report }: { report: GarminCheckReport }) {
                   <th>{t('garmin.check.column')}</th>
                   <th>{t('garmin.check.field')}</th>
                   <th>{t('garmin.check.matches')}</th>
+                  <th>{t('garmin.check.meanDiff')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,6 +188,7 @@ function CheckResult({ report }: { report: GarminCheckReport }) {
                           <td>{r.column}</td>
                           <td>{t('garmin.check.noField')}</td>
                           <td>0 / {r.nights}</td>
+                          <td>—</td>
                         </tr>,
                       ]
                     : r.candidates.map((c) => (
@@ -196,6 +198,7 @@ function CheckResult({ report }: { report: GarminCheckReport }) {
                           <td>
                             {c.matches} / {r.nights}
                           </td>
+                          <td>{c.meanAbsDiff}</td>
                         </tr>
                       )),
                 )}

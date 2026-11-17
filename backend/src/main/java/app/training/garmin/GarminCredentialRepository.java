@@ -35,6 +35,12 @@ public class GarminCredentialRepository {
                 .optional();
     }
 
+    /** Athletes whose Garmin is connected (the morning run looks at these only). */
+    public java.util.List<Long> connectedAthletes() {
+        return jdbc.sql("SELECT athlete_id FROM garmin_credential WHERE status = 'CONNECTED' ORDER BY athlete_id")
+                .query(Long.class).list();
+    }
+
     /** A new Connect replaces any earlier row, including one locked with an old key (ADR 0011 D7). */
     public void saveConnected(long athleteId, byte[] ciphertext, String keyId, Instant now) {
         jdbc.sql("""

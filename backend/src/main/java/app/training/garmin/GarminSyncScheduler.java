@@ -8,8 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
- * Background work of the Garmin sync: retries of runs that wait (ADR 0015 D6); the morning run
- * arrives in PR 3. Off for command-line runs (scoring) and when app.garmin.sync.scheduler-enabled
+ * Background work of the Garmin sync: retries of runs that wait (ADR 0015 D6) and the morning
+ * run (D9). Off for command-line runs (scoring) and when app.garmin.sync.scheduler-enabled
  * is false (tests call the service directly).
  */
 @Configuration
@@ -32,9 +32,12 @@ public class GarminSyncScheduler {
         if (enabled) runs.failInterrupted(java.time.Instant.now());
     }
 
-    // Every minute: retry waits are 10 and 30 minutes, so a minute late is fine. [configurable]
+    // Every minute: retry waits are 10 and 30 minutes, and the morning run may start a minute after
+    // 07:00 (or after the Mac wakes), so a minute late is fine. [configurable]
     @Scheduled(fixedDelayString = "${app.garmin.sync.poll-ms:60000}", initialDelayString = "${app.garmin.sync.poll-ms:60000}")
     void tick() {
-        if (enabled) sync.retryDue();
+        if (!enabled) return;
+        sync.retryDue();
+        sync.morningDue();
     }
 }

@@ -85,22 +85,61 @@ public class GarminSyncService {
 
     /** Sync now: starts a run in the background and returns it at once (the UI polls the run list). */
     public Run start(long athleteId, Trigger trigger) {
-        long id = begin(athleteId, trigger, today(athleteId));
+        long id = begin(athleteId, trigger, today(athleteId), Instant.now(clock));
         background.execute(() -> execute(id));
         return runs.find(id).orElseThrow();
     }
 
-    /** The same, on the caller's thread (tests, and the morning run in PR 3). */
+    /** The same, on the caller's thread (tests). */
     public Run runNow(long athleteId, Trigger trigger, LocalDate today) {
-        long id = begin(athleteId, trigger, today);
+        long id = begin(athleteId, trigger, today, Instant.now(clock));
         execute(id);
         return runs.find(id).orElseThrow();
     }
 
-    private long begin(long athleteId, Trigger trigger, LocalDate today) {
+    /**
+     * The morning run (ADR 0015 D9), checked every minute by GarminSyncScheduler: for each
+     * connected athlete whose morning run is due ({@link MorningSchedule}), start one in the
+     * background. Because the check runs every minute, a Mac that was asleep at 07:00 starts the
+     * run within a minute of waking. An athlete who can't sync right now (key changed, a run
+     * already going) is skipped quietly and looked at again next minute.
+     */
+    public void morningDue() {
+        morning(Instant.now(clock), true);
+    }
+
+    /** The same on the caller's thread with a given "now" (tests with a fake clock); returns the runs started. */
+    List<Run> morningDueNow(Instant now) {
+        return morning(now, false);
+    }
+
+    private List<Run> morning(Instant now, boolean inBackground) {
+        var started = new ArrayList<Run>();
+        if (!props.morningEnabled() || !setup.enabled()) return started;
+        for (long athleteId : credentials.connectedAthletes()) {
+            var zone = athletes.zoneOf(athleteId);
+            if (!MorningSchedule.due(now, zone, props.morningTime(), runs.lastMorningCounting(athleteId).orElse(null))) continue;
+            long id;
+            try {
+                id = begin(athleteId, Trigger.MORNING, now.atZone(zone).toLocalDate(), now);
+            } catch (ApiException e) {
+                continue; // not syncable now (reconnect needed, a run already going): try again next minute
+            }
+            log.info("Garmin morning sync run {} started for athlete {}", id, athleteId);
+            if (inBackground) {
+                background.execute(() -> execute(id));
+                started.add(runs.find(id).orElseThrow());
+            } else {
+                execute(id);
+                started.add(runs.find(id).orElseThrow());
+            }
+        }
+        return started;
+    }
+
+    private long begin(long athleteId, Trigger trigger, LocalDate today, Instant now) {
         requireConnected(athleteId);
-        Instant now = Instant.now(clock);
-        runs.supersedeWaiting(athleteId, now); // pressing Sync now replaces a run that waits to retry
+        if (trigger == Trigger.MANUAL) runs.supersedeWaiting(athleteId, now); // Sync now replaces a run that waits to retry
         return runs.start(athleteId, trigger, today.minusDays(props.refetchDays()), today, now)
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "A Garmin sync is already running", "SYNC_RUNNING"));
     }

@@ -62,6 +62,26 @@ public class GarminSyncRunRepository {
                 .params(athleteId, limit).query(mapper).list();
     }
 
+    /**
+     * Start of the latest run that counts as a morning run (ADR 0015 D9): any MORNING run, or a
+     * run that succeeded (a Sync now). {@link MorningSchedule} compares it with today's start time.
+     */
+    public Optional<Instant> lastMorningCounting(long athleteId) {
+        return jdbc.sql("""
+                SELECT started_at FROM garmin_sync_run
+                WHERE athlete_id = ? AND (trigger = 'MORNING' OR status = 'SUCCEEDED')
+                ORDER BY started_at DESC LIMIT 1""")
+                .param(athleteId).query((rs, n) -> instant(rs.getTimestamp(1))).optional();
+    }
+
+    /** The latest run that succeeded, for the "Last sync" line (Today, Imports). */
+    public Optional<Run> lastSucceeded(long athleteId) {
+        return jdbc.sql("""
+                SELECT * FROM garmin_sync_run WHERE athlete_id = ? AND status = 'SUCCEEDED'
+                ORDER BY started_at DESC, id DESC LIMIT 1""")
+                .param(athleteId).query(mapper).optional();
+    }
+
     public Optional<Run> active(long athleteId) {
         return jdbc.sql("SELECT * FROM garmin_sync_run WHERE athlete_id = ? AND status IN ('RUNNING', 'RETRY_WAIT')")
                 .param(athleteId).query(mapper).optional();

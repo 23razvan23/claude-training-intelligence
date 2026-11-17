@@ -128,6 +128,11 @@ app:
       # A fetch downloads FIT files for several days; 5 minutes covers a slow connection. [configurable]
       timeout-seconds: 300
       scheduler-enabled: true
+      # The morning run (ADR 0015 D9): starts at this time in the athlete's timezone, or as soon as the
+      # Mac is awake again that day. 07:00 leaves an hour of slack (two retries) before the spec's 08:00
+      # deadline, and Garmin has normally received the night from the watch by then. [configurable]
+      morning-enabled: true
+      morning-time: "07:00"
 
 logging:
   level:

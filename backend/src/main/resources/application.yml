@@ -110,6 +110,19 @@ app:
     # A login can try several Garmin sign-in routes in turn; 60 s leaves room for that
     # without leaving the Connect button hanging for minutes. [configurable]
     sidecar-timeout-seconds: 60
+    sync:
+      # Days before today fetched again on every sync: covers a watch that syncs late and Garmin
+      # re-processing a night's sleep. A re-fetched day that changed is a revision (ADR 0010). [configurable]
+      refetch-days: 2
+      # Waits before the 2nd and 3rd attempt when Garmin is unavailable or rate limited: often enough to
+      # be ready by 08:00 after a 07:00 start, rare enough not to get the account blocked. [configurable]
+      retry-delays-minutes: [10, 30]
+      # Longest range "Check against export" accepts: two weeks is plenty to compare, and keeps one
+      # request to Garmin small. [configurable]
+      check-max-days: 14
+      # A fetch downloads FIT files for several days; 5 minutes covers a slow connection. [configurable]
+      timeout-seconds: 300
+      scheduler-enabled: true
 
 logging:
   level:

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import { useGarminConnect, useGarminDisconnect, useGarminStatus } from '../api/hooks';
+import { GarminSync } from './GarminSync';
 
 // Garmin connection (ADR 0011): the password is typed once and sent to the app, which signs
 // in through the sidecar and keeps only an encrypted token. If Garmin asks for a code, the
@@ -71,6 +72,8 @@ export function GarminCard({ athleteId }: { athleteId: number }) {
           {status.connectedAt && t('garmin.connectedSince', { when: new Date(status.connectedAt).toLocaleString() })}
         </p>
       )}
+
+      {status.state === 'CONNECTED' && <GarminSync athleteId={athleteId} />}
 
       {status.state === 'RECONNECT_NEEDED' && (
         <div className="banner" role="alert">

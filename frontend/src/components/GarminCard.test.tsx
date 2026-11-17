@@ -141,3 +141,72 @@ describe('GarminCard', () => {
     expect(calls.some((c) => c.init?.method === 'DELETE' && c.url === '/api/athletes/1/garmin')).toBe(true);
   });
 });
+
+describe('GarminSync (inside the card)', () => {
+  const connected = { state: 'CONNECTED', stored: true, connectedAt: '2026-11-16T07:00:00Z' };
+  const run = (over: Record<string, unknown>) => ({
+    id: 1, trigger: 'MANUAL', status: 'SUCCEEDED', attempt: 1, firstDay: '2026-11-15', lastDay: '2026-11-17',
+    startedAt: '2026-11-17T05:00:00Z', finishedAt: '2026-11-17T05:01:00Z', recomputed: true, rowsInserted: 120, missing: [],
+    ...over,
+  });
+
+  it('shows the last sync and starts a new one', async () => {
+    let runs = [run({})];
+    const calls = mockApi((url, init) => {
+      if (url === '/api/athletes/1/garmin') return { status: 200, body: connected };
+      if (url === '/api/athletes/1/garmin/sync/runs') return { status: 200, body: runs };
+      if (url === '/api/athletes/1/garmin/sync' && init?.method === 'POST') {
+        runs = [run({ id: 2, status: 'RUNNING', finishedAt: null }), ...runs];
+        return { status: 202, body: runs[0] };
+      }
+      return { status: 404 };
+    });
+    renderCard();
+    expect(await screen.findByText(/120 new rows; features and scores updated/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+    expect(await screen.findByRole('button', { name: 'Syncing…' })).toBeTruthy();
+    expect(calls.some((c) => c.url === '/api/athletes/1/garmin/sync' && c.init?.method === 'POST')).toBe(true);
+  });
+
+  it('says when a sync waits to retry, or failed', async () => {
+    mockApi((url) =>
+      url.endsWith('/sync/runs')
+        ? { status: 200, body: [run({ status: 'RETRY_WAIT', errorCode: 'GARMIN_UNAVAILABLE', nextRetryAt: '2026-11-17T05:10:00Z' })] }
+        : { status: 200, body: connected },
+    );
+    renderCard();
+    expect(await screen.findByText(/Garmin could not be reached\. It will try again at/)).toBeTruthy();
+  });
+
+  it('reports a failed sync in plain words', async () => {
+    mockApi((url) =>
+      url.endsWith('/sync/runs')
+        ? { status: 200, body: [run({ status: 'FAILED', errorCode: 'SIDECAR_UNREACHABLE' })] }
+        : { status: 200, body: connected },
+    );
+    renderCard();
+    expect(await screen.findByText(/failed: The garmin-sync service is not running/)).toBeTruthy();
+  });
+
+  it('runs the check against an export and shows the outcome without values', async () => {
+    mockApi((url) => {
+      if (url.endsWith('/garmin/check')) {
+        return {
+          status: 200,
+          body: {
+            from: '2026-11-05', to: '2026-11-11', differencesUsedByScores: 1, missing: [], warnings: [],
+            tables: { daily_wellness: { inserted: 1, duplicates: 13, skipped: 0 } },
+            differences: [{ table: 'daily_wellness', day: '2026-11-07', record: 'uds', column: 'resting_hr', usedByScores: true, outcome: 'DIFFERENT' }],
+          },
+        };
+      }
+      if (url.endsWith('/sync/runs')) return { status: 200, body: [] };
+      return { status: 200, body: connected };
+    });
+    renderCard();
+    fireEvent.click(await screen.findByText('Check against export'));
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    expect(await screen.findByText(/1 stored value the scores use would change/)).toBeTruthy();
+    expect(screen.getByText('resting_hr')).toBeTruthy();
+  });
+});

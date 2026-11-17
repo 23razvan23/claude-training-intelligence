@@ -19,7 +19,8 @@ public class ImportBatchRepository {
         this.json = json;
     }
 
-    public long create(long athleteId, ImportKind kind, String filename, String sha256, long userId) {
+    /** {@code userId} is null for a batch the app starts itself (a Garmin sync). */
+    public long create(long athleteId, ImportKind kind, String filename, String sha256, Long userId) {
         return jdbc.sql("""
                 INSERT INTO import_batch (athlete_id, kind, filename, file_sha256, status, created_by)
                 VALUES (?, ?, ?, ?, 'PENDING', ?) RETURNING id""")

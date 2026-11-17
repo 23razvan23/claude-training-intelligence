@@ -5,7 +5,9 @@ import type {
   AthleteInput,
   CoverageReport,
   FeatureSummary,
+  GarminCheckReport,
   GarminConnectResult,
+  GarminSyncRun,
   GarminStatus,
   HoldoutFeed,
   HoldoutReport,
@@ -244,5 +246,46 @@ export function useGarminDisconnect(athleteId?: number) {
   return useMutation({
     mutationFn: () => api<void>(`/api/athletes/${athleteId}/garmin`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['garmin', athleteId] }),
+  });
+}
+
+/** The latest Garmin sync runs; polls while one is running. */
+export function useGarminRuns(athleteId?: number, enabled = true) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ['garmin-runs', athleteId],
+    queryFn: async () => {
+      const runs = await api<GarminSyncRun[]>(`/api/athletes/${athleteId}/garmin/sync/runs`);
+      // A run that just finished may have changed scores, imports and the connection state.
+      if (runs[0]?.status === 'SUCCEEDED' || runs[0]?.status === 'FAILED') {
+        const prev = qc.getQueryData<GarminSyncRun[]>(['garmin-runs', athleteId]);
+        if (prev?.[0]?.id === runs[0].id && prev[0].status === 'RUNNING') {
+          for (const key of ['today', 'imports', 'holdout', 'features', 'garmin', 'coverage']) {
+            qc.invalidateQueries({ queryKey: [key, athleteId] });
+          }
+        }
+      }
+      return runs;
+    },
+    enabled: athleteId != null && enabled,
+    refetchInterval: (q) => (q.state.data?.[0]?.status === 'RUNNING' ? 2000 : false),
+  });
+}
+
+export function useGarminSyncNow(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<GarminSyncRun>(`/api/athletes/${athleteId}/garmin/sync`, { method: 'POST' }),
+    onSuccess: (run) => {
+      qc.setQueryData<GarminSyncRun[]>(['garmin-runs', athleteId], (old) => [run, ...(old ?? []).filter((r) => r.id !== run.id)]);
+      qc.invalidateQueries({ queryKey: ['imports', athleteId] });
+    },
+  });
+}
+
+export function useGarminCheck(athleteId?: number) {
+  return useMutation({
+    mutationFn: (range: { from: string; to: string }) =>
+      api<GarminCheckReport>(`/api/athletes/${athleteId}/garmin/check`, { method: 'POST', body: JSON.stringify(range) }),
   });
 }

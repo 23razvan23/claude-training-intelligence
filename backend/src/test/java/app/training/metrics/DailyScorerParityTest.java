@@ -28,7 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Unrounded values agree within 1e-6 absolute and 1e-7 relative; rounded values, bands, flags and
  * reasons agree exactly.
  */
-class DailyScorerParityTest {
+public class DailyScorerParityTest {
     static final ObjectMapper JSON = new ObjectMapper();
     static final double ABS = 1e-6;
     static final double REL = 1e-7;
@@ -53,7 +53,7 @@ class DailyScorerParityTest {
      * The ADR 0008 worked example lists only the scoring blocks; give it the metadata a stored
      * contract carries so it passes the same strict parser as a real model version.
      */
-    static JsonNode asContract(JsonNode coefficients) {
+    public static JsonNode asContract(JsonNode coefficients) {
         var c = (ObjectNode) coefficients.deepCopy();
         if (!c.has("schema_version")) {
             c.put("schema_version", 2);
@@ -156,7 +156,7 @@ class DailyScorerParityTest {
         }
     }
 
-    static InputStream resource(String fixture, String file) {
+    public static InputStream resource(String fixture, String file) {
         var in = DailyScorerParityTest.class.getResourceAsStream("/parity/" + fixture + "/" + file);
         assertThat(in).as("fixture " + fixture + "/" + file).isNotNull();
         return in;

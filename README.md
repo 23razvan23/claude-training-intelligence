@@ -104,6 +104,11 @@ The app can sign in to Garmin Connect as you and fetch each day's data itself ([
 2. **Imports** → **Garmin connection**: type your Garmin e-mail and password and press **Connect**.
 3. If Garmin sends you a code (e-mail or text message), a code field appears in the same form. Type the code within 5 minutes.
 
+**Check, then sync:**
+1. Under the Garmin card, open **Check against export**. Pick about a week your last Garmin export covers fully (not its last day, which was exported half-finished) and press **Check**. Nothing is saved. It should say the sync matches your export in everything the scores use. If it lists differences, send Claude the table and column names it shows (it never shows values).
+2. Press **Sync now**. It fetches today and the 2 days before, imports them like an export, and then recomputes features and scores by itself. The card shows the last sync and its result. Running it twice adds nothing the second time. If Garmin is unavailable, it tries again after 10 and 30 minutes.
+3. Each sync appears under **Import history** as "Garmin sync".
+
 **If Garmin needs you to connect again** (it stopped accepting the token, or you changed `GARMIN_TOKEN_KEY`), the card says so and shows the form again. Sync pauses until you do; imports keep working.
 
 **Disconnect** deletes the stored token from the app. Garmin cannot be told to cancel that token from here. To be thorough, also sign out of other devices in your Garmin account's security settings, or change your Garmin password.

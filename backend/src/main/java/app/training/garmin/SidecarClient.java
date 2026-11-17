@@ -55,6 +55,17 @@ public class SidecarClient {
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
+    /**
+     * The days' data and the token bundle to keep (ADR 0015 D2, D5). The tokens travel only in the
+     * body; the answer can be several MB (FIT files), so it gets the longer sync timeout.
+     */
+    public JsonNode fetchDays(String tokens, java.util.List<java.time.LocalDate> days, int timeoutSeconds) {
+        JsonNode body = post("/sync/days", Map.of("tokens", tokens, "dates", days.stream().map(Object::toString).toList()),
+                timeoutSeconds);
+        if (!body.hasNonNull("tokens") || !body.path("days").isArray()) throw new SidecarException("BAD_RESPONSE");
+        return body;
+    }
+
     public LoginResult login(String username, String password) {
         return loginResult(post("/auth/login", Map.of("username", username, "password", password)));
     }
@@ -75,12 +86,16 @@ public class SidecarClient {
     }
 
     JsonNode post(String path, Object body) {
+        return post(path, body, props.sidecarTimeoutSeconds());
+    }
+
+    JsonNode post(String path, Object body, int timeoutSeconds) {
         String secret = setup.syncSecret();
         if (secret == null) throw new SidecarException("NOT_CONFIGURED");
         HttpResponse<byte[]> res;
         try {
             var req = HttpRequest.newBuilder(URI.create(props.sidecarUrl() + path))
-                    .timeout(Duration.ofSeconds(props.sidecarTimeoutSeconds()))
+                    .timeout(Duration.ofSeconds(timeoutSeconds))
                     .header("Content-Type", "application/json")
                     .header(SECRET_HEADER, secret)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(json.writeValueAsBytes(body)))

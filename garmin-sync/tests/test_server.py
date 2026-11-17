@@ -34,7 +34,7 @@ def test_unknown_path_is_404(server):
 
 def test_stub_adapter_refuses():
     with pytest.raises(SyncUnavailableError):
-        NotConfiguredAdapter().fetch_day(date(2024, 1, 1))
+        NotConfiguredAdapter().fetch_days("{}", [date(2024, 1, 1)])
 
 
 def test_log_lines_never_contain_query_strings(server, capsys):

@@ -353,3 +353,43 @@ export interface GarminConnectResult {
   status: 'CONNECTED' | 'MFA_REQUIRED';
   mfaId?: string | null;
 }
+
+/** One Garmin sync run (ADR 0015 D6). Holds no Garmin data. */
+export interface GarminSyncRun {
+  id: number;
+  trigger: 'MANUAL' | 'MORNING';
+  status: 'RUNNING' | 'RETRY_WAIT' | 'SUCCEEDED' | 'FAILED';
+  attempt: number;
+  firstDay: string;
+  lastDay: string;
+  startedAt: string;
+  finishedAt?: string | null;
+  nextRetryAt?: string | null;
+  /** A fixed code such as GARMIN_UNAVAILABLE or AUTH_REJECTED. */
+  errorCode?: string | null;
+  importBatchId?: number | null;
+  rowsInserted?: number | null;
+  recomputed: boolean;
+  /** Parts Garmin had no data for, e.g. "hrv:2026-11-17". */
+  missing: string[];
+}
+
+/** "Check against export": what a sync would add or change on days already imported. Nothing is kept. */
+export interface GarminCheckDifference {
+  table: string;
+  day: string;
+  record: string;
+  column?: string | null;
+  usedByScores: boolean;
+  outcome: 'DIFFERENT' | 'MISSING_IN_SYNC' | 'ONLY_IN_SYNC' | 'NEW_RECORD';
+}
+
+export interface GarminCheckReport {
+  from: string;
+  to: string;
+  tables: Record<string, { inserted: number; duplicates: number; skipped: number }>;
+  differences: GarminCheckDifference[];
+  differencesUsedByScores: number;
+  missing: string[];
+  warnings: string[];
+}

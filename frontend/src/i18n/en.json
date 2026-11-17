@@ -222,6 +222,8 @@
     "noScoreYet_other": "{{count}} days with Whoop data have no score from us yet (our last scored day: {{last}}). Press Calibration → Recompute features.",
     "stale_one": "{{count}} day was scored before the latest import. Press Calibration → Recompute features.",
     "stale_other": "{{count}} days were scored before the latest import. Press Calibration → Recompute features.",
+    "waitingForExport_one": "{{count}} compared day waits for a Garmin export: it was scored from a synced night (Garmin's live breathing rate), so it doesn't count toward the pass marks until an exported night replaces it and you press Recompute features.",
+    "waitingForExport_other": "{{count}} compared days wait for a Garmin export: they were scored from synced nights (Garmin's live breathing rate), so they don't count toward the pass marks until an exported night replaces them and you press Recompute features.",
     "marks": "Pass marks",
     "marksHint": "A mark is met when its measured value meets it; the 95% interval shows how sure that is. Strain is judged on days with at least 10 h of all-day heart rate. The recovery marks matter most: they drive training decisions.",
     "mark": {
@@ -297,6 +299,7 @@
       "COMPARED_LOW_COVERAGE": "Compared, low coverage (no mark)",
       "NO_WHOOP": "No Whoop score that day",
       "NO_SCORE_YET": "No score from us yet (press Recompute features)",
+      "WAITS_FOR_EXPORT": "Waits for a Garmin export (scored from a synced night)",
       "UNKNOWN": "No score from us (no reason stored)",
       "NO_DAY_DATA": "No Garmin data that day",
       "NO_GARMIN_CORE": "Missing resting HR, overnight HRV or sleep",
@@ -336,6 +339,18 @@
       "note": "Both lines are exponentially weighted averages of your daily training load (Edwards heart-rate load), not of the 0–21 strain score. A rest day counts as 0; a day with no data is skipped, not counted as 0. The 7 and 28 day windows are conventional choices, not proven thresholds."
     }
   },
+  "sync": {
+    "last": "Last sync: {{when}}",
+    "never": "Last sync: none yet",
+    "morning": "Garmin syncs every morning at {{time}}",
+    "reconnectTitle": "Garmin needs you to connect again",
+    "reconnectBody": "Garmin no longer accepts the stored sign-in, so the morning sync has stopped. The coach connects again on the Imports page; until then, Garmin exports still work.",
+    "failedTitle": "Sync failed ({{when}})",
+    "retryingTitle": "Sync failed ({{when}}); trying again at {{retry}}",
+    "running": "Syncing with Garmin…",
+    "noDataTitle": "Synced {{when}}, but Garmin had no data for today yet",
+    "noDataBody": "Open the Garmin Connect app so the watch uploads last night, then sync again (Sync now on the Imports page) or wait for tomorrow's morning sync."
+  },
   "today": {
     "title": "Today",
     "subtitle": "{{date}}",
@@ -344,6 +359,7 @@
     "noData": "No daily scores yet. After importing data, press Recompute features on the Calibration tab.",
     "staleTitle": "No data for today yet",
     "staleBody": "Last data from {{date}}. New scores appear after the next Whoop and Garmin import and Recompute features.",
+    "staleBodySynced": "Last data from {{date}}. Garmin sync is on: today's scores appear after the next successful sync.",
     "lastScored": "Last scored day: {{date}}",
     "notToday": "This is not today's recovery.",
     "recovery": "Recovery",

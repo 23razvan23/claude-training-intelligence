@@ -217,4 +217,21 @@ describe('GarminSync (inside the card)', () => {
     expect(screen.getByText('no field found')).toBeTruthy();
     expect(screen.getByText('0.01')).toBeTruthy();
   });
+  it('shows the last sync line on the Imports page once connected', async () => {
+    mockApi((url) => {
+      if (url === '/api/athletes/1/garmin') return { status: 200, body: status({ state: 'CONNECTED', stored: true }) };
+      if (url === '/api/athletes/1/garmin/sync/status') {
+        return {
+          status: 200,
+          body: { connection: 'CONNECTED', lastSuccessAt: '2026-11-16T05:01:00Z', latestStatus: 'SUCCEEDED', morningEnabled: true, morningTime: '07:00:00' },
+        };
+      }
+      if (url === '/api/athletes/1/garmin/sync/runs') return { status: 200, body: [] };
+      return { status: 404 };
+    });
+    renderCard();
+    const line = await screen.findByTestId('last-sync');
+    expect(line).toHaveTextContent('Last sync:');
+    expect(line).toHaveTextContent('every morning at 07:00');
+  });
 });

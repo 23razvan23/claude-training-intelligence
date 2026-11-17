@@ -54,6 +54,7 @@ No day is ever left out by hand. Every day in the window is counted in exactly o
 - **No Whoop score** that day: counted as "no Whoop".
 - **No score from us:** counted under its ADR 0008 reason (`NO_DAY_DATA`, `NO_HRV`, `NO_RESTING_HR`, `NO_RESPIRATION`, `NO_SLEEP`, `NO_STRAIN_YESTERDAY` with its detail, `NO_GARMIN_CORE`, `NO_SPO2`, `NO_BODY_BATTERY`; strain: `MISSING_WORKOUT_HR`, `NO_ALL_DAY_HR`, `NO_ZONE_MINUTES`). Nothing is filled in.
 - **Stale days** (after the last `day_features` date, ADR 0008 C2) are not compared until data arrives.
+- **Scored from a synced night** (Garmin's live breathing rate, not the export's): the day waits as `WAITS_FOR_EXPORT` until an exported night replaces it and the day is rescored. Added 2026-11-17 with the coach's agreement, display and selection only: ADR 0015 D13.
 - **Recovery** is compared on every day where both sides have a recovery. Recovery marked lower confidence (ADR 0008 S8, `LOW_COVERAGE_YESTERDAY`) **is included**, as in 1a, and its count is shown. *(Assumption A2.)*
 - **Strain:** the two strain marks are judged on days with ≥ `strain_min_monitored_minutes` of all-day HR. Low-coverage days are compared and shown separately, without a mark, as in 1a.
 

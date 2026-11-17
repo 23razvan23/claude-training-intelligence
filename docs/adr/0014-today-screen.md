@@ -20,6 +20,11 @@ Today is the 30-second morning check on a phone. It only **shows** stored daily 
   | `STALE` | no row dated today (ADR 0008 C2) | banner "No data for today yet. Last data from <date>", then the last scored day under the heading "Last scored day: <date>" and "This is not today's recovery" |
   | `NO_DATA` / `NO_MODEL` | no scored days yet / no ACTIVE model | what to do next |
 
+- **With Garmin sync (updated 2026-11-17, ADR 0015 D9):** a "Last sync" line sits under the title once Garmin is connected. With sync on, the `STALE` body reads "Last data from <date>. Garmin sync is on: today's scores appear after the next successful sync." (without sync it still points to the next imports). A second banner says why today's data is missing, from the newest sync run, and tells apart:
+  - **"Garmin needs you to connect again"** (shown on any day, even with data, since the morning sync has stopped);
+  - **"Sync failed (<time>)"** with the reason in plain words, or **"Sync failed (<time>); trying again at <time>"**, or **"Syncing with Garmin…"**;
+  - **"Synced <time>, but Garmin had no data for today yet"** (the watch hasn't uploaded the night).
+  Not connected or not set up: no sync line or banner. If the sync status can't be read, Today shows as before.
 - **Never yesterday as today.** The response field `day` only ever holds the row whose date equals today. Any older row can only appear as `lastScored`, which always carries its date. Rows dated after today (a clock problem) are ignored. The page checks the date a second time before drawing the "today" card. Tests cover this on both sides (`TodayViewTest`, `TodayIT`, `TodayPage.test.tsx`).
 - Data-quality notes come from the stored flags (ADR 0012 D7):
   - lower confidence on strain (`low_coverage`) and on recovery (`recovery_lower_confidence`, S8);
@@ -62,5 +67,5 @@ Points are shown as whole numbers with a sign. The lines are sorted by size of e
 - When data is stale, the last scored day is shown, clearly dated (T4).
 
 ## Consequences
-- With exports every week or two, `STALE` is the normal state until daily sync (1b-4) exists.
+- With exports every week or two, `STALE` was the normal state until daily sync (1b-4). With the morning sync, `FRESH` is normal and the banner explains any morning that isn't.
 - Changing a scoring rule still follows ADR 0008. This ADR only covers display.

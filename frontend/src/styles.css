@@ -208,6 +208,8 @@ table.data .nowrap { white-space: nowrap; }
 .today h2 { margin: 0; }
 .banner { display: flex; flex-direction: column; gap: 0.2rem; border: 1px solid var(--warn); border-left-width: 4px; border-radius: var(--radius); padding: 0.7rem 0.9rem; background: var(--surface); }
 .banner strong { color: var(--warn); }
+.banner.danger { border-color: var(--danger); }
+.banner.danger strong { color: var(--danger); }
 .past { border-top: 1px dashed var(--border); padding-top: 0.5rem; }
 .recovery { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .dial { position: relative; margin: 0; width: 132px; height: 132px; flex-shrink: 0; }

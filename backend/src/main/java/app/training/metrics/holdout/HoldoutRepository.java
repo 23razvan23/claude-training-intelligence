@@ -39,6 +39,32 @@ public class HoldoutRepository {
     }
 
     /**
+     * Days from {@code from} on whose stored score (this model version) was calculated from a
+     * night that came from a Garmin sync, i.e. with Garmin's live breathing rate (ADR 0015 D12,
+     * D13). The night is the one the score actually used: for each Garmin sleep record, the newest
+     * version imported by the time the score was written ({@code computed_at}), as
+     * {@code sleep_session_current} would have returned it then. So a day keeps waiting after an
+     * export arrives until it is rescored (Recompute features), and a retired version's days,
+     * never rescored, stay as they were. Read-only.
+     */
+    public java.util.Set<LocalDate> syncedNights(long athleteId, String modelVersion, LocalDate from) {
+        return new java.util.HashSet<>(jdbc.sql("""
+                SELECT dm.cycle_date FROM derived_day_metrics dm
+                WHERE dm.athlete_id = ? AND dm.model_version = ? AND dm.cycle_date >= ?
+                  AND EXISTS (
+                      SELECT 1 FROM sleep_session s JOIN import_batch b ON b.id = s.import_batch_id
+                      WHERE s.athlete_id = dm.athlete_id AND s.source = 'GARMIN' AND NOT s.is_nap
+                        AND s.cycle_date = dm.cycle_date AND s.ingested_at <= dm.computed_at AND b.kind = 'GARMIN_SYNC'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM sleep_session n
+                            WHERE n.athlete_id = s.athlete_id AND n.source = s.source
+                              AND split_part(n.source_id, '@', 1) = split_part(s.source_id, '@', 1)
+                              AND n.ingested_at > s.ingested_at AND n.ingested_at <= dm.computed_at))""")
+                .params(athleteId, modelVersion, from)
+                .query(LocalDate.class).list());
+    }
+
+    /**
      * When the coach pressed Recompute features for the athlete between the two instants (either
      * may be null: open). Runs after a Garmin sync are left out: a morning sync recomputes every
      * day, and marking each would bury the coach's own runs (ADR 0015 D8).

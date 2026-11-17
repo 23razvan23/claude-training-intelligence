@@ -82,11 +82,12 @@ public class HoldoutService {
         var ours = scores.days(athleteId, m.version(), marks.windowFrom(), null).stream().map(d -> ourDay(d, contract)).toList();
         var whoop = repo.whoop(athleteId, marks.windowFrom().minusDays(1), until);
         var runs = repo.recomputeRuns(athleteId, marks.windowFrom().atStartOfDay(zone).toInstant(), until);
+        var syncedNights = repo.syncedNights(athleteId, m.version(), marks.windowFrom());
 
         return HoldoutEvaluator.evaluate(new HoldoutEvaluator.Input(
                 m.version(), m.status(), m.activatedAt(), m.retiredAt(), m.holdoutTargets(), marks,
                 contract.greenMin(), contract.redMax(), ours, whoop, props.holdoutWhoopEnd(), LocalDate.now(clock.withZone(zone)),
-                props.holdoutRollingDays(), runs));
+                props.holdoutRollingDays(), runs, syncedNights));
     }
 
     /**

@@ -3,15 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import { useGarminCheck, useGarminRuns, useGarminSyncNow } from '../api/hooks';
 import type { GarminCheckReport, GarminSyncRun } from '../api/types';
+import { codeKey } from '../sync';
 
 // Sync now, the last run, and "Check against export" (ADR 0015 D5-D6). Shown inside the
 // Garmin card once Garmin is connected.
 
-const KNOWN_CODES = [
-  'GARMIN_UNAVAILABLE', 'RATE_LIMITED', 'SIDECAR_UNREACHABLE', 'IMPORT_RUNNING', 'AUTH_REJECTED', 'KEY_CHANGED',
-  'RECONNECT_NEEDED', 'NOT_CONNECTED', 'NOT_CONFIGURED', 'SECRET_MISMATCH', 'IMPORT_FAILED', 'RECOMPUTE_FAILED',
-  'INTERRUPTED', 'BAD_RESPONSE', 'SYNC_RUNNING',
-];
 
 function time(iso: string) {
   return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
@@ -27,7 +23,7 @@ export function GarminSync({ athleteId }: { athleteId: number }) {
   const syncNow = useGarminSyncNow(athleteId);
   const last = runs?.[0];
   const running = last?.status === 'RUNNING';
-  const code = (c?: string | null) => (c && KNOWN_CODES.includes(c) ? t(`garmin.codes.${c}`) : t('garmin.codes.OTHER'));
+  const code = (c?: string | null) => t(codeKey(c));
 
   return (
     <div className="stack">

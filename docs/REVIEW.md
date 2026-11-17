@@ -1,5 +1,7 @@
 # Project review – 2026-11-13, at 8d5a7d7
 
+> **Status on 2026-11-17:** every item R-01 … R-15 is done (PR numbers in §3 and in each item), except **R-05**: no fix now, revisit at the next recalibration. The text below is the original review and is kept as written.
+
 ## 1. Verdict (≤ 10 lines)
 
 The project is in good health: small, readable, well tested for its size, and honest about its own
@@ -78,27 +80,27 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 | ID | Title | Priority | Type | Size | Depends on | Blocks stage |
 |---|---|---|---|---|---|---|
-| R-01 | Write down the scoring rules that today exist only in Python | P0 | design | S | – | 1b-1 |
-| R-02 | Emit a versioned coefficients contract with training ranges and a profile snapshot (done) | P0 | design | M | R-01 | 1b-1 |
-| R-03 | Generate a committed parity fixture and guard the feature version in CI (done) | P0 | test-gap | S | R-02 | 1b-1 |
-| R-04 | Record when a model was activated and refuse unsafe activations | P0 | bug | S | R-02 | 1b-1, 1b-3 |
-| R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; fix deferred to P2 | bug | M | – | – |
-| R-06 | Stop freezing unfinished Whoop cycles on import (done) | P1 | bug | S | – | 1b-3 |
-| R-07 | Fix the live-holdout rules in writing before looking at holdout data (done) | P1 | design | S | R-04 | 1b-3 |
-| R-08 | Make the nightly backup fail loudly and prove it restores (done) | P1 | bug | S | – | – |
-| R-09 | End sessions when a login is removed or its password changes | P1 | security | S | – | 1b-2 (athlete access); done |
-| R-10 | Define how re-fetched Garmin days replace earlier partial ones (done) | P1 | design | M | – | 1b-3, 1b-4 |
-| R-11 | Decide how Garmin credentials are stored before writing sync code (done) | P1 | security | S | – | 1b-4 |
-| R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI (done) | P1 | test-gap | M | – | 1b-2, 1b-4 |
-| R-13 | Correct the Phase 2 tables before anything writes to them (done) | P1 | design | M | – | 2-1, 2-3 |
-| R-14 | Build the local golden-file check the spec asks for (done) | P2 | test-gap | M | 1b-1 | – |
-| R-15 | Bring documents back in line with the code | P2 | docs | S | – | – |
+| R-01 | Write down the scoring rules that today exist only in Python (done, #16) | P0 | design | S | – | 1b-1 |
+| R-02 | Emit a versioned coefficients contract with training ranges and a profile snapshot (done, #20) | P0 | design | M | R-01 | 1b-1 |
+| R-03 | Generate a committed parity fixture and guard the feature version in CI (done, #21) | P0 | test-gap | S | R-02 | 1b-1 |
+| R-04 | Record when a model was activated and refuse unsafe activations (done, #22/#23) | P0 | bug | S | R-02 | 1b-1, 1b-3 |
+| R-05 | Check and fix day assignment when no night's sleep was recorded | Query done; no fix now, revisit at next recalibration | bug | M | – | – |
+| R-06 | Stop freezing unfinished Whoop cycles on import (done, #18/#19) | P1 | bug | S | – | 1b-3 |
+| R-07 | Fix the live-holdout rules in writing before looking at holdout data (done, #24) | P1 | design | S | R-04 | 1b-3 |
+| R-08 | Make the nightly backup fail loudly and prove it restores (done, #17) | P1 | bug | S | – | – |
+| R-09 | End sessions when a login is removed or its password changes (done, #31) | P1 | security | S | – | 1b-2 (athlete access) |
+| R-10 | Define how re-fetched Garmin days replace earlier partial ones (done, #28) | P1 | design | M | – | 1b-3, 1b-4 |
+| R-11 | Decide how Garmin credentials are stored before writing sync code (done, #33) | P1 | security | S | – | 1b-4 |
+| R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI (done, #32) | P1 | test-gap | M | – | 1b-2, 1b-4 |
+| R-13 | Correct the Phase 2 tables before anything writes to them (done, #42) | P1 | design | M | – | 2-1, 2-3 |
+| R-14 | Build the local golden-file check the spec asks for (done, #41) | P2 | test-gap | M | 1b-1 | – |
+| R-15 | Bring documents back in line with the code (done) | P2 | docs | S | – | – |
 
 ---
 
 ### R-01: Write down the scoring rules that today exist only in Python
 - **Priority / Type / Size:** P0 / design / S
-- **Status:** CONFIRMED; done 2026-11-15 (ADR 0008)
+- **Status:** CONFIRMED; **done 2026-11-15, PR #16** (ADR 0008)
 - **Problem:** ADR 0007 and PLAN §6 describe the contract as "`_strain_coefficients` plus the
   recovery terms, sleep and bands". But three recovery/sleep inputs are not columns of
   `day_features`; they are computed inside `pipeline.run` as a chain: strain → `prev_strain` →
@@ -162,7 +164,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-02: Emit a versioned coefficients contract with training ranges and a profile snapshot
 - **Priority / Type / Size:** P0 / design / M
-- **Status:** CONFIRMED; done 2026-11-15 (calibration 0.6.0, `calibration/contract.schema.json`). Coach re-run and comparison query pending.
+- **Status:** CONFIRMED; **done 2026-11-15, PR #20** (calibration 0.6.0, `calibration/contract.schema.json`). The coach's re-run is done too: m15 reproduces the PASS model with contract v2 and is ACTIVE (see PLAN §3).
 - **Problem:** the coefficients JSON has no schema version, no training ranges (needed for the drift flag 1b-1 must write), no record of the athlete profile and feature settings the features were built with, and no calibration package version. Its shape is only checked by one key-set assertion. Re-running calibration later cannot reproduce the PASS model's test window because there is `--test-from` but no `--test-to`.
 - **Evidence:**
   - `pipeline.py:207-213`: keys are exactly `feature_version, strain, sleep, recovery, bands`.
@@ -223,7 +225,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-03: Generate a committed parity fixture and guard the feature version in CI
 - **Priority / Type / Size:** P0 / test-gap / S
-- **Status:** CONFIRMED; done 2026-11-15 (`backend/src/test/resources/parity/`, `calibration/calibration/parity.py`, `calibration/tests/test_parity.py`). The fixture builder lives in `calibration/tests/parity_fixtures.py` because it needs the synthetic tables in `tests/`.
+- **Status:** CONFIRMED; **done 2026-11-15, PR #21** (`backend/src/test/resources/parity/`, `calibration/calibration/parity.py`, `calibration/tests/test_parity.py`). The fixture builder lives in `calibration/tests/parity_fixtures.py` because it needs the synthetic tables in `tests/`.
 - **Problem:** stage 1b-1 asks for a Java/Python parity test "generated from the Python tests", but nothing produces such a fixture, and the existing synthetic table (`tests/synthetic.py`) has no gaps, no null inputs and no low-coverage days in the places where Java is most likely to differ. Separately, the feature version is typed by hand in two files with no check that they agree.
 - **Evidence:** `tests/synthetic.py:49` only nulls `ln_rmssd_z` for the first 14 days; `calibration/__main__.py:18` `FEATURE_VERSION = "f3"` vs `application.yml:64` `feature-version: f3`; no CI step compares them (`.github/workflows/ci.yml`).
 - **Why it matters:** a parity test on clean rows proves little; the mismatches are on edge days (see R-01). A feature-version mismatch makes the calibration read an empty or stale table (this already cost one iteration, PLAN §3 row m5).
@@ -263,7 +265,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-04: Record when a model was activated and refuse unsafe activations
 - **Priority / Type / Size:** P0 / bug / S
-- **Status:** CONFIRMED; done 2026-11-15 (`V13__model_activation.sql`; V12 was taken by R-06). m13 keeps a null `activated_at` (coach decision: no invented time) and the Calibration page warns that it uses the old format. Re-activating the ACTIVE version is a no-op. A candidate older than the ACTIVE version is also refused (coach decision, follow-up PR). m15 activated by the coach on 2026-11-15 19:47:54 UTC; m13 retired at the same instant.
+- **Status:** CONFIRMED; **done 2026-11-15, PRs #22 and #23** (`V13__model_activation.sql`; V12 was taken by R-06). m13 keeps a null `activated_at` (coach decision: no invented time) and the Calibration page warns that it uses the old format. Re-activating the ACTIVE version is a no-op. A candidate older than the ACTIVE version is also refused (coach decision, follow-up PR). m15 activated by the coach on 2026-11-15 19:47:54 UTC; m13 retired at the same instant.
 - **Problem:** activation only flips a status. The time of activation is not stored, although stage 1b-3 is defined "from its activation date". Activation also accepts a model built on a different feature set from the one the app is currently computing, and (after R-02) should refuse a contract version the scorer does not understand.
 - **Evidence:** `MetricsRepository.java:69-74` (two `UPDATE … SET status`); V6:64-80 has no `activated_at`; `MetricsController.java:80-92` checks only `passed` and `RETIRED`.
 - **Why it matters:** without the timestamp the holdout window cannot be reconstructed after the fact; activating an `f2` model while the app computes `f3` rows would score nothing, or score the wrong columns.
@@ -298,7 +300,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-05: Check and fix day assignment when no night's sleep was recorded
 - **Priority / Type / Size:** P0 for the query (minutes), P1 for the fix / bug / M
-- **Status:** rule CONFIRMED in code. On the coach's data (2026-11-13) the day-assignment effect is nil (0 of 483 workouts, 2 nights without sleep), so **no fix now**. The pause double count is CONFIRMED (103 of 482 workouts, median 8.3 min) and estimated at well under 0.5 strain per affected day: fix at the next recalibration.
+- **Status:** **no fix now; revisit at the next recalibration** (decision, no PR). Rule CONFIRMED in code. On the coach's data (2026-11-13) the day-assignment effect is nil (0 of 483 workouts, 2 nights without sleep), so **no fix now**. The pause double count is CONFIRMED (103 of 482 workouts, median 8.3 min) and estimated at well under 0.5 strain per affected day: fix at the next recalibration.
 - **Problem:** an activity or an all-day HR sample belongs to the day opened by the last main sleep that ended within the previous **36 hours**. When the watch records no sleep for a night, everything until 36 h after the previous wake-up stays on the previous day: a run at 10:00 the next morning is added to yesterday's load, and today gets nothing until the evening. Whoop, worn separately, splits those days normally. The rule is also implemented twice (SQL view and Java loop), which can drift.
 - **Evidence:**
   - `V2__raw.sql:169-170`: `ss.end_at <= a.start_at AND ss.end_at > a.start_at - INTERVAL '36 hours'`.
@@ -356,7 +358,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-06: Stop freezing unfinished Whoop cycles on import
 - **Priority / Type / Size:** P1 / bug / S
-- **Status:** CONFIRMED, including on the coach's data (1 open cycle, dated 2026-11-09)
+- **Status:** CONFIRMED, including on the coach's data (1 open cycle, dated 2026-11-09); **done 2026-11-15, PRs #18 and #19** (V12, ADR 0003)
 - **Problem:** a Whoop export taken during the day contains the current, unfinished cycle (recovery is final, day strain is still growing). The importer stores it; every later import of the finished cycle hits the same key and is ignored. That day's Whoop strain stays too low forever. Stage 1b-3 asks the coach to re-import "every week or two", so each import would plant one wrong reference day in the holdout.
 - **Evidence:** `RawWriter.java:175-188` (`INSERT INTO whoop_reference … ON CONFLICT DO NOTHING`, unique on `(athlete_id, cycle_start)`, V2:121); `WhoopCsvImporter.java:120-151` imports rows without a cycle end. PLAN §3/§4: the export ends 2026-11-08 but the test window ends 2026-11-09, which is what a cycle that started on the evening of the 8th and was still open would look like.
 - **Why it matters:** biased strain comparison on exactly the days that decide whether Whoop can be cancelled; one such day is probably already in the 1a test window.
@@ -392,7 +394,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-07: Fix the live-holdout rules in writing before looking at holdout data
 - **Priority / Type / Size:** P1 / design / S
-- **Status:** CONFIRMED; done 2026-11-15 (`docs/adr/0009-live-holdout-protocol.md`, `V15__holdout_targets.sql`). Window from the day after the ACTIVE model's `test_to` (2026-11-09 for m15) to the last Whoop day (subscription ends 2027-02-19); minimum lowered to 90 compared recovery days (coach); m15's frozen marks filled in by V15.
+- **Status:** CONFIRMED; **done 2026-11-15, PR #24** (`docs/adr/0009-live-holdout-protocol.md`, `V15__holdout_targets.sql`). Window from the day after the ACTIVE model's `test_to` (2026-11-09 for m15) to the last Whoop day (subscription ends 2027-02-19); minimum lowered to 90 compared recovery days (coach); m15's frozen marks filled in by V15.
 - **Problem:** PLAN §3 says the holdout is "the clean go/no-go check" because the parsimony rule was chosen after seeing the test window. The same is true of two more choices: the strain targets (2.0 / 0.80) and the "≥ 600 minutes" filter were set after seeing 1.91 / 0.82. The holdout only stays clean if its rules are fixed before its data is looked at, and today nothing fixes them: no start date, no minimum number of days, no rule for excluded days, and targets live in an editable file. Also, the 1a evidence is thinner than the headline suggests: with about 55 test days, "0 green↔red flips" cannot show a rate under 3% (the 95% upper bound for 0 of 55 is about 5%).
 - **Evidence:** ADR 0007 items 3 and 6 (dates 2026-11-13); `targets.json:3-5`; PROMPTS stage 1b-3 "Only days after activation" (but every day after `test_to` is unseen, and the activation time is not stored — R-04).
 - **Why it matters:** this is the evidence for cancelling a paid subscription the coach currently trusts. Without pre-set rules the holdout can be bent the same way the test window was, with nobody intending to.
@@ -436,7 +438,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-08: Make the nightly backup fail loudly and prove it restores
 - **Priority / Type / Size:** P1 / bug / S
-- **Status:** CONFIRMED (by reading; not executed); **done 2026-11-15** (`deploy/backup/backup.sh`, `deploy/backup/test-backup.sh`, CI job `backup`)
+- **Status:** CONFIRMED (by reading; not executed); **done 2026-11-15, PR #17** (`deploy/backup/backup.sh`, `deploy/backup/test-backup.sh`, CI job `backup`)
 - **Problem:** the backup is `pg_dump | gzip | openssl`. In `sh`, a pipeline's result is the last command's, so if `pg_dump` fails (database down, wrong password, disk full mid-dump) `openssl` still succeeds, the script prints "backup written" and then prunes older files. Fourteen bad nights erase every good backup. Nothing ever tests that a backup can be restored. Uploaded exports are deleted after import (ADR 0006), so this database is the only copy of the coach's data in the system.
 - **Evidence:** `deploy/backup/backup.sh:4` `set -eu` (no pipefail), `:25-27` the pipeline, `:29` `prune`; CI only runs `sh -n` on it (`ci.yml`, job `compose`).
 - **Why it matters:** silent loss of all health data and model history after a disk or volume failure.
@@ -472,7 +474,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-09: End sessions when a login is removed or its password changes
 - **Priority / Type / Size:** P1 / security / S
-- **Status:** CONFIRMED (by reading; no test exists either way); **done 2026-11-16** (ADR 0005, V18, `LoginFlowIT`, `SecurityIT`).
+- **Status:** CONFIRMED (by reading; no test exists either way); **done 2026-11-16, PR #31** (ADR 0005, V18, `LoginFlowIT`, `SecurityIT`).
 - **Problem:** a session keeps a copy of the user in memory for 30 days and is never checked against the database again. Deleting an athlete's login, or changing a password, does not end existing sessions. ADR 0005 says "revocation is just session invalidation", but no code invalidates anything. Two smaller points in the same area: the API description pages are public, and login attempts are unlimited.
 - **Evidence:** `application.yml:27` `timeout: 30d`; `SecurityConfig.java:55-57` (`HttpSessionSecurityContextRepository`, principal stored in the session); `UserRepository.java:48` and `UserController.java` `delete`/`changePassword` touch only the table; `SecurityConfig.java:40` `permitAll` for `/api/openapi/**`, `/api/docs/**`.
 - **Why it matters:** from stage 1b-2 athletes get their own Today screen. A removed athlete (or a phone that was lost) keeps reading health data for up to a month. Low risk on a home network today; real once the app is reachable from outside.
@@ -509,7 +511,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-10: Define how re-fetched Garmin days replace earlier partial ones
 - **Priority / Type / Size:** P1 / design / M
-- **Status:** CONFIRMED (code paths); **done 2026-11-16** (ADR 0010, V17, `RawRevisionsIT`). Brought forward from 1b-4: the coach feeds Garmin exports during the live holdout (route a). On the coach's data: 0 nights with two Garmin sleeps; 2026-11-09 was imported half-finished (18:47 the same day) and will be corrected by the next export.
+- **Status:** CONFIRMED (code paths); **done 2026-11-16, PR #28** (ADR 0010, V17, `RawRevisionsIT`). Brought forward from 1b-4: the coach feeds Garmin exports during the live holdout (route a). On the coach's data: 0 nights with two Garmin sleeps; 2026-11-09 was imported half-finished (18:47 the same day) and will be corrected by the next export.
 - **Problem:** raw tables are insert-once. That is right for a one-time export, but a 07:00 sync fetches a day that is still changing (resting HR, stress, Body Battery, sometimes a re-processed sleep). The first version is kept forever and later, better versions are dropped. Where a later version does get in under a different key, readers combine versions wrongly: two sleep rows for one night are added together, and the wellness view takes the maximum of each column rather than the newest.
 - **Evidence:**
   - `GarminExportImporter.java:263` daily summary key is the constant `"uds"` + date → the first fetch of a day wins (`RawWriter.java:56`).
@@ -555,7 +557,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-11: Decide how Garmin credentials are stored before writing sync code
 - **Priority / Type / Size:** P1 / security / S
-- **Status:** CONFIRMED (nothing exists yet); **done 2026-11-16** (ADR 0011, coach chose option (a); `.env.example` documents `GARMIN_TOKEN_KEY` and `GARMIN_SYNC_SECRET`; the sidecar now logs method, path without query string and status only; the `garmin_credential` migration comes with 1b-4).
+- **Status:** CONFIRMED (nothing exists yet); **done 2026-11-16, PR #33** (ADR 0011, coach chose option (a); `.env.example` documents `GARMIN_TOKEN_KEY` and `GARMIN_SYNC_SECRET`; the sidecar now logs method, path without query string and status only; the `garmin_credential` migration comes with 1b-4).
 - **Problem:** stage 1b-4 says "credentials and tokens are encrypted at rest (key from .env)". The pieces that make that meaningful are undecided: whether the password is stored at all (the `garth` library works from long-lived tokens after one login), who decrypts (app or sidecar), how the sidecar is protected from other containers, how multi-factor login is handled, and what the backup contains. The sidecar currently has no authentication and prints request lines.
 - **Evidence:** `garmin-sync/garmin_sync/server.py` (plain HTTP, no auth, `log_message` prints the request line); `docker-compose.yml` passes no secret to it; no encryption code or key variable in `.env.example`; PROMPTS stage 1b-4.
 - **Why it matters:** a Garmin password unlocks an account with location history and health data. A design chosen in a hurry inside a large sync PR is hard to change after credentials are stored.
@@ -588,7 +590,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-12: Add timezone/DST tests, a frontend test runner and an image build to CI
 - **Priority / Type / Size:** P1 / test-gap / M
-- **Status:** CONFIRMED; **done 2026-11-16** (`DayAssignmentDstIT`, `CycleDateDstTest`, `DayGridDstTest`; Vitest + `src/pace.test.ts`; CI job `images`). All new backend cases passed on the first run: no day-assignment defect found, no production code changed. The scoring day grid is plain `LocalDate` stepping, so it needs only a small no-gap/no-duplicate test. The `images` job builds the five images as a matrix (one cache scope each, pull requests only); the `compose` job fails if a service is added to `docker-compose.yml` without being added to that matrix.
+- **Status:** CONFIRMED; **done 2026-11-16, PR #32** (`DayAssignmentDstIT`, `CycleDateDstTest`, `DayGridDstTest`; Vitest + `src/pace.test.ts`; CI job `images`). All new backend cases passed on the first run: no day-assignment defect found, no production code changed. The scoring day grid is plain `LocalDate` stepping, so it needs only a small no-gap/no-duplicate test. The `images` job builds the five images as a matrix (one cache scope each, pull requests only); the `compose` job fails if a service is added to `docker-compose.yml` without being added to that matrix.
 - **Problem:** three gaps against SPEC "Engineering standards" that the next stages will lean on. (1) No test exercises a daylight-saving change or a non-default timezone for cycle assignment, although every day boundary depends on it; I found no defect by reading, but the 07:00-local scheduler (1b-4) and "today" (1b-2) add more such code. (2) The frontend has no test runner at all; 1b-2 adds logic with a safety meaning ("never show yesterday's recovery as today's"). (3) CI never builds the Docker images, so a broken Dockerfile reaches the coach's machine first (a stale image already cost one iteration, PLAN §3 row m5).
 - **Evidence:** no match for `DST`, `2026-03-29` or `2026-10-25` under `backend/src` or `calibration`; `frontend/package.json` has no `test` script; `ci.yml` job `compose` runs only `docker compose config --quiet` and `sh -n`.
 - **Why it matters:** a day-boundary slip is the one bug class that already invalidated a full calibration (m1); catching the next one in CI is cheap.
@@ -628,7 +630,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-13: Correct the Phase 2 tables before anything writes to them
 - **Priority / Type / Size:** P1 / design / M
-- **Status:** DONE (2026-11-17): ADR 0018 (not 0012, which was taken by daily scoring), migration V22. The coach confirmed all six Phase 2 tables were empty. Coach decisions: `dedup_key` leaves the inputs out (P1); "latest wins" scope is session, else activity, else the whole day (P2). JSON columns are named `signals` / `settings` (`values` is an SQL keyword). Tests: `Phase2SchemaIT`, `Phase2SchemaMigrationIT` (builds a database to V21 with Phase 1 data, then migrates). PLAN §5 (stage 2-0, settings store in 2-2, 2-5 UI only) and PROMPTS 2-1/2-2/2-3/2-5 updated.
+- **Status:** DONE (2026-11-17, PR #42): ADR 0018 (not 0012, which was taken by daily scoring), migration V22. The coach confirmed all six Phase 2 tables were empty. Coach decisions: `dedup_key` leaves the inputs out (P1); "latest wins" scope is session, else activity, else the whole day (P2). JSON columns are named `signals` / `settings` (`values` is an SQL keyword). Tests: `Phase2SchemaIT`, `Phase2SchemaMigrationIT` (builds a database to V21 with Phase 1 data, then migrates). PLAN §5 (stage 2-0, settings store in 2-2, 2-5 UI only) and PROMPTS 2-1/2-2/2-3/2-5 updated.
 - **Problem:** the planning tables were laid down in Phase 0 "so later phases only add columns". Read against SPEC Module 3 and stages 2-1 to 2-5, several shapes will force rework once rows exist:
   1. `planned_session` has both `demand` (KEY/SUPPORTING/EASY) and `is_key`: two sources of truth for the guardrail "protect key sessions".
   2. `adaptation_suggestion` points at one session; a SWAP involves two. There is no key preventing the same suggestion being inserted again each time the morning run repeats (SPEC: "every step is idempotent").
@@ -680,7 +682,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-14: Build the local golden-file check the spec asks for
 - **Priority / Type / Size:** P2 / test-gap / M
-- **Status:** CONFIRMED; **done 2026-11-17** (`golden freeze` / `golden check`, ADR 0017: replays from the raw data as it was at freeze time in a rolled-back transaction, so new imports never look like code changes; "inputs changed" is reported apart from "code changed"; `GoldenHasherTest`, `GoldenCliTest`, `GoldenIT` on synthetic data and the parity fixture)
+- **Status:** CONFIRMED; **done 2026-11-17, PR #41** (`golden freeze` / `golden check`, ADR 0017: replays from the raw data as it was at freeze time in a rolled-back transaction, so new imports never look like code changes; "inputs changed" is reported apart from "code changed"; `GoldenHasherTest`, `GoldenCliTest`, `GoldenIT` on synthetic data and the parity fixture)
 - **Problem:** SPEC requires "golden-file tests on a frozen 60-day sample of real data, so a code change that moves any score fails loudly". Real data cannot be committed, so the check has to run on the coach's machine. Nothing exists yet. Until it does, a refactor of `DayFeatureService` or the scorer can move real scores without any test failing (fixtures are small and regular).
 - **Evidence:** PLAN §5 backlog, second bullet; no golden files or commands in the repo.
 - **Why it matters:** the live holdout (to 2027-02) assumes the scores are produced the same way every day. A silent change mid-holdout mixes two models in one verdict.
@@ -714,7 +716,14 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-15: Bring documents back in line with the code
 - **Priority / Type / Size:** P2 / docs / S
-- **Status:** CONFIRMED
+- **Status:** DONE (2026-11-17, documentation only; no migration). Result per bullet:
+  - ADR 0004 header and date range: **fixed here.** Header now says Whoop and Garmin are both verified. The Garmin start month (2024-09 per PLAN §4, 2024-11 per ADR 0004) is written as "about 2024-09/11, to be confirmed from the stored data".
+  - "Wake to wake" versus Whoop's sleep-onset cycle: **fixed here** (one paragraph at the top of ADR 0002's Decision).
+  - V2 column comment on `whoop_reference.cycle_date`: **TODO, not fixed** (a merged migration is never edited; no migration in this PR). Listed in the PLAN backlog: fold `COMMENT ON COLUMN` into the next migration.
+  - SPEC's `rules_version` and `feature_version` on derived rows: **already resolved** for `feature_version` (V14 added the column; ADR 0003 says which table carries which version) and **accepted deviation** for `rules_version` (stated in ADR 0003; the scoring rules are fixed per model by ADR 0008).
+  - PLAN §6 naming a private function: **already resolved** (§6 points to ADR 0008 and `calibration/contract.schema.json`). The leftover in PROMPTS (stage 1b-1 and the 1a close-out) is **fixed here**.
+  - ADR 0007 "current state": **fixed here** (a short block above Context).
+  - Also corrected: the stale status lines of this file (PR numbers), ADR 0005's claim that nobody has to log in again (sessions live in memory, so every restart logs everyone out), PLAN's long "Last updated" line (now a short summary plus a Change log at the end), and the PROMPTS shared preamble (new rules).
 - **Problem:** small contradictions that will mislead a context-free engineer:
   - ADR 0004 header still says "Whoop: provisional until the real export is inspected" while its body says verified on 2026-11-10; it gives the Garmin range as 2024-11 → 2026-11, PLAN §4 says 2024-09.
   - ADR 0002/SPEC call a day "wake to wake"; the Whoop export's cycle runs sleep onset to sleep onset. Our days are wake to wake; the difference (sleep time) should be stated once.
@@ -727,8 +736,8 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 - **Proposed change:** edit the documents; no code. Fold the `COMMENT ON` and `feature_version` column into whichever migration lands next (R-04 or 1b-1).
 - **Out of scope:** rewriting ADR history; SPEC.md wording (it is the coach's source document; note deviations in ADRs instead).
 - **Acceptance criteria:**
-  - [ ] Each bullet above is resolved or explicitly marked "accepted deviation" in an ADR.
-  - [ ] PLAN "Last updated" line refreshed.
+  - [x] Each bullet above is resolved or explicitly marked "accepted deviation" in an ADR (one is a recorded TODO: the V2 comment).
+  - [x] PLAN "Last updated" line refreshed.
 - **Verification:** none beyond review; if a migration is touched, `cd backend && ./gradlew build`.
 - **Coach decision needed:** no.
 - **Opus prompt:**

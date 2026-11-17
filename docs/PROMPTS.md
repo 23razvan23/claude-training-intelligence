@@ -30,14 +30,32 @@ the coach's setup), then SPEC.md (the build spec) and docs/adr/. Follow docs/PLA
 - Test fixtures must be synthetic. Commit in small focused steps; open one PR per agreed step,
   ending with what I must run after merging. Update docs/PLAN.md in the same PR.
 - Keep explanations plain: I'm a coach, not a developer.
-```
+- A PR is NOT done until every CI check on it is green. Check the PR's CI results yourself and
+  fix failures before asking me to merge.
+- Never edit a merged Flyway migration; add a new one. Before choosing a migration number, look
+  at origin/main for the newest merged V-number (another session may have taken the next one).
+- Do NOT start other Claude sessions and do not begin any item you were not asked to do. When
+  the PR is open and green, stop and tell me.
+- Feature engineering lives only in Java (`day_features`); Python only fits. While the live
+  holdout runs (to 2027-02-19), Phase 2 inputs never go into `day_features`: they are computed in
+  the `adaptation` package and stored in `day_signals` (ADR 0018 D8). Changing a feature means a
+  new feature version (in both `application.yml` and `calibration/__main__.py`) and restarts the
+  holdout: ask first.
+- After any change touching `metrics/` or `ingestion/`, run the golden check (ADR 0017; PLAN §2:
+  `docker compose run --rm app golden check --athlete 1`, which I run on my Mac) and tell me to
+  expect `0 differences`; in CI the golden test on the synthetic fixture must pass.
+- Do not edit SPEC.md (my source document); note deviations in an ADR. Do not rewrite ADR
+  history: add a "current state" note or an amendment.
+- `tools/inspect_exports.py` must stay Python 3.9-compatible.
 
 ---
 
 ## Stage 1a close-out (no session needed)
 
-In the app: **Calibration → the passing version → Activate**. Daily scoring (1b-1) and the
-live holdout (1b-3) use the ACTIVE version.
+Done: the coach re-ran the calibration with fixed test dates (R-02) and activated **m15-20261115**
+on 2026-11-15. For any later model: re-run the calibration, then **Calibration → the new version →
+Activate**. Daily scoring (1b-1) and the live holdout (1b-3) use the ACTIVE version, and activating
+a different model restarts the holdout count (ADR 0009 H8): ask first.
 
 ---
 
@@ -50,8 +68,8 @@ Goal: every day with features gets Recovery, Strain and Sleep scores from the AC
 model, computed in Java, explainable and reproducible.
 
 Scope:
-- Read the ACTIVE model_version.coefficients (contract: calibration/calibration/pipeline.py
-  _strain_coefficients plus the recovery terms, sleep and bands; ADR 0007). Support both strain
+- Read the ACTIVE model_version.coefficients. The contract is docs/adr/0008-scoring-contract.md
+  plus calibration/contract.schema.json; refuse any schema_version other than 2. Support both strain
   forms ("load" with background and "zones"), even though "load" is active now.
 - Compute from day_features and write derived_day_metrics: recovery_pct, recovery_band, strain,
   sleep_need_min, sleep_performance_pct, per-feature recovery contributions (points), loads, and

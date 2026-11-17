@@ -22,6 +22,7 @@
 - Whoop workouts are stored as `source = 'WHOOP'` activities (reference only). They are never merged with Garmin activities.
 - Each import batch runs in one transaction: it lands completely or not at all.
 - Derived tables can be dropped and recomputed. Which version each carries: `day_features` → `feature_version`; `model_version` → the `feature_version` it was fitted on; `derived_day_metrics` → `model_version` **and** `feature_version` (V14, stage 1b-1; its scoring rules are fixed per model by ADR 0008); `adaptation_suggestion` → `rules_version`.
+  - *Accepted deviation from SPEC.md:* the spec asks every derived row to store `model_version` and `rules_version`. `derived_day_metrics` stores `model_version` and `feature_version` instead; the scoring rules are fixed per model (ADR 0008), so the model version already identifies them. `rules_version` belongs to the Phase 2 suggestion engine only.
 
 ## Consequences
 - Corrections to raw data are new rows (for example in `subjective_log`, where the latest wins), never updates.

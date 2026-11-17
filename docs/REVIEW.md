@@ -91,7 +91,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 | R-11 | Decide how Garmin credentials are stored before writing sync code (done) | P1 | security | S | – | 1b-4 |
 | R-12 | Add timezone/DST tests, a frontend test runner and an image build to CI (done) | P1 | test-gap | M | – | 1b-2, 1b-4 |
 | R-13 | Correct the Phase 2 tables before anything writes to them | P1 | design | M | – | 2-1, 2-3 |
-| R-14 | Build the local golden-file check the spec asks for | P2 | test-gap | M | 1b-1 | – |
+| R-14 | Build the local golden-file check the spec asks for (done) | P2 | test-gap | M | 1b-1 | – |
 | R-15 | Bring documents back in line with the code | P2 | docs | S | – | – |
 
 ---
@@ -680,7 +680,7 @@ session-fixation handling; the sandboxed calibration report; import deadlock fix
 
 ### R-14: Build the local golden-file check the spec asks for
 - **Priority / Type / Size:** P2 / test-gap / M
-- **Status:** CONFIRMED (absent; already in PLAN backlog)
+- **Status:** CONFIRMED; **done 2026-11-17** (`golden freeze` / `golden check`, ADR 0017: replays from the raw data as it was at freeze time in a rolled-back transaction, so new imports never look like code changes; "inputs changed" is reported apart from "code changed"; `GoldenHasherTest`, `GoldenCliTest`, `GoldenIT` on synthetic data and the parity fixture)
 - **Problem:** SPEC requires "golden-file tests on a frozen 60-day sample of real data, so a code change that moves any score fails loudly". Real data cannot be committed, so the check has to run on the coach's machine. Nothing exists yet. Until it does, a refactor of `DayFeatureService` or the scorer can move real scores without any test failing (fixtures are small and regular).
 - **Evidence:** PLAN §5 backlog, second bullet; no golden files or commands in the repo.
 - **Why it matters:** the live holdout (to 2027-02) assumes the scores are produced the same way every day. A silent change mid-holdout mixes two models in one verdict.

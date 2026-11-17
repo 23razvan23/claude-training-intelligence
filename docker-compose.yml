@@ -18,7 +18,11 @@ services:
       retries: 20
 
   app:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # Optional: recorded in golden files (R-14). GIT_COMMIT=$(git rev-parse --short HEAD) docker compose up --build -d
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     restart: unless-stopped
     depends_on:
       db:
@@ -36,8 +40,12 @@ services:
       GARMIN_TOKEN_KEY: ${GARMIN_TOKEN_KEY:-}
       GARMIN_SYNC_SECRET: ${GARMIN_SYNC_SECRET:-}
       GARMIN_SYNC_URL: http://garmin-sync:8090
+      # Golden files (R-14, ADR 0017): `docker compose run --rm app golden freeze|check --athlete 1`.
+      APP_GOLDEN_DIR: /backups/golden
     volumes:
       - import-work:/var/lib/training-imports
+      # Only this folder, not ./backups: the app has no business reading the database dumps.
+      - ./backups/golden:/backups/golden
 
   web:
     build: ./frontend

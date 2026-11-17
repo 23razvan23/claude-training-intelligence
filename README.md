@@ -73,6 +73,21 @@ docker compose run --rm app score --athlete 1 --from 2026-11-01 --to 2026-11-15
 ```
 `--from` and `--to` are optional. It runs next to the running app and prints a one-line summary. How the scores are computed: [ADR 0008](docs/adr/0008-scoring-contract.md); what is stored: [ADR 0012](docs/adr/0012-daily-scoring-storage.md).
 
+### 6c. The golden check: did an update move my real scores?
+While the live holdout runs, scores must be produced the same way every day. This check proves it on your own data (nothing is shared, nothing stored changes). Once, now:
+```bash
+mkdir -p backups/golden
+docker compose run --rm app golden freeze --athlete 1
+```
+This snapshots 60 days (ending 2 days before your last data) as hashes in `./backups/golden/` (git-ignored; treat it like a backup, never share it). After **every update** (and before pressing anything else), run:
+```bash
+docker compose run --rm app golden check --athlete 1
+```
+- `0 differences`: nothing moved. Carry on.
+- `CODE CHANGED` (exit 1) with dates and column names: the update moved your real numbers. Do not proceed; send Claude the printed lines (they contain no values).
+- `INPUTS CHANGED` (exit 3): your profile, the ACTIVE model or raw rows changed, so the check cannot judge. If you expected it, run `golden freeze` again.
+New Garmin or Whoop exports and syncs never trigger it. How it works and what each case means: [ADR 0017](docs/adr/0017-golden-check.md).
+
 ### 6a. The Today screen
 **Today** is the landing page: the morning check on your phone. It shows today's recovery (dial in the band colour), strain so far against a personal target range, sleep performance and need, and what moved recovery, in plain words. While data comes from exports, it usually says **"No data for today yet. Last data from <date>"** and shows the last scored day under its own date: it never shows an older recovery as today's. The coach picks the athlete in the top bar; athletes see only their own. Rules: [ADR 0014](docs/adr/0014-today-screen.md).
 
@@ -210,4 +225,4 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 **Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md).
 
-See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014), Garmin daily sync (0015), Trends screen (0016).
+See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014), Garmin daily sync (0015), Trends screen (0016), golden check (0017).

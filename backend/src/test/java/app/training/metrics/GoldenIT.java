@@ -318,7 +318,9 @@ class GoldenIT extends IntegrationTest {
         assertThat(r.exit()).as(all(r)).isEqualTo(1);
         String line = lineFor(r, day);
         assertThat(line).contains("day_features: ln_rmssd_z").contains("derived_day_metrics:");
-        assertThat(all(r)).doesNotContain("0.5");
+        // The header line carries the file name, freeze time and app version (e.g. "16:18:50.535Z"), never a value: skip it.
+        assertThat(r.lines().get(0)).startsWith("Golden check, athlete");
+        assertThat(String.join("\n", r.lines().subList(1, r.lines().size()))).doesNotContain("0.5");
     }
 
     @Test

@@ -191,12 +191,17 @@ Goal: the engine needs a schedule to adapt and subjective inputs, before the pla
 
 Scope:
 - Manual plan entry: create a plan, add or edit planned sessions (date, type, demand
-  key/supporting/easy, structure, targets, estimated strain), using the existing
-  plan/plan_week/planned_session tables (add migrations as needed).
+  key/supporting/easy, structure, targets, estimated strain), using the
+  plan/plan_week/planned_session tables as corrected by ADR 0018 (V22): `demand` is the only
+  key marker (`is_key` is gone); write a planned_session_revision row (before/after JSON, who)
+  for every create/edit/delete; prefer status SKIPPED/REPLACED over deleting a session (a delete
+  also removes its history). Add migrations as needed; never edit a merged one.
 - Spreadsheet import (CSV and XLSX) of an existing schedule, with a preview and clear errors.
   Inspect a sample I provide, or ask me for its column layout first.
-- Check-in form (10 seconds, phone): RPE, soreness 1-5, niggle with body location, illness, note
-  → subjective_log (append-only, latest wins). Athletes log for themselves; the coach sees it.
+- Check-in form (10 seconds, phone): RPE, soreness 1-5, niggle with body location, niggle
+  resolved, injury, illness, note → subjective_log (append-only). Read check-ins only through
+  the view subjective_current ("latest wins" per athlete, day and scope: planned session, else
+  activity, else the whole day; ADR 0018 D6). Athletes log for themselves; the coach sees it.
 - Optionally seed history from the Garmin summaries' workoutRpe/workoutFeel (143 activities):
   ask me first.
 - A simple Plan screen listing upcoming sessions (the full calendar comes in Phase 3).
@@ -213,16 +218,28 @@ and do a check-in on my phone.
 Stage 2-2: adaptive-engine signals (Phase 2). Requires 2-1.
 
 Goal: compute every signal in SPEC.md "Module 3 → Signals" per athlete per day, explainably.
+Read docs/adr/0018-phase2-schema.md first.
 
 Scope:
+- The settings store (moved here from 2-5): every [configurable] value of the signals and
+  rules as one JSON document in settings_version (append-only; the defaults are version 1;
+  ADR 0018 D2). Code reads the current version; nothing hard-codes a threshold.
 - Readiness today, with its 3- and 7-day trend (from 1b-1 scores); 7-day sleep debt; EWMA acute
   (7 d) and chronic (28 d) load, both total and running-only, with ACWR; Foster monotony and
   strain; subjective flags; session demand.
+- ACWR and Foster monotony/strain use a daily load in TRIMP units (default: the Edwards daily
+  load, as the Trends screen does, ADR 0016; Banister as a setting), never the 0-21 strain
+  score, which is a log scale and compresses hard days (ADR 0018 D9).
+- Compute signals in the `adaptation` package from activity_with_cycle, activity_load and
+  derived_day_metrics; store them in day_signals (signals_version + settings_version). Do NOT
+  add or change day_features columns or FEATURE_VERSION: that restarts the live holdout
+  (ADR 0018 D8). Overnight HRV exists only from 2025-09-17, so readiness-based signals start
+  there; say so in the UI.
 - Running tolerance exactly as specified: the highest 4-week average weekly running volume in
-  the last 12 months without a niggle or injury flag, decayed for time away (e.g. −10% per week
+  the last 12 months without a niggle or injury flag (subjective_current), decayed for time away (e.g. −10% per week
   beyond one week), capped by chronic running load. Show the number with its derivation, and
   allow a coach override (athletes screen).
-- Store the signals daily with a version tag. Every constant [configurable] with a rationale.
+- Every constant [configurable] with a rationale, in the settings store.
   ACWR is one signal among several, never a gate.
 - Unit tests for each formula; a fixture-based test over a synthetic year.
 
@@ -250,7 +267,13 @@ Scope:
 - One scenario test per rule, written "given (signals) → expect (suggestion + reason)", plus
   guardrail tests.
 - adaptation_suggestion rows: action (keep/reduce/swap/replace/move/add), before/after, 1-3
-  plain-language reasons with numbers, confidence, inputs snapshot, status, coach note.
+  plain-language reasons with numbers, confidence, inputs snapshot, status, coach note, and
+  (ADR 0018) counterpart_session_id for a swap, rules_version, settings_version,
+  signals_version and engine_run_date on every row. The database refuses a second PENDING
+  suggestion with the same dedup_key (same session(s), date, action, rules and settings
+  version); on a re-run with fresher inputs, expire the outdated pending one, then store the
+  new one. Accepting sets planned_session.changed_by_suggestion_id (and replaces_session_id
+  for a replacement) and writes a planned_session_revision row with the suggestion id.
 - UI: pending suggestions on Today and per session in Plan, with one-tap accept, edit or reject;
   accepting changes the plan; every decision is logged.
 - Run after each morning sync and score (1b-4), and on demand.
@@ -282,15 +305,19 @@ give me the phase summary.
 
 ---
 
-## Stage 2-5: Settings screen
+## Stage 2-5: Settings screen (UI only)
 
 ```text
 Stage 2-5: Settings screen for every [configurable] value (SPEC.md UI table: Settings).
 
+The settings store and its versioning already exist (stage 2-2, settings_version, ADR 0018 D2);
+this stage is the screen only.
+
 Scope: list all thresholds (metrics, signals, rules, targets) with the current value, default,
-rationale and unit; edit with validation; reset to default; versioned, so scores and suggestions
-record which settings produced them. Coach only. Recompute or re-run where a change requires it
-(say so in the UI).
+rationale and unit; edit with validation; reset to default; saving adds a new settings_version
+row (never edits one), so suggestions record which settings produced them. Coach only. Recompute
+or re-run where a change requires it (say so in the UI). Module 1 scoring constants stay frozen
+while the live holdout runs (ADR 0008): show them read-only.
 
 Done when: tests cover validation and versioning; I can change a rule threshold and see it
 reflected in the next suggestions.

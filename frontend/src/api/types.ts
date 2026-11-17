@@ -336,6 +336,34 @@ export interface Today {
   lastScored?: TodayDay | null;
 }
 
+// Trends screen (stage 1b-2b, ADR 0016): GET /api/athletes/{id}/trends. Every value is null when not recorded.
+export interface TrendsDay {
+  date: string;
+  rmssd?: number | null;
+  rhr?: number | null;
+  sleepMinutes?: number | null;
+  /** Edwards daily load: 0 is a recorded rest day, null is unknown. */
+  dayLoadEdwards?: number | null;
+  recoveryPct?: number | null;
+  band?: Band | null;
+  strain?: number | null;
+  strainLowCoverage: boolean;
+  sleepPerformancePct?: number | null;
+  sleepNeedMin?: number | null;
+}
+
+export interface Trends {
+  modelVersion?: string | null;
+  featureVersion?: string | null;
+  /** First day asked for (the load warm-up included) and the last (today in the athlete's timezone). */
+  from: string;
+  to: string;
+  /** First day with overnight HRV anywhere in the athlete's data. */
+  firstHrvDate?: string | null;
+  historyDays: number;
+  days: TrendsDay[];
+}
+
 /** Garmin connection (ADR 0011). Never carries the token or anything from Garmin. */
 export type GarminState = 'NOT_CONFIGURED' | 'NOT_CONNECTED' | 'CONNECTED' | 'RECONNECT_NEEDED';
 

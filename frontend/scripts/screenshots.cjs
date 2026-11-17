@@ -1,4 +1,4 @@
-// Today screen screenshots at phone width (390 px), light and dark, on synthetic data only.
+// Today and Trends screenshots at phone width (390 px), light and dark, on synthetic data only.
 // Usage: npm run build && npx vite preview --port 4173 &  then  node scripts/screenshots.cjs <outDir>
 // The API is faked in the browser: nothing here talks to a backend or reads real data.
 const { chromium } = require('playwright');
@@ -33,6 +33,38 @@ const day = (over = {}) => ({
   profileChanged: false,
   ...over,
 });
+
+// Synthetic Trends data: 14 months, a week with the watch off, HRV only from 2025-09-17, a few low-coverage days.
+function trendsBody() {
+  const DAY = 86400000;
+  const iso = (n) => new Date(n * DAY).toISOString().slice(0, 10);
+  const num = (s) => Math.round(Date.parse(s + 'T00:00:00Z') / DAY);
+  const to = num(TODAY);
+  const from = to - 455;
+  const days = [];
+  for (let n = from; n <= to; n++) {
+    const date = iso(n);
+    const i = n - from;
+    const off = date >= '2026-10-20' && date <= '2026-10-26'; // watch off for a week: real gaps
+    if (off) continue;
+    const band = ['GREEN', 'YELLOW', 'RED'][(i * 7) % 11 < 5 ? 0 : (i * 7) % 11 < 9 ? 1 : 2];
+    const week = Math.floor(i / 7) % 4; // a 4-week build with an easier week
+    days.push({
+      date,
+      rmssd: date >= '2025-09-17' ? Math.round(48 + 8 * Math.sin(i / 6) + (i % 5)) : null,
+      rhr: 47 + Math.round(2 * Math.sin(i / 9)) + (i % 3 === 0 ? 1 : 0),
+      sleepMinutes: 400 + ((i * 13) % 70),
+      dayLoadEdwards: i % 7 === 6 ? 0 : [90, 120, 150, 70][week] + ((i * 17) % 40),
+      recoveryPct: 35 + ((i * 7) % 60),
+      band,
+      strain: Math.round((6 + ((i * 5) % 9) + week) * 10) / 10,
+      strainLowCoverage: i % 23 === 0,
+      sleepPerformancePct: 80 + ((i * 3) % 20),
+      sleepNeedMin: 450,
+    });
+  }
+  return { modelVersion: 'm-synthetic', featureVersion: 'f3', from: iso(from), to: TODAY, firstHrvDate: '2025-09-17', historyDays: 365, days };
+}
 
 const scenarios = {
   fresh: { today: TODAY, timezone: 'Europe/Bucharest', state: 'FRESH', modelVersion: 'm-synthetic', lastDataDate: TODAY, day: day() },
@@ -79,6 +111,7 @@ const scenarios = {
         if (url === '/api/auth/me') return json({ username: 'coach', role: 'COACH', athleteId: 1 });
         if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
         if (url === '/api/athletes/1/today') return json(body);
+        if (url === '/api/athletes/1/trends') return json(trendsBody());
         return route.fulfill({ status: 404, body: '' });
       });
       await page.goto(`${BASE}/today`);
@@ -88,6 +121,30 @@ const scenarios = {
       if (width > 390) throw new Error(`${name}/${scheme}: horizontal scroll (${width}px wide)`);
       await page.screenshot({ path: path.join(out, `today-${name}-${scheme}.png`), fullPage: true });
       console.log(`today-${name}-${scheme}.png (scrollWidth ${width})`);
+      await ctx.close();
+    }
+  }
+  for (const scheme of ['light', 'dark']) {
+    for (const range of ['3 months', '12 months']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme });
+      const page = await ctx.newPage();
+      await page.route('**/api/**', (route) => {
+        const url = new URL(route.request().url()).pathname;
+        const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+        if (url === '/api/auth/me') return json({ username: 'coach', role: 'COACH', athleteId: 1 });
+        if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
+        if (url === '/api/athletes/1/trends') return json(trendsBody());
+        return route.fulfill({ status: 404, body: '' });
+      });
+      await page.goto(`${BASE}/trends`);
+      await page.waitForSelector('section.trends svg');
+      await page.getByRole('button', { name: range }).click();
+      await page.waitForTimeout(150);
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      const name = `trends-${range.replace(' ', '')}-${scheme}.png`;
+      if (width > 390) throw new Error(`${name}: horizontal scroll (${width}px wide)`);
+      await page.screenshot({ path: path.join(out, name), fullPage: true });
+      console.log(`${name} (scrollWidth ${width})`);
       await ctx.close();
     }
   }

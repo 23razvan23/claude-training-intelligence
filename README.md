@@ -76,6 +76,9 @@ docker compose run --rm app score --athlete 1 --from 2026-11-01 --to 2026-11-15
 ### 6a. The Today screen
 **Today** is the landing page: the morning check on your phone. It shows today's recovery (dial in the band colour), strain so far against a personal target range, sleep performance and need, and what moved recovery, in plain words. While data comes from exports, it usually says **"No data for today yet. Last data from <date>"** and shows the last scored day under its own date: it never shows an older recovery as today's. The coach picks the athlete in the top bar; athletes see only their own. Rules: [ADR 0014](docs/adr/0014-today-screen.md).
 
+### 6b. The Trends screen
+**Trends** draws HRV, resting HR, recovery (dots in the band colour), strain, sleep and training load over 4 weeks, 3 months or 12 months. A day without data is a **gap**, never zero. Acute (7 d) and chronic (28 d) load are averages of your daily heart-rate load, not of strain; their ratio is shown as one signal, not a verdict. Overnight HRV exists only from 2025-09-17. Rules: [ADR 0016](docs/adr/0016-trends-screen.md).
+
 ### 7. Live comparison with Whoop (until 2027-02-19)
 The **Holdout** tab (coach) compares our scores with Whoop's on days the active model has never seen. Its rules are fixed in [ADR 0009](docs/adr/0009-live-holdout-protocol.md). It needs new data from both sides, so repeat this every week or two:
 1. Request a **Whoop** data export and a **Garmin** account export. Garmin's email can take a few days.
@@ -199,4 +202,4 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 **Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md).
 
-See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014), Garmin daily sync (0015).
+See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014), Garmin daily sync (0015), Trends screen (0016).

@@ -13,7 +13,7 @@ import java.util.TreeMap;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
-/** The Trends screen (stage 1b-2b, ADR 0015). Read-only: it reads day_features and derived_day_metrics, writes nothing. */
+/** The Trends screen (stage 1b-2b, ADR 0016). Read-only: it reads day_features and derived_day_metrics, writes nothing. */
 @Service
 public class TrendsService {
     private final AthleteRepository athletes;

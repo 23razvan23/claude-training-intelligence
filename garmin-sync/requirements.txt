@@ -1,0 +1,14 @@
+# Pinned on purpose (ADR 0011 D11, ADR 0015): garminconnect talks to Garmin's private,
+# unofficial sign-in and web endpoints, which change without notice. Update deliberately,
+# one version at a time, and re-run the tests. garth is deprecated and no longer used.
+garminconnect==0.3.20
+# Its dependencies, pinned too so a rebuild cannot silently pull a different version.
+certifi==2026.10.23
+cffi==2.1.1
+charset-normalizer==3.5.2
+curl_cffi==0.17.0
+idna==3.20
+pycparser==3.12
+requests==2.34.2
+ua-generator==2.1.9
+urllib3==2.8.0

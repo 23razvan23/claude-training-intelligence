@@ -97,3 +97,8 @@ At startup the app reads `GARMIN_TOKEN_KEY` once:
 - Stage 1b-4 implements this ADR: the migration (D3), the crypto and startup check (D2, D10), the sidecar endpoints with the shared secret (D4) and MFA (D5), refresh/rejection handling (D6), Disconnect (D7), the compose variables (D4), and README notes (D1 network caveat, D7, D8). Its prompt in `docs/PROMPTS.md` points here.
 - After 1b-4 merges, the coach adds `GARMIN_TOKEN_KEY` and `GARMIN_SYNC_SECRET` to `.env` (commands in `.env.example`) before connecting.
 - Not decided here: the Garmin library versions, the sync schedule and what is fetched (1b-4).
+
+## Amendment (stage 1b-4, 2026-11-16; coach agreed, question 1 of the 1b-4 plan)
+- **Library:** `garth` is deprecated and no longer maintained. The sidecar uses `garminconnect==0.3.20` alone, which signs in itself and returns an access + refresh token pair instead of `garth`'s OAuth1/OAuth2 pair. Everything above still holds with "the token bundle" meaning that pair: opaque to Java, encrypted with AES-256-GCM, refreshed bundles re-encrypted (D4, D6), rejection → `RECONNECT_NEEDED` (D6).
+- **No token file (D1):** the sidecar passes tokens to the library as JSON text and reads them back in memory; it never gives the library a file path, and removes `GARMINTOKENS` from its environment at startup.
+- **MFA (D5):** a mistyped code may be retried, up to 3 tries within the 5 minutes; then, or on success, expiry or any other error, the waiting login is deleted. The password is cleared before the waiting login is kept. Details: ADR 0015 D3.

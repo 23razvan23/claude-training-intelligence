@@ -20,7 +20,7 @@ import {
   type Range,
 } from '../trends';
 
-// Trends (stage 1b-2b, ADR 0015). It only shows stored values. Days without data are gaps, never zeros.
+// Trends (stage 1b-2b, ADR 0016). It only shows stored values. Days without data are gaps, never zeros.
 
 export function TrendsPage() {
   const { t } = useTranslation();

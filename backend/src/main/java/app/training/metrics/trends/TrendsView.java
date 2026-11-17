@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** The Trends response (stage 1b-2b, ADR 0015). Pure: it only lines up stored values by date and fills nothing in. */
+/** The Trends response (stage 1b-2b, ADR 0016). Pure: it only lines up stored values by date and fills nothing in. */
 public final class TrendsView {
     private TrendsView() {}
 

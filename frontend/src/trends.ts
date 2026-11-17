@@ -1,4 +1,4 @@
-// Trends maths (stage 1b-2b, ADR 0015). Display only: nothing here is stored or feeds a score.
+// Trends maths (stage 1b-2b, ADR 0016). Display only: nothing here is stored or feeds a score.
 // Rule for everything below: a day without data is `null`, never 0 and never filled in.
 
 /** [configurable] Acute window, days: about one training week. EWMA decay α = 2 / (span + 1). */

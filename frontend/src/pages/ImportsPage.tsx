@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useImports, useMe, useUpload } from '../api/hooks';
 import type { ImportBatch } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
+import { GarminCard } from '../components/GarminCard';
 
 type Kind = 'whoop' | 'garmin' | 'fit';
 const ACCEPT: Record<Kind, string> = { whoop: '.zip,.csv', garmin: '.zip', fit: '.fit' };
@@ -18,6 +19,7 @@ export function ImportsPage() {
   return (
     <section className="stack">
       <h1>{t('imports.title')}</h1>
+      {me?.role === 'COACH' && <GarminCard athleteId={athleteId} />}
       {me?.role === 'COACH' ? (
         <div className="cards">
           {(['whoop', 'garmin', 'fit'] as Kind[]).map((k) => (

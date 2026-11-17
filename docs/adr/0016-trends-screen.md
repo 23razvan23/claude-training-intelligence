@@ -1,4 +1,4 @@
-# ADR 0015: The Trends screen: data, load averages, gaps, phone navigation
+# ADR 0016: The Trends screen: data, load averages, gaps, phone navigation
 
 - Status: accepted (stage 1b-2b, 2026-11-16; coach decisions TR1–TR3 the same day, taking the recommendations)
 - Related: ADR 0008 (scoring, **unchanged**), ADR 0012 (what is stored), ADR 0014 (Today), ADR 0005 (roles).

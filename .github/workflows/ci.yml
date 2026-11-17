@@ -59,8 +59,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # calibration needs its scientific stack; the other projects have no dependencies
-      - run: if [ "${{ matrix.project }}" = calibration ]; then pip install -e '.[dev]'; else pip install pytest==8.3.3 ruff==0.8.1; fi
+      # calibration needs its scientific stack; garmin-sync its pinned Garmin library; tools has no dependencies
+      - run: |
+          case "${{ matrix.project }}" in
+            calibration) pip install -e '.[dev]' ;;
+            garmin-sync) pip install -r requirements.txt pytest==8.3.3 ruff==0.8.1 ;;
+            *) pip install pytest==8.3.3 ruff==0.8.1 ;;
+          esac
       - run: ruff check .
       - run: ruff format --check .
       - run: python -m pytest -q

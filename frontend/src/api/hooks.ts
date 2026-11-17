@@ -5,6 +5,8 @@ import type {
   AthleteInput,
   CoverageReport,
   FeatureSummary,
+  GarminConnectResult,
+  GarminStatus,
   HoldoutFeed,
   HoldoutReport,
   HoldoutVersion,
@@ -220,5 +222,37 @@ export function useTrends(athleteId?: number) {
     queryKey: ['trends', athleteId],
     queryFn: () => api<Trends>(`/api/athletes/${athleteId}/trends`),
     enabled: athleteId != null,
+  });
+}
+
+/** Garmin connection status (coach only, ADR 0011). */
+export function useGarminStatus(athleteId?: number) {
+  return useQuery({
+    queryKey: ['garmin', athleteId],
+    queryFn: () => api<GarminStatus>(`/api/athletes/${athleteId}/garmin`),
+    enabled: athleteId != null,
+  });
+}
+
+/** Password and code go only in the request body (ADR 0011 D9). */
+export function useGarminConnect(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string } | { mfaId: string; code: string }) =>
+      api<GarminConnectResult>(`/api/athletes/${athleteId}/garmin/${'mfaId' in body ? 'mfa' : 'connect'}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (r) => {
+      if (r.status === 'CONNECTED') qc.invalidateQueries({ queryKey: ['garmin', athleteId] });
+    },
+  });
+}
+
+export function useGarminDisconnect(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<void>(`/api/athletes/${athleteId}/garmin`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['garmin', athleteId] }),
   });
 }

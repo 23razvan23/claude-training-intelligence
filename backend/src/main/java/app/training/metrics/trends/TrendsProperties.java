@@ -3,7 +3,7 @@ package app.training.metrics.trends;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * The Trends screen's display constants (stage 1b-2b, ADR 0015); all [configurable], rationale in
+ * The Trends screen's display constants (stage 1b-2b, ADR 0016); all [configurable], rationale in
  * application.yml. None of them changes a stored score.
  *
  * @param historyDays how far back the screen can look (its longest range)

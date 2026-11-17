@@ -23,7 +23,7 @@ Open <http://localhost:8080> and sign in with `COACH_USERNAME` / `COACH_PASSWORD
 | `web` | nginx serving the PWA; proxies `/api` to `app` |
 | `app` | Spring Boot backend (Java 21); runs Flyway migrations on start |
 | `db` | PostgreSQL 16 + TimescaleDB |
-| `garmin-sync` | Garmin sync sidecar (health endpoint only until Phase 1) |
+| `garmin-sync` | Garmin sync sidecar: signs in to Garmin for the app; keeps no token (ADR 0011) |
 | `backup` | Nightly encrypted `pg_dump` into `./backups` |
 
 API docs (OpenAPI): <http://localhost:8080/api/docs>. Raw spec: `/api/openapi`.
@@ -77,7 +77,7 @@ docker compose run --rm app score --athlete 1 --from 2026-11-01 --to 2026-11-15
 **Today** is the landing page: the morning check on your phone. It shows today's recovery (dial in the band colour), strain so far against a personal target range, sleep performance and need, and what moved recovery, in plain words. While data comes from exports, it usually says **"No data for today yet. Last data from <date>"** and shows the last scored day under its own date: it never shows an older recovery as today's. The coach picks the athlete in the top bar; athletes see only their own. Rules: [ADR 0014](docs/adr/0014-today-screen.md).
 
 ### 6b. The Trends screen
-**Trends** draws HRV, resting HR, recovery (dots in the band colour), strain, sleep and training load over 4 weeks, 3 months or 12 months. A day without data is a **gap**, never zero. Acute (7 d) and chronic (28 d) load are averages of your daily heart-rate load, not of strain; their ratio is shown as one signal, not a verdict. Overnight HRV exists only from 2025-09-17. Rules: [ADR 0015](docs/adr/0015-trends-screen.md).
+**Trends** draws HRV, resting HR, recovery (dots in the band colour), strain, sleep and training load over 4 weeks, 3 months or 12 months. A day without data is a **gap**, never zero. Acute (7 d) and chronic (28 d) load are averages of your daily heart-rate load, not of strain; their ratio is shown as one signal, not a verdict. Overnight HRV exists only from 2025-09-17. Rules: [ADR 0016](docs/adr/0016-trends-screen.md).
 
 ### 7. Live comparison with Whoop (until 2027-02-19)
 The **Holdout** tab (coach) compares our scores with Whoop's on days the active model has never seen. Its rules are fixed in [ADR 0009](docs/adr/0009-live-holdout-protocol.md). It needs new data from both sides, so repeat this every week or two:
@@ -90,6 +90,32 @@ The **Holdout** tab (coach) compares our scores with Whoop's on days the active 
 4. Open **Holdout**. Its "Keeping it fed" panel shows the last Whoop, Garmin and scored days, and says when Recompute features is needed.
 
 **When Whoop ends:** take the last Whoop export on 2027-02-19 and a Garmin export after it. Import both, press Recompute features, then press **Download decision report** on the Holdout tab and keep the file. It states pass / not met / not enough days by the rule.
+
+### 8. Garmin daily sync: connecting your Garmin account (Phase 1b)
+The app can sign in to Garmin Connect as you and fetch each day's data itself ([ADR 0011](docs/adr/0011-garmin-credentials.md)). You type your Garmin password **once**. The app uses it for one sign-in and keeps only the renewable access token Garmin hands back, locked with a key that lives in your `.env` file. The password is never stored or logged.
+
+**One-time setup** (on the Mac, in `~/claude-training-intelligence`):
+1. Generate two random values. Run this command twice and copy each result:
+   ```bash
+   openssl rand -base64 32
+   ```
+2. Open `.env` and fill them in: the first after `GARMIN_TOKEN_KEY=`, the second after `GARMIN_SYNC_SECRET=`. Never paste them anywhere else.
+3. Restart: `docker compose up --build -d`. Without these two values the app works as before; only Garmin sync is switched off, and the Imports page says so.
+
+**Connect:**
+1. **On the Mac itself**, open `http://localhost:8080` (or your `WEB_PORT`). The app has no HTTPS yet, so from another device your password would cross the network unencrypted, once.
+2. **Imports** → **Garmin connection**: type your Garmin e-mail and password and press **Connect**.
+3. If Garmin sends you a code (e-mail or text message), a code field appears in the same form. Type the code within 5 minutes.
+
+**If Garmin needs you to connect again** (it stopped accepting the token, or you changed `GARMIN_TOKEN_KEY`), the card says so and shows the form again. Sync pauses until you do; imports keep working.
+
+**Disconnect** deletes the stored token from the app. Garmin cannot be told to cancel that token from here. To be thorough, also sign out of other devices in your Garmin account's security settings, or change your Garmin password.
+
+**Keep `.env` away from backup copies.** The nightly backups contain only the locked token, useless without `GARMIN_TOKEN_KEY`. When you copy `backups/` to another disk or cloud drive, do not copy `.env` with it. Keep a copy of `.env` somewhere else, as with the backup passphrase. If `.env` is lost, nothing else is: put new values in and connect again.
+
+**Network:** the `garmin-sync` service needs to reach Garmin over the internet (outbound HTTPS) from this Mac. Nothing on your network can reach it: it has no published port, and the app talks to it with `GARMIN_SYNC_SECRET`.
+
+**Unofficial API:** Garmin has no official API for this. If Garmin changes its sign-in, sync stops with a clear message until the app is updated. Garmin account exports and FIT uploads (sections 2 and 3) always remain the fallback.
 
 Personal exports never belong in git: `.gitignore` excludes `data/`, `*.zip`, `*.fit` and `.env`.
 
@@ -131,7 +157,7 @@ backend/        Spring Boot modular monolith
   metrics/      Module 1 (Phase 1)    planning/  Module 2 (Phase 3)    adaptation/  Module 3 (Phase 2)
   resources/db/migration/   Flyway schema (V1 core, V2 raw, V3 derived + planning)
 frontend/       React + TypeScript PWA (i18n keys, dark mode)
-garmin-sync/    Python sidecar: Garmin adapter boundary
+garmin-sync/    Python sidecar: Garmin sign-in (garminconnect, pinned) and adapter boundary
 calibration/    Python calibration job (Phase 1)
 tools/          inspect_exports.py
 deploy/backup/  nightly encrypted backup
@@ -176,4 +202,4 @@ This is health data. Self-host only. Uploaded export files are deleted once impo
 
 **Continuing the work?** Start with [docs/PLAN.md](docs/PLAN.md): it covers status, results so far, facts about the real data, next steps and conventions. Ready-to-paste prompts for each remaining stage are in [docs/PROMPTS.md](docs/PROMPTS.md).
 
-See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014), Trends screen (0015).
+See [docs/adr/](docs/adr/): modular monolith (0001), what a "day" is (0002), raw data and dedup (0003), export format assumptions (0004), auth (0005), import handling (0006), Module 1 calibration (0007), scoring contract (0008), live holdout (0009, 0013), raw revisions (0010), Garmin credentials (0011), daily scoring storage (0012), Today screen (0014), Garmin daily sync (0015), Trends screen (0016).

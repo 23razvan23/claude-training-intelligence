@@ -22,6 +22,9 @@ import java.util.function.Predicate;
  * {@code COMPARED} (strain also {@code COMPARED_LOW_COVERAGE}), {@code NO_WHOOP},
  * {@code NO_SCORE_YET} (after our last data date), or our own ADR 0008 reason. Order of
  * precedence when several apply: no Whoop, then no score yet, then our reason (ADR 0013 D3).
+ * A day that would be compared but whose score was calculated from a night that came from a
+ * Garmin sync goes to {@code WAITS_FOR_EXPORT} instead, for every score, until an exported night
+ * replaces it and the day is rescored (ADR 0015 D13).
  */
 public final class HoldoutEvaluator {
     private HoldoutEvaluator() {}
@@ -30,6 +33,8 @@ public final class HoldoutEvaluator {
     public static final String COMPARED_LOW_COVERAGE = "COMPARED_LOW_COVERAGE";
     public static final String NO_WHOOP = "NO_WHOOP";
     public static final String NO_SCORE_YET = "NO_SCORE_YET";
+    /** Scored from a synced night (Garmin's live breathing rate): not counted until an export replaces it (ADR 0015 D13). */
+    public static final String WAITS_FOR_EXPORT = "WAITS_FOR_EXPORT";
 
     // ---------------------------------------------------------------- inputs
 
@@ -102,11 +107,25 @@ public final class HoldoutEvaluator {
      * @param today the athlete's local date; decides whether the comparison has ended
      * @param rollingDays length of the drift window ending on the last Whoop day
      * @param recomputeRuns when Recompute features was pressed on or after the window's first day (H8 markers)
+     * @param syncedNights days whose stored score was calculated from a night that came from a Garmin sync (ADR 0015 D13)
      */
     public record Input(
             String modelVersion, String status, Instant activatedAt, Instant retiredAt, JsonNode frozen, Marks marks,
             double greenMin, double redMax, List<OurDay> ours, List<WhoopDay> whoop, LocalDate whoopEnd, LocalDate today,
-            int rollingDays, List<Instant> recomputeRuns) {}
+            int rollingDays, List<Instant> recomputeRuns, java.util.Set<LocalDate> syncedNights) {
+
+        public Input {
+            syncedNights = syncedNights == null ? java.util.Set.of() : java.util.Set.copyOf(syncedNights);
+        }
+
+        /** Without synced nights (every night exported). */
+        public Input(String modelVersion, String status, Instant activatedAt, Instant retiredAt, JsonNode frozen, Marks marks,
+                     double greenMin, double redMax, List<OurDay> ours, List<WhoopDay> whoop, LocalDate whoopEnd, LocalDate today,
+                     int rollingDays, List<Instant> recomputeRuns) {
+            this(modelVersion, status, activatedAt, retiredAt, frozen, marks, greenMin, redMax, ours, whoop, whoopEnd, today,
+                    rollingDays, recomputeRuns, java.util.Set.of());
+        }
+    }
 
     // ---------------------------------------------------------------- output
 
@@ -147,7 +166,9 @@ public final class HoldoutEvaluator {
             boolean lowerConfidence, String strainGroup, Double ourStrain, Double whoopStrain, boolean lowCoverage,
             String sleepGroup, Integer ourSleepPerf, Integer whoopSleepPerf, Integer naiveRecovery, String naiveBand) {}
 
-    public record Markers(int profileChangedDays, JsonNode profile, List<Instant> recomputeRuns, int staleFeatureDays) {}
+    /** @param waitingForExportDays window days that would be compared but wait for a Garmin export (ADR 0015 D13) */
+    public record Markers(int profileChangedDays, JsonNode profile, List<Instant> recomputeRuns, int staleFeatureDays,
+                          int waitingForExportDays) {}
 
     public record Report(
             String modelVersion, String status, Instant activatedAt, Instant retiredAt, String protocol, String source,
@@ -176,7 +197,7 @@ public final class HoldoutEvaluator {
         var days = new ArrayList<Day>();
         if (windowTo != null) {
             for (LocalDate d = m.windowFrom(); !d.isAfter(windowTo); d = d.plusDays(1)) {
-                days.add(classify(d, ours.get(d), whoop.get(d), whoop.get(d.minusDays(1)), m));
+                days.add(classify(d, ours.get(d), whoop.get(d), whoop.get(d.minusDays(1)), m, in.syncedNights().contains(d)));
             }
         }
 
@@ -206,6 +227,7 @@ public final class HoldoutEvaluator {
         var rows = new ArrayList<DayRow>();
         int profileChanged = 0;
         int staleFeatures = 0;
+        int waiting = 0;
         JsonNode profile = null;
         for (Day x : days) {
             rows.add(row(x, in));
@@ -214,15 +236,17 @@ public final class HoldoutEvaluator {
                 profile = x.ours().profile();
             }
             if (x.ours() != null && x.ours().staleFeatures()) staleFeatures++;
+            if (WAITS_FOR_EXPORT.equals(x.recoveryGroup()) || WAITS_FOR_EXPORT.equals(x.strainGroup())
+                    || WAITS_FOR_EXPORT.equals(x.sleepGroup()) || WAITS_FOR_EXPORT.equals(x.sleepNeedGroup())) waiting++;
         }
         var runs = windowTo == null ? List.<Instant>of() : in.recomputeRuns().stream().sorted().toList();
 
         return new Report(in.modelVersion(), in.status(), in.activatedAt(), in.retiredAt(), m.protocol(), m.source(), in.frozen(),
                 m.windowFrom(), windowTo, in.whoopEnd(), lastScored, phase, verdict(cumulative, m, phase), cumulative, rolling, weeks,
-                naive(days, in), new Markers(profileChanged, profile, runs, staleFeatures), rows);
+                naive(days, in), new Markers(profileChanged, profile, runs, staleFeatures, waiting), rows);
     }
 
-    private static Day classify(LocalDate d, OurDay o, WhoopDay w, WhoopDay wy, Marks m) {
+    private static Day classify(LocalDate d, OurDay o, WhoopDay w, WhoopDay wy, Marks m, boolean syncedNight) {
         String rec;
         if (w == null || w.recovery() == null) rec = NO_WHOOP;
         else if (o == null) rec = NO_SCORE_YET;
@@ -247,7 +271,19 @@ public final class HoldoutEvaluator {
         else if (o.sleepNeed() == null) need = "UNKNOWN";
         else need = COMPARED;
 
+        if (syncedNight) {
+            // ADR 0015 D13: the whole day waits for a Garmin export (coach, Q1 of the PR 3 plan).
+            rec = waits(rec);
+            strain = waits(strain);
+            sleep = waits(sleep);
+            need = waits(need);
+        }
         return new Day(d, o, w, wy, rec, strain, sleep, need);
+    }
+
+    /** Only a day that would be compared waits; a day left out for another reason keeps that reason. */
+    private static String waits(String group) {
+        return COMPARED.equals(group) || COMPARED_LOW_COVERAGE.equals(group) ? WAITS_FOR_EXPORT : group;
     }
 
     /** H4: below the frozen all-day HR minutes, strain is low coverage (compared, shown apart, no mark). */

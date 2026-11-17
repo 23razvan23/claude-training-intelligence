@@ -4,6 +4,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** A fixed machine-readable reason from the server (ProblemDetail property "code"), if any. */
+    public code?: string,
   ) {
     super(message);
   }
@@ -47,13 +49,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 401 && path !== '/api/auth/login' && path !== '/api/auth/me') onUnauthorized?.();
   if (!res.ok) {
     let message = res.statusText;
+    let code: string | undefined;
     try {
       const problem = await res.json();
       message = problem.detail ?? problem.title ?? message;
+      code = typeof problem.code === 'string' ? problem.code : undefined;
     } catch {
       /* no JSON body */
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, code);
   }
   if (res.status === 204 || res.headers.get('Content-Length') === '0') return undefined as T;
   const text = await res.text();

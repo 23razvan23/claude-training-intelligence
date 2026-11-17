@@ -44,6 +44,32 @@
     },
     "warnings_one": "{{count}} warning", "warnings_other": "{{count}} warnings", "coachOnly": "Only the coach can import data."
   },
+  "garmin": {
+    "title": "Garmin connection",
+    "notConfigured": "Garmin sync is not set up on this computer. Add GARMIN_TOKEN_KEY and GARMIN_SYNC_SECRET to the .env file (README: Garmin daily sync), then run docker compose up -d again.",
+    "state": { "CONNECTED": "Connected", "NOT_CONNECTED": "Not connected", "RECONNECT_NEEDED": "Connect again", "NOT_CONFIGURED": "Not set up" },
+    "connectedSince": "since {{when}}",
+    "passwordOnce": "Your Garmin password is used once, to sign in, and is never stored. The app keeps only an encrypted access token.",
+    "remoteWarning": "You are not on the Mac that runs the app. The app has no HTTPS yet, so your password would cross the network unencrypted. Connect from the Mac itself (http://localhost).",
+    "username": "Garmin e-mail", "password": "Garmin password", "code": "Code from Garmin",
+    "mfaHint": "Garmin sent you a code by e-mail or text message. Type it here within 5 minutes.",
+    "connect": "Connect", "submitCode": "Send code", "connecting": "Signing in to Garmin…",
+    "reconnectTitle": "Garmin needs you to connect again",
+    "reconnectHint": "Garmin no longer accepts the stored token. Sync is paused until you connect again; imports still work.",
+    "reconnectKeyChanged": "GARMIN_TOKEN_KEY has changed since you connected, so the stored token can no longer be opened. Connect again.",
+    "disconnect": "Disconnect", "disconnectHint": "Deletes the stored token from this app.",
+    "confirmDisconnect": "Disconnect Garmin? The stored token is deleted; you can connect again at any time.",
+    "errors": {
+      "AUTH_FAILED": "Garmin did not accept that e-mail and password.",
+      "MFA_INVALID": "That code was not accepted. Check it and try again.",
+      "MFA_EXPIRED": "The code request expired. Enter your password again.",
+      "RATE_LIMITED": "Garmin is limiting sign-ins. Wait a few minutes, then try again.",
+      "GARMIN_UNAVAILABLE": "Garmin could not be reached. Check the internet connection and try again later.",
+      "SIDECAR_UNREACHABLE": "The garmin-sync service is not running. Run docker compose up -d.",
+      "SECRET_MISMATCH": "The app and the garmin-sync service have different GARMIN_SYNC_SECRET values. Check .env, then run docker compose up -d.",
+      "NOT_CONFIGURED": "Garmin sync is not set up on this computer (see above)."
+    }
+  },
   "calibration": {
     "title": "Calibration",
     "intro": "Garmin-derived Recovery, Strain and Sleep, calibrated against Whoop and checked on days the model never saw. This report is the go/no-go evidence for cancelling Whoop.",

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -225,11 +226,12 @@ class GarminSyncIT extends GarminTestBase {
         garminReturns(GarminApiFixtures.payload(FIRST, 0, 3, TOKENS).toString());
         assertThat(sync.runNow(synced, Trigger.MANUAL, FIRST.plusDays(2)).status()).isEqualTo(Status.SUCCEEDED);
 
-        // Every column the day features read, plus the rest of each row (hrv_status aside, ADR 0015 D5).
+        // Every column the day features read, plus the rest of each row (hrv_status and the unused
+        // sleep stress aside: Garmin's live answer may not carry them in the export's form, ADR 0015 D5, D11).
         for (String sql : List.of(
                 "SELECT calendar_date, resting_hr, hrv_rmssd_ms, body_battery_high, body_battery_low, respiration_rate, spo2_pct, stress_avg"
                         + " FROM daily_wellness_merged WHERE athlete_id = ? ORDER BY 1",
-                "SELECT start_at, end_at, cycle_date, deep_s, light_s, rem_s, awake_s, sleep_score, avg_respiration, avg_sleep_stress,"
+                "SELECT start_at, end_at, cycle_date, deep_s, light_s, rem_s, awake_s, sleep_score, avg_respiration,"
                         + " avg_spo2_pct, lowest_spo2_pct FROM sleep_session_current WHERE athlete_id = ? ORDER BY 1",
                 "SELECT source_id, sport, source_sport, start_at, calendar_date, duration_s, distance_m, elevation_gain_m, avg_hr, max_hr,"
                         + " calories, training_load, aerobic_te, anaerobic_te FROM activity WHERE athlete_id = ? ORDER BY start_at",
@@ -353,7 +355,11 @@ class GarminSyncIT extends GarminTestBase {
                         .content("{\"from\":\"" + FIRST + "\",\"to\":\"" + FIRST.plusDays(4) + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.differencesUsedByScores").value(0))
-                .andExpect(jsonPath("$.tables.sleep_session.inserted").value(0))
+                // Sleep stress is left empty (no precise source known, no score reads it), so each night
+                // differs in that one unused column only.
+                .andExpect(jsonPath("$.differences[?(@.table == 'sleep_session')].column").value(
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("avg_sleep_stress"))))
+                .andExpect(jsonPath("$.differences[?(@.usedByScores == true)]").isEmpty())
                 .andExpect(jsonPath("$.tables.activity.inserted").value(0))
                 .andExpect(jsonPath("$.tables.monitoring_hr.inserted").value(0))
                 .andExpect(jsonPath("$.tables.activity_stream.inserted").value(0))
@@ -363,6 +369,42 @@ class GarminSyncIT extends GarminTestBase {
 
         assertThat(count("SELECT (SELECT count(*) FROM daily_wellness WHERE athlete_id = ?) + (SELECT count(*) FROM monitoring_hr"
                 + " WHERE athlete_id = ?) + (SELECT count(*) FROM import_batch WHERE athlete_id = ?)", a, a, a)).isEqualTo(rawBefore);
+    }
+
+    @Test
+    void checkAgainstExportFindsWhereThePreciseSleepValuesAre() throws Exception {
+        long a = athlete();
+        importExport(a, 3);
+        connect(a);
+        garminReturns(GarminApiFixtures.payload(FIRST, 0, 3, TOKENS).toString());
+        mvc.perform(post("/api/athletes/" + a + "/garmin/check").with(user(coach)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"from\":\"" + FIRST + "\",\"to\":\"" + FIRST.plusDays(2) + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].nights").value(3))
+                .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].candidates[0].path").value("averageRespiration"))
+                .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_respiration')].candidates[0].matches").value(3))
+                .andExpect(jsonPath("$.sleepFieldSearch[?(@.column == 'avg_spo2_pct')].candidates[0].path")
+                        .value("wellnessSpO2SleepSummaryDTO.averageSPO2"));
+    }
+
+    /** Bug of 2026-11-17 (ADR 0015 D11): the summary's whole numbers must never be stored. */
+    @Test
+    void aLiveAnswerWithOnlyRoundedAveragesStoresNoneRatherThanRoundedOnes() throws Exception {
+        long a = athlete();
+        connect(a);
+        garminReturns(GarminApiFixtures.payload(FIRST, 0, 1, TOKENS, day -> {
+            var answer = (com.fasterxml.jackson.databind.node.ObjectNode) day.get("sleep");
+            answer.remove("averageRespiration");
+            answer.remove("wellnessSpO2SleepSummaryDTO");
+        }).toString());
+        assertThat(sync.runNow(a, Trigger.MANUAL, FIRST).status()).isEqualTo(Status.SUCCEEDED);
+        var row = jdbc.sql("SELECT deep_s, sleep_score, avg_respiration, avg_spo2_pct, lowest_spo2_pct FROM sleep_session WHERE athlete_id = ?")
+                .param(a).query().singleRow();
+        assertThat(row.get("deep_s")).isEqualTo(6000);
+        assertThat(row.get("sleep_score")).isEqualTo(81);
+        assertThat(row.get("avg_respiration")).isNull();
+        assertThat(row.get("avg_spo2_pct")).isNull();
+        assertThat((BigDecimal) row.get("lowest_spo2_pct")).isEqualByComparingTo("86.0");
     }
 
     @Test

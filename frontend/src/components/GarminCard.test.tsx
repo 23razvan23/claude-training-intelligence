@@ -197,6 +197,10 @@ describe('GarminSync (inside the card)', () => {
             from: '2026-11-05', to: '2026-11-11', differencesUsedByScores: 1, missing: [], warnings: [],
             tables: { daily_wellness: { inserted: 1, duplicates: 13, skipped: 0 } },
             differences: [{ table: 'daily_wellness', day: '2026-11-07', record: 'uds', column: 'resting_hr', usedByScores: true, outcome: 'DIFFERENT' }],
+            sleepFieldSearch: [
+              { column: 'avg_respiration', nights: 6, candidates: [{ path: 'averageRespiration', matches: 6 }] },
+              { column: 'avg_sleep_stress', nights: 6, candidates: [] },
+            ],
           },
         };
       }
@@ -208,5 +212,8 @@ describe('GarminSync (inside the card)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check' }));
     expect(await screen.findByText(/1 stored value the scores use would change/)).toBeTruthy();
     expect(screen.getByText('resting_hr')).toBeTruthy();
+    expect(screen.getByText('averageRespiration')).toBeTruthy();
+    expect(screen.getAllByText('6 / 6').length).toBe(1);
+    expect(screen.getByText('no field matches')).toBeTruthy();
   });
 });

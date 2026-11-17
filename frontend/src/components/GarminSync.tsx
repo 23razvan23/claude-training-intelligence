@@ -166,6 +166,44 @@ function CheckResult({ report }: { report: GarminCheckReport }) {
         </div>
       )}
       {newRows.length > 0 && <p className="muted">{t('garmin.check.newRowsHint')}</p>}
+      {report.sleepFieldSearch && report.sleepFieldSearch.some((r) => r.nights > 0) && (
+        <details>
+          <summary>{t('garmin.check.fieldSearch')}</summary>
+          <p className="muted">{t('garmin.check.fieldSearchHint')}</p>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t('garmin.check.column')}</th>
+                  <th>{t('garmin.check.field')}</th>
+                  <th>{t('garmin.check.matches')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.sleepFieldSearch.flatMap((r) =>
+                  r.candidates.length === 0
+                    ? [
+                        <tr key={r.column}>
+                          <td>{r.column}</td>
+                          <td>{t('garmin.check.noField')}</td>
+                          <td>0 / {r.nights}</td>
+                        </tr>,
+                      ]
+                    : r.candidates.map((c) => (
+                        <tr key={r.column + c.path}>
+                          <td>{r.column}</td>
+                          <td>{c.path}</td>
+                          <td>
+                            {c.matches} / {r.nights}
+                          </td>
+                        </tr>
+                      )),
+                )}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
       {report.missing.length > 0 && <p className="muted">{t('garmin.check.missing', { list: report.missing.join(', ') })}</p>}
       <p className="muted">{t('garmin.check.nothingKept')}</p>
     </div>

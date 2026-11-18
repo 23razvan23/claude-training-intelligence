@@ -29,6 +29,7 @@ public class ImportRunner {
     private final RawWriter writer;
     private final WhoopCsvImporter whoop;
     private final GarminExportImporter garmin;
+    private final app.training.adaptation.checkin.GarminSeedService seed;
     private static final long PROGRESS_INTERVAL_MS = 2_000;
     private static final long PROGRESS_LOG_INTERVAL_NANOS = 30_000_000_000L;
 
@@ -36,13 +37,15 @@ public class ImportRunner {
     private final TransactionTemplate progressTx;
 
     public ImportRunner(ImportBatchRepository batches, AthleteRepository athletes, RawWriter writer,
-                        WhoopCsvImporter whoop, GarminExportImporter garmin, TransactionTemplate tx,
+                        WhoopCsvImporter whoop, GarminExportImporter garmin,
+                        app.training.adaptation.checkin.GarminSeedService seed, TransactionTemplate tx,
                         PlatformTransactionManager txManager) {
         this.batches = batches;
         this.athletes = athletes;
         this.writer = writer;
         this.whoop = whoop;
         this.garmin = garmin;
+        this.seed = seed;
         this.tx = tx;
         this.progressTx = new TransactionTemplate(txManager);
         this.progressTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -107,6 +110,7 @@ public class ImportRunner {
                     throw new java.io.UncheckedIOException(e);
                 }
             });
+            if (kind == ImportKind.GARMIN_EXPORT) seedCheckins(athleteId, stats);
             progress.flush();
             batches.markFinished(batchId, stats);
             log.info("Import batch {} ({}) finished: {} rows inserted", batchId, kind, stats.insertedTotal());
@@ -122,6 +126,20 @@ public class ImportRunner {
                     log.warn("Could not delete upload {}", p.getFileName());
                 }
             }
+        }
+    }
+
+    /**
+     * After a Garmin export: seed check-ins from the effort fields (ADR 0020 amendment). A failure here
+     * never fails the import, which is already stored; the {@code garmin-seed} command can be run instead.
+     */
+    private void seedCheckins(long athleteId, ImportStats stats) {
+        try {
+            int n = seed.seed(athleteId).seeded();
+            if (n > 0) stats.inserted("subjective_log", n);
+        } catch (RuntimeException e) {
+            log.warn("Seeding check-ins from the Garmin export failed: {}", e.toString());
+            stats.warn("The import is complete, but seeding check-ins from Garmin effort failed; run the garmin-seed command.");
         }
     }
 

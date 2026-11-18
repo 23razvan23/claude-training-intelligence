@@ -394,11 +394,16 @@ public class GarminExportImporter {
         }
 
         // Same workout already imported from a FIT file (or under another id)? Keep the first.
-        if (writer.activityNear(ctx.athleteId(), RawRows.GARMIN, start, matchTolerance).isPresent()) {
+        // The effort fields are kept even when the activity itself is a duplicate, so a re-uploaded export fills them in.
+        Integer workoutRpe = integer(a, ACT_WORKOUT_RPE);
+        Integer workoutFeel = integer(a, ACT_WORKOUT_FEEL);
+        var existing = writer.activityNear(ctx.athleteId(), RawRows.GARMIN, start, matchTolerance);
+        if (existing.isPresent()) {
             ctx.stats().duplicates("activity", 1);
+            writer.activityEffort(ctx, existing.get(), workoutRpe, workoutFeel);
             return;
         }
-        writer.activity(ctx, new RawRows.Activity(
+        long activityId = writer.activity(ctx, new RawRows.Activity(
                 RawRows.GARMIN,
                 sourceId,
                 sport,
@@ -417,6 +422,7 @@ public class GarminExportImporter {
                 decimal(a, ACT_AEROBIC_TE),
                 decimal(a, ACT_ANAEROBIC_TE),
                 null));
+        writer.activityEffort(ctx, activityId, workoutRpe, workoutFeel);
     }
 
     // ---------------------------------------------------------------- JSON helpers

@@ -38,6 +38,9 @@ final class GarminFields {
     static final String ACT_TRAINING_LOAD = "activityTrainingLoad";
     static final String ACT_AEROBIC_TE = "aerobicTrainingEffect";
     static final String ACT_ANAEROBIC_TE = "anaerobicTrainingEffect";
+    // Effort the athlete entered on the watch; 0-100 in steps of 10 (verified on the coach's export, ADR 0020 amendment).
+    static final String ACT_WORKOUT_RPE = "workoutRpe";
+    static final String ACT_WORKOUT_FEEL = "workoutFeel";
 
     // --- sleepData.json: [ {...per night...} ] ---
     static final String SLEEP_DATE = "calendarDate";

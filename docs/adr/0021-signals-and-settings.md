@@ -2,7 +2,7 @@
 
 - Status: accepted (stage 2-2, 2026-11-18; coach answers the same day: settings coach-wide; "take the recommendations" on the plan's open questions)
 - Related: ADR 0018 (D2 `settings_version`, D7 `day_signals`, D8 nothing new in `day_features`, D9 daily load in TRIMP units), ADR 0016 (Trends: the same EWMA), ADR 0019 D3 (default demand per session type), ADR 0020 (check-in, `subjective_current`), ADR 0017 (golden check), ADR 0008 (scoring, **unchanged**).
-- Delivered in two PRs: **PR 1** (#48) the settings store and the load signals (D1–D8); **PR 2** readiness, sleep debt, check-in flags, session demand, running tolerance with its override, and the screens (D9–D12, written when PR 2 was built; migration `V24__tolerance_override.sql`).
+- Delivered in two PRs: **PR 1** (#48) the settings store and the load signals (D1–D8); **PR 2** readiness, sleep debt, check-in flags, session demand, running tolerance with its override, and the screens (D9–D12, written when PR 2 was built; migration `V25__tolerance_override.sql`).
 
 ## In plain words
 The adaptive engine (stage 2-3) will decide using a handful of daily numbers ("signals"): how recovered you are and the trend, sleep debt, how your recent load compares with what you are used to, how much you run against what you tolerate, how monotonous the week was, and how you feel. This stage computes them once a day per athlete and stores them, each tagged with the version of the code and of the settings that produced it.
@@ -72,7 +72,7 @@ Over the last **7** nights including the day: sleep need (Module 1) minus minute
   4. **Override:** the coach's newest override replaces the number from the day it was set. The computed number stays visible beside it.
   5. **Derivation:** stored with the number and shown step by step on the Athletes screen.
 - **No flags in the history:** there are no niggle or injury flags before the check-in existed (the Garmin seed carries effort only), so older windows count as clean. The override is the safety valve (coach).
-- **The override is kept as a history:** table `tolerance_override` (V24), append-only by the same trigger as ADR 0018. Each row has km per week (empty = cleared), a note, who set it and when.
+- **The override is kept as a history:** table `tolerance_override` (V25), append-only by the same trigger as ADR 0018. Each row has km per week (empty = cleared), a note, who set it and when.
   - `GET /api/athletes/{id}/tolerance` (AccessPolicy);
   - `POST /api/athletes/{id}/tolerance/override` (coach), which recomputes the signals at once.
 - **Signals version** becomes `s2` (all sections). The PR 1 rows (`s1`) stay until someone drops them; they are derived data.
@@ -89,7 +89,7 @@ Over the last **7** nights including the day: sleep need (Module 1) minus minute
 
 ## Why the live holdout and the golden check are unaffected
 - PR 1 adds **no migration**. It writes only `settings_version` and `day_signals` (both from V22), and reads `day_features`, `activity_with_cycle` and `activity_load` without changing them.
-- PR 2 adds V24: a new table `tolerance_override` and a column comment on `whoop_reference.cycle_date` (the R-15 backlog item; a comment changes no row). It additionally reads `derived_day_metrics`, `subjective_current` and `planned_session`. `FEATURE_VERSION` stays `f3`; no score is computed differently.
+- PR 2 adds V25: a new table `tolerance_override` and a column comment on `whoop_reference.cycle_date` (the R-15 backlog item; a comment changes no row). It additionally reads `derived_day_metrics`, `subjective_current` and `planned_session`. `FEATURE_VERSION` stays `f3`; no score is computed differently.
 - The signals run **after** the feature recompute, in the controller and the sync, not inside `FeatureRecomputeService.recompute`. The golden check (ADR 0017) replays exactly that method and hashes `day_features`, `derived_day_metrics` and the raw tables, none of which this stage writes. So it still prints **0 differences**.
 
 ## Tests

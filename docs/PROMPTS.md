@@ -267,7 +267,7 @@ plausible to me.
 
 Status (2026-11-18): done in two PRs (ADR 0021): PR 1 settings store (coach-wide) and load
 signals; PR 2 readiness, sleep debt, check-in flags, session demand, running tolerance with a
-coach override (V24), Trends and Athletes screens. For 2-3: on the morning of a day, read the
+coach override (V25), Trends and Athletes screens. For 2-3: on the morning of a day, read the
 previous day's load signals (today's load is unfinished, ADR 0021 D5); upcoming sessions come
 from the plan, not from day_signals.
 

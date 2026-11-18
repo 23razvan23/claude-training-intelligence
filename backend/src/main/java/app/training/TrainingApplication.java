@@ -19,6 +19,9 @@ public class TrainingApplication {
         if (args.length > 0 && app.training.adaptation.checkin.GarminSeedCli.COMMAND.equals(args[0])) {
             System.exit(app.training.adaptation.checkin.GarminSeedCli.main(TrainingApplication.class, args));
         }
+        if (args.length > 0 && app.training.adaptation.signals.SignalsCli.COMMAND.equals(args[0])) {
+            System.exit(app.training.adaptation.signals.SignalsCli.main(TrainingApplication.class, args));
+        }
         SpringApplication.run(TrainingApplication.class, args);
     }
 }

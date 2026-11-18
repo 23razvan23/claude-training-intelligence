@@ -24,15 +24,17 @@ import org.springframework.web.bind.annotation.*;
 public class PlanController {
     private final PlanService plans;
     private final AccessPolicy access;
+    private final DemandDefaults demandDefaults;
 
-    public PlanController(PlanService plans, AccessPolicy access) {
+    public PlanController(PlanService plans, AccessPolicy access, DemandDefaults demandDefaults) {
         this.plans = plans;
         this.access = access;
+        this.demandDefaults = demandDefaults;
     }
 
     @GetMapping("/plan/session-types")
     public List<SessionTypes.SessionType> sessionTypes() {
-        return SessionTypes.all();
+        return SessionTypes.all(demandDefaults.current());
     }
 
     @GetMapping("/athletes/{athleteId}/plans")

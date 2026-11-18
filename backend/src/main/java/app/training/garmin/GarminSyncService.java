@@ -1,5 +1,6 @@
 package app.training.garmin;
 
+import app.training.adaptation.signals.SignalService;
 import app.training.athletes.AthleteRepository;
 import app.training.common.ApiException;
 import app.training.garmin.GarminSyncRunRepository.Run;
@@ -58,6 +59,7 @@ public class GarminSyncService {
     private final ImportBatchRepository batches;
     private final ImportRunner runner;
     private final FeatureRecomputeService recompute;
+    private final SignalService signals;
     private final AthleteRepository athletes;
     private final GarminSyncProperties props;
     private final Clock clock;
@@ -65,7 +67,9 @@ public class GarminSyncService {
 
     public GarminSyncService(GarminSetup setup, GarminCredentialRepository credentials, GarminSyncRunRepository runs,
                              SidecarClient sidecar, ImportBatchRepository batches, ImportRunner runner,
-                             FeatureRecomputeService recompute, AthleteRepository athletes, GarminSyncProperties props, Clock clock) {
+                             FeatureRecomputeService recompute, AthleteRepository athletes, GarminSyncProperties props, Clock clock,
+                             SignalService signals) {
+        this.signals = signals;
         this.setup = setup;
         this.credentials = credentials;
         this.runs = runs;
@@ -188,6 +192,8 @@ public class GarminSyncService {
                 try {
                     recompute.recompute(athleteId, null, FeatureRecomputeService.SOURCE_SYNC);
                     recomputed = true;
+                    // Stage 2-2: the engine's signals follow the new scores; a failure is logged and keeps the sync green.
+                    signals.recomputeQuietly(athleteId);
                 } catch (RuntimeException e) {
                     log.warn("Garmin sync run {}: recompute failed: {}", runId, e.getClass().getSimpleName());
                     throw new SyncFailure("RECOMPUTE_FAILED");

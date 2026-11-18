@@ -87,3 +87,28 @@ def test_file_listing_masks_digits(tmp_path):
     out = "\n".join(inspect_exports.inspect_zip(str(path), show_files=True))
     assert "2  DI_CONNECT/DI-Connect-Metrics/TrainingReadinessDTO_#_#_#.json" in out
     assert "127236701" not in out
+
+
+def test_rpe_feel_summary_prints_only_numbers_and_counts():
+    recs = [
+        {"activityId": 1, "name": "Secret run", "startTimeGmt": 1709312400000.0, "workoutRpe": 50, "workoutFeel": 75},
+        {"activityId": 2, "startTimeGmt": 1709398800000.0, "workoutRpe": 50, "workoutFeel": 100},
+        {"activityId": 3, "startTimeGmt": 1709485200000.0, "workoutRpe": 70, "workoutFeel": None},
+        {"activityId": 4, "startTimeGmt": 1709571600000.0, "workoutRpe": "hard"},
+        {"activityId": 5, "startTimeGmt": 1709658000000.0},
+    ]
+    blob = json.dumps([{"summarizedActivitiesExport": recs}]).encode()
+    out = "\n".join(inspect_exports.inspect_json_group("x", [("x.json", blob)]))
+    assert "workoutRpe: 3 numeric, 1 empty or missing, 1 not a number" in out
+    assert "min=50 max=70; multiples of 10: 3 of 3" in out
+    assert "50x2, 70x1" in out
+    assert "workoutFeel: 2 numeric, 3 empty or missing, 0 not a number" in out
+    assert "records with both: 2" in out
+    assert "(50, 75)x1, (50, 100)x1" in out
+    assert "Secret run" not in out and "hard" not in out.split("Per-activity effort")[1]
+
+
+def test_no_rpe_section_when_fields_absent():
+    blob = json.dumps([{"activityId": 1}]).encode()
+    out = "\n".join(inspect_exports.inspect_json_group("x", [("x.json", blob)]))
+    assert "Per-activity effort" not in out

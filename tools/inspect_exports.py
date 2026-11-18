@@ -206,6 +206,75 @@ def _record_day(r: dict) -> date | None:
     return None
 
 
+RPE_KEYS = ("workoutRpe", "workoutFeel")
+MAX_DISTINCT_SHOWN = 25
+
+
+def _num_or_text(v):
+    """A number stays a number; anything else is only counted, never shown."""
+    if isinstance(v, bool) or v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    return None
+
+
+def _show(x: float) -> str:
+    return str(int(x)) if x == int(x) else f"{x:g}"
+
+
+def rpe_feel_summary(recs: list[dict]) -> list[str]:
+    """Counts and distinct values of workoutRpe / workoutFeel (stage 2-1b seed, ADR 0020 D7).
+
+    Only numbers and how often they occur; no dates, ids, sport names or text.
+    """
+    if not any(k in r for r in recs for k in RPE_KEYS):
+        return []
+    out = [f"== Per-activity effort fields (workoutRpe / workoutFeel), {len(recs)} activity records"]
+    values: dict = {}
+    for key in RPE_KEYS:
+        nums: Counter = Counter()
+        other = missing = 0
+        for r in recs:
+            v = r.get(key)
+            if v is None or v == "":
+                missing += 1
+                continue
+            n = _num_or_text(v)
+            if n is None:
+                other += 1
+            else:
+                nums[n] += 1
+        values[key] = nums
+        total = sum(nums.values())
+        out.append(f"  {key}: {total} numeric, {missing} empty or missing, {other} not a number")
+        if nums:
+            lo, hi = min(nums), max(nums)
+            tens = sum(c for x, c in nums.items() if x % 10 == 0)
+            out.append(f"    min={_show(lo)} max={_show(hi)}; multiples of 10: {tens} of {total}")
+            shown = sorted(nums.items())[:MAX_DISTINCT_SHOWN]
+            out.append("    value x count: " + ", ".join(f"{_show(x)}x{c}" for x, c in shown))
+            if len(nums) > MAX_DISTINCT_SHOWN:
+                out.append(f"    ... and {len(nums) - MAX_DISTINCT_SHOWN} more distinct values")
+    pairs: Counter = Counter()
+    for r in recs:
+        a, b = _num_or_text(r.get("workoutRpe")), _num_or_text(r.get("workoutFeel"))
+        if a is not None or b is not None:
+            pairs[(a, b)] += 1
+    both = sum(c for (a, b), c in pairs.items() if a is not None and b is not None)
+    out.append(f"  records with both: {both}; with a value in either: {sum(pairs.values())}")
+    if both:
+        out.append(
+            "  (rpe, feel) x count: "
+            + ", ".join(
+                f"({_show(a)}, {_show(b)})x{c}"
+                for (a, b), c in sorted(pairs.items())
+                if a is not None and b is not None
+            )[:1500]
+        )
+    return out
+
+
 def inspect_json_group(label: str, blobs: list[tuple[str, bytes]]) -> list[str]:
     recs: list[dict] = []
     bad = 0
@@ -235,6 +304,7 @@ def inspect_json_group(label: str, blobs: list[tuple[str, bytes]]) -> list[str]:
     if len(presence) > MAX_KEYS:
         out.append(f"  ... and {len(presence) - MAX_KEYS} more keys")
     out.extend(coverage(days))
+    out.extend(rpe_feel_summary(recs))
     return out
 
 

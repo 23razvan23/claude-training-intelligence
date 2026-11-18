@@ -170,6 +170,54 @@ scenarios['sync-nodata'] = scenarios.stale;
       await ctx.close();
     }
   }
+
+  // Check-in (stage 2-1b): the empty form, a filled form with a niggle, and the coach's view with everyone's list.
+  const checkinOptions = (current) => ({
+    today: TODAY, date: TODAY, timezone: 'Europe/Bucharest',
+    locations: ['foot', 'ankle', 'calf', 'shin', 'knee', 'hamstring', 'quad', 'hip', 'glute', 'back', 'other'],
+    maxBackdateDays: 7,
+    activities: [{ id: 7, sport: 'running', startAt: `${TODAY}T05:30:00Z`, durationS: 3600, distanceM: 10200 }],
+    sessions: [{ id: 3, title: 'Tempo 3 x 10 min', sessionType: 'threshold', demand: 'KEY', status: 'PLANNED' }],
+    current,
+  });
+  const ck = (over) => ({
+    id: 1, athleteId: 1, athleteName: 'Synthetic Runner', date: TODAY, scope: 'day', plannedSessionId: null, activityId: null,
+    rpe: null, soreness: null, niggleLocation: null, niggleSeverity: null, niggleResolved: false, injury: false, illness: false,
+    note: null, source: 'MANUAL', onBehalf: false, createdAt: `${TODAY}T06:10:00Z`, ...over,
+  });
+  const recent = [
+    ck({ id: 4, rpe: 7, soreness: 3, niggleLocation: 'calf', niggleSeverity: 2, note: 'Left calf tight after the hills' }),
+    ck({ id: 3, date: '2026-11-15', scope: 'activity', activityId: 6, rpe: 8 }),
+    ck({ id: 2, date: '2026-11-14', soreness: 2, niggleLocation: 'calf', niggleResolved: true, onBehalf: true }),
+    ck({ id: 1, date: '2026-11-13', illness: true, note: 'Sore throat', source: 'GARMIN_SEED' }),
+  ];
+  const everyone = [...recent.slice(0, 2), ck({ id: 9, athleteId: 2, athleteName: 'Second Athlete', rpe: 5, soreness: 1 })];
+  for (const scheme of ['light', 'dark']) {
+    for (const name of ['checkin-empty', 'checkin-filled', 'checkin-coach']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme });
+      const page = await ctx.newPage();
+      const coach = name === 'checkin-coach';
+      await page.route('**/api/**', (route) => {
+        const url = new URL(route.request().url()).pathname;
+        const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+        if (url === '/api/auth/me') return json({ id: 1, username: coach ? 'coach' : 'runner', role: coach ? 'COACH' : 'ATHLETE', athleteId: coach ? undefined : 1 });
+        if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
+        if (url === '/api/athletes/1/checkins/options') return json(checkinOptions(name === 'checkin-empty' ? [] : [ck({ id: 4, rpe: 7, soreness: 3, niggleLocation: 'calf', niggleSeverity: 2 })]));
+        if (url === '/api/athletes/1/checkins/recent') return json(name === 'checkin-empty' ? recent.slice(1) : recent);
+        if (url === '/api/checkins/recent') return json(everyone);
+        return route.fulfill({ status: 404, body: '' });
+      });
+      await page.goto(`${BASE}/checkin`);
+      await page.waitForSelector('[data-testid="checkin-page"]');
+      await page.waitForTimeout(250);
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      const file = `${name}-${scheme}.png`;
+      if (width > 390) throw new Error(`${file}: horizontal scroll (${width}px wide)`);
+      await page.screenshot({ path: path.join(out, file), fullPage: true });
+      console.log(`${file} (scrollWidth ${width})`);
+      await ctx.close();
+    }
+  }
   await browser.close();
 })().catch((e) => {
   console.error(e);

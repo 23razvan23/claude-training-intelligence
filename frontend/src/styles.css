@@ -263,3 +263,26 @@ table.data .nowrap { white-space: nowrap; }
 .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; }
 .swatch.hollow { background: var(--surface); border: 2px solid var(--muted); }
 .ratio { margin: 0.5rem 0 0; font-weight: 600; }
+
+/* Check-in (stage 2-1b): big tap targets, no horizontal scroll at 390 px. */
+a.button-link {
+  display: inline-block; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text);
+  border-radius: 8px; padding: 0.45rem 0.9rem; text-decoration: none; white-space: nowrap;
+}
+.checkin-q { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.checkin-q p { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; }
+button.pick {
+  min-height: 44px; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  max-width: 100%; overflow-wrap: anywhere;
+}
+button.pick.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.pick.on.danger-pick { background: var(--danger); border-color: var(--danger); color: #fff; }
+.scale { margin-top: 0.25rem; }
+.date-pick { max-width: 12rem; }
+button.save { min-height: 48px; font-weight: 600; }
+.niggle-detail { gap: 0.5rem; }
+.badge { font-size: 0.75rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.5rem; color: var(--muted); }
+.checkin-list .summary { margin: 0.25rem 0 0; }
+.checkin-list .note-text { margin: 0.25rem 0 0; overflow-wrap: anywhere; }

@@ -58,6 +58,12 @@ app:
     # for them to be treated as the same activity. [configurable]
     activity-match-tolerance-seconds: 120
 
+  # Check-in (stage 2-1b, ADR 0019).
+  checkin:
+    # How many days back a check-in may still be entered. [configurable] A late entry is still honest
+    # (it carries its own creation time); a long gap is more likely a wrong date than a late memory.
+    max-backdate-days: 7
+
   # Module 1 feature engineering. Every number below is a starting value, not
   # settled science: [configurable], with the reason next to it.
   metrics:

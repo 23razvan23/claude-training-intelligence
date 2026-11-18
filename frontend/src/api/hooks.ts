@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
 import type {
   Athlete,
+  Checkin,
+  CheckinInput,
+  CheckinOptions,
   AthleteInput,
   CoverageReport,
   FeatureSummary,
@@ -310,5 +313,39 @@ export function useGarminCheck(athleteId?: number) {
   return useMutation({
     mutationFn: (range: { from: string; to: string }) =>
       api<GarminCheckReport>(`/api/athletes/${athleteId}/garmin/check`, { method: 'POST', body: JSON.stringify(range) }),
+  });
+}
+
+export function useCheckinOptions(athleteId?: number, date?: string) {
+  return useQuery({
+    queryKey: ['checkin-options', athleteId, date],
+    queryFn: () => api<CheckinOptions>(`/api/athletes/${athleteId}/checkins/options${date ? `?date=${date}` : ''}`),
+    enabled: athleteId != null,
+  });
+}
+
+export function useRecentCheckins(athleteId?: number) {
+  return useQuery({
+    queryKey: ['checkins', athleteId],
+    queryFn: () => api<Checkin[]>(`/api/athletes/${athleteId}/checkins/recent`),
+    enabled: athleteId != null,
+  });
+}
+
+/** The coach's overview: every athlete's current check-ins. */
+export function useAllRecentCheckins(enabled: boolean) {
+  return useQuery({ queryKey: ['checkins-all'], queryFn: () => api<Checkin[]>('/api/checkins/recent'), enabled });
+}
+
+export function useCreateCheckin(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CheckinInput) =>
+      api<Checkin>(`/api/athletes/${athleteId}/checkins`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['checkin-options'] });
+      qc.invalidateQueries({ queryKey: ['checkins'] });
+      qc.invalidateQueries({ queryKey: ['checkins-all'] });
+    },
   });
 }

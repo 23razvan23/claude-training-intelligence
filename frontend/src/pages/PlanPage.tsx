@@ -12,6 +12,7 @@ import {
   useSessionTypes,
 } from '../api/hooks';
 import type { Demand, Plan, PlannedSession, SessionInput, SessionStatus } from '../api/types';
+import { PlanImport } from '../components/PlanImport';
 import { useAthleteSelection } from '../athleteContext';
 import { addDays, formatSessionDay, groupByWeek, parseNumber, shownRange, todayIn } from '../plan';
 
@@ -31,6 +32,7 @@ export function PlanPage() {
   const plans = usePlans(athleteId);
   const sessions = useSessions(athleteId, from, to);
   const [editing, setEditing] = useState<PlannedSession | 'new' | null>(null);
+  const [importing, setImporting] = useState(false);
   const [planForm, setPlanForm] = useState<Plan | 'new' | null>(null);
   const isCoach = me?.role === 'COACH';
 
@@ -50,6 +52,11 @@ export function PlanPage() {
         {isCoach && active && (
           <button onClick={() => setEditing('new')} disabled={editing === 'new'}>
             {t('plan.addSession')}
+          </button>
+        )}
+        {isCoach && active && (
+          <button className="ghost" onClick={() => setImporting(true)} disabled={importing}>
+            {t('plan.import.button')}
           </button>
         )}
       </div>
@@ -87,6 +94,8 @@ export function PlanPage() {
           onDone={() => setPlanForm(null)}
         />
       )}
+
+      {isCoach && active && importing && <PlanImport athleteId={athleteId} onDone={() => setImporting(false)} />}
 
       {isCoach && editing === 'new' && active && (
         <SessionForm athleteId={athleteId} defaultDate={today < from ? from : today} onDone={() => setEditing(null)} />

@@ -1,0 +1,6 @@
+date,type,demand,title,workout,distance_km,duration_min,notes
+23/11/2026,easy,,,Relaxed aerobic run,8,45,
+24/11/2026,threshold,,Tempo,"3 km warm-up, 20 min at threshold, 2 km cool-down",12.5,60,Synthetic example
+25/11/2026,rest,,,,,,
+26/11/2026,strides,,,"Easy run, then 6 x 20 s strides",7,40,
+28/11/2026,long,,,Steady long run,22,130,

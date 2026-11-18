@@ -57,4 +57,12 @@ class SessionValidatorTest {
     void aMissingTypeIsNamed() {
         assertThat(SessionValidator.check(req(D, " ", null, null, null, null)).problems()).containsExactly("Type is missing");
     }
+
+    @Test
+    void theDefaultDemandCanComeFromTheSettingsStore() {
+        var r = SessionValidator.check(req(D, "hills", null, null, null, null), code -> Demand.KEY);
+        assertThat(r.session().demand()).isEqualTo(Demand.KEY);
+        var explicit = SessionValidator.check(req(D, "hills", Demand.EASY, null, null, null), code -> Demand.KEY);
+        assertThat(explicit.session().demand()).isEqualTo(Demand.EASY);
+    }
 }

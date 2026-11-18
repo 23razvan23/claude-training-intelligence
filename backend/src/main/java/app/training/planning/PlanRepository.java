@@ -102,6 +102,11 @@ public class PlanRepository {
                 .params(athleteId, from, to).query(sessionMapper).list();
     }
 
+    /** Like {@link #sessions} for the import preview, which may span more than the list endpoint allows. */
+    public List<Session> sessionsInRange(long athleteId, LocalDate from, LocalDate to) {
+        return sessions(athleteId, from, to);
+    }
+
     public List<Session> sessionsOfPlan(long planId) {
         return jdbc.sql("SELECT " + SESSION_COLUMNS + " FROM planned_session WHERE plan_id = ? ORDER BY session_date, id")
                 .param(planId).query(sessionMapper).list();

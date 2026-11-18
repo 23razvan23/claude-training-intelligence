@@ -20,6 +20,8 @@ import type {
   Me,
   ModelVersion,
   Plan,
+  PlanImported,
+  PlanImportPreview,
   PlanInput,
   PlannedSession,
   SessionInput,
@@ -409,6 +411,30 @@ export function useSaveSession(athleteId?: number) {
       id
         ? api<PlannedSession>(`/api/sessions/${id}`, { method: 'PUT', body: JSON.stringify(input) })
         : api<PlannedSession>(`/api/athletes/${athleteId}/sessions`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => invalidatePlan(qc),
+  });
+}
+
+function fileForm(file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  return form;
+}
+
+/** Step 1 of a plan import: read the file and say what would happen. Saves nothing. */
+export function usePlanImportPreview(athleteId?: number) {
+  return useMutation({
+    mutationFn: (file: File) =>
+      api<PlanImportPreview>(`/api/athletes/${athleteId}/plan-import/preview`, { method: 'POST', body: fileForm(file) }),
+  });
+}
+
+/** Step 2: the same file again; saves every row or none. */
+export function usePlanImportCommit(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) =>
+      api<PlanImported>(`/api/athletes/${athleteId}/plan-import/commit`, { method: 'POST', body: fileForm(file) }),
     onSuccess: () => invalidatePlan(qc),
   });
 }

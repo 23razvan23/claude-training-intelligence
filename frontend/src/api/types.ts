@@ -515,6 +515,42 @@ export interface SessionRevision {
   changedAt: string;
 }
 
+// Spreadsheet import of a plan (stage 2-1a PR 2, ADR 0019). Preview saves nothing; the same file is sent again to import.
+export interface PlanImportRow {
+  row: number;
+  date?: string | null;
+  sessionType?: string | null;
+  demand?: Demand | null;
+  title?: string | null;
+  workout?: string | null;
+  distanceKm?: number | null;
+  durationMin?: number | null;
+  notes?: string | null;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface PlanImportPreview {
+  canImport: boolean;
+  fileErrors: string[];
+  rowCount: number;
+  errorCount: number;
+  warningCount: number;
+  planId?: number | null;
+  planName?: string | null;
+  planStart?: string | null;
+  planEnd?: string | null;
+  newPlanStart?: string | null;
+  newPlanEnd?: string | null;
+  rows: PlanImportRow[];
+}
+
+export interface PlanImported {
+  imported: number;
+  planId: number;
+  stretchedPlan: boolean;
+}
+
 // Check-in (stage 2-1b, ADR 0020). `scope` is what the answers are about: a planned session, an activity, or the whole day.
 export type CheckinScope = 'session' | 'activity' | 'day';
 

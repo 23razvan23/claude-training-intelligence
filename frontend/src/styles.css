@@ -302,3 +302,11 @@ button.save { min-height: 48px; font-weight: 600; }
 .badge { font-size: 0.75rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.5rem; color: var(--muted); }
 .checkin-list .summary { margin: 0.25rem 0 0; }
 .checkin-list .note-text { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+
+/* Plan import (stage 2-1a PR 2): rows are cards, not a table, so nothing scrolls sideways at 390 px. */
+.import-row { min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; overflow-wrap: anywhere; }
+.import-row.bad { border-left: 4px solid var(--danger); }
+.import-row.note { border-left: 4px solid var(--warn); }
+.import-row .problem { color: var(--danger); margin: 0; }
+.import-row .caution { color: var(--warn); margin: 0; }
+.import-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }

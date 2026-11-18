@@ -7,6 +7,7 @@ import app.training.planning.PlanModels.Session;
 import app.training.planning.PlanModels.SessionRequest;
 import app.training.security.AccessPolicy;
 import app.training.security.CurrentUser;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -14,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * The Plan screen (stage 2-1a, ADR 0019). Reading: the coach for anyone, an athlete only their own (AccessPolicy;
@@ -24,10 +26,12 @@ import org.springframework.web.bind.annotation.*;
 public class PlanController {
     private final PlanService plans;
     private final AccessPolicy access;
+    private final PlanImportService imports;
     private final DemandDefaults demandDefaults;
 
-    public PlanController(PlanService plans, AccessPolicy access, DemandDefaults demandDefaults) {
+    public PlanController(PlanService plans, AccessPolicy access, PlanImportService imports, DemandDefaults demandDefaults) {
         this.plans = plans;
+        this.imports = imports;
         this.access = access;
         this.demandDefaults = demandDefaults;
     }
@@ -85,6 +89,22 @@ public class PlanController {
     @PreAuthorize("hasRole('COACH')")
     public void deleteSession(@PathVariable long sessionId, @AuthenticationPrincipal CurrentUser user) {
         plans.deleteSession(sessionId, user.id());
+    }
+
+    /** Spreadsheet import, step 1: read the file and say what would happen. Saves nothing. */
+    @PostMapping("/athletes/{athleteId}/plan-import/preview")
+    @PreAuthorize("hasRole('COACH')")
+    public PlanImportModels.Preview importPreview(@PathVariable long athleteId, @RequestPart("file") MultipartFile file)
+            throws IOException {
+        return imports.preview(athleteId, file.getBytes());
+    }
+
+    /** Step 2: the same file again; saves every row or none. */
+    @PostMapping("/athletes/{athleteId}/plan-import/commit")
+    @PreAuthorize("hasRole('COACH')")
+    public PlanImportModels.Imported importCommit(@PathVariable long athleteId, @RequestPart("file") MultipartFile file,
+                                                   @AuthenticationPrincipal CurrentUser user) throws IOException {
+        return imports.commit(athleteId, file.getBytes(), user.id());
     }
 
     @GetMapping("/sessions/{sessionId}/revisions")

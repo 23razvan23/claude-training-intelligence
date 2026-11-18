@@ -88,6 +88,13 @@ docker compose run --rm app golden check --athlete 1
 - `INPUTS CHANGED` (exit 3): your profile, the ACTIVE model or raw rows changed, so the check cannot judge. If you expected it, run `golden freeze` again.
 New Garmin or Whoop exports and syncs never trigger it. How it works and what each case means: [ADR 0017](docs/adr/0017-golden-check.md).
 
+### 6d. Check-in history from your Garmin watch
+If you entered an effort (RPE) on the watch after workouts, a Garmin export import turns each one into a check-in labelled **from Garmin** (RPE = Garmin's value ÷ 10; your own check-in for the same activity always wins). It happens by itself after every Garmin export import. The first time, upload your Garmin export again under **Imports** (nothing is duplicated), or, to run it by hand:
+```bash
+docker compose run --rm app garmin-seed --athlete 1
+```
+It prints how many check-ins it added, how many activities already had one and how many had no usable RPE; running it again adds nothing. Rules: [ADR 0020](docs/adr/0020-checkin.md) (amendment).
+
 ### 6a. The Today screen
 **Today** is the landing page: the morning check on your phone. It shows today's recovery (dial in the band colour), strain so far against a personal target range, sleep performance and need, and what moved recovery, in plain words. While data comes from exports, it usually says **"No data for today yet. Last data from <date>"** and shows the last scored day under its own date: it never shows an older recovery as today's. The coach picks the athlete in the top bar; athletes see only their own. Rules: [ADR 0014](docs/adr/0014-today-screen.md).
 

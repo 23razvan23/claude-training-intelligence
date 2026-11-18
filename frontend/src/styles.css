@@ -263,3 +263,19 @@ table.data .nowrap { white-space: nowrap; }
 .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; }
 .swatch.hollow { background: var(--surface); border: 2px solid var(--muted); }
 .ratio { margin: 0.5rem 0 0; font-weight: 600; }
+
+/* Plan (stage 2-1a, ADR 0019) */
+.week-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; margin: 0.5rem 0 0; font-size: 1.05rem; }
+.session { display: flex; flex-direction: column; gap: 0.3rem; border-left-width: 4px; }
+.session.demand-key { border-left-color: var(--accent); }
+.session.demand-supporting { border-left-color: var(--warn); }
+.session.past-day { opacity: 0.7; }
+.session-day { font-weight: 600; font-variant-numeric: tabular-nums; }
+.badge.demand.key { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.badge.demand.supporting { color: var(--warn); border-color: var(--warn); }
+.badge.status.skipped, .badge.status.replaced { color: var(--danger); border-color: var(--danger); }
+.badge.status.done { color: var(--band-green); border-color: var(--band-green); }
+.struck strong { text-decoration: line-through; }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.session-form textarea { width: 100%; }
+.history { margin: 0; padding-left: 1.2rem; }

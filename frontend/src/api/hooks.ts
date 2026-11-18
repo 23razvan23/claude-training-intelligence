@@ -28,6 +28,8 @@ import type {
   RecomputeResult,
   Today,
   Trends,
+  StoredSignals,
+  ToleranceView,
   UserView,
 } from './types';
 
@@ -234,6 +236,37 @@ export function useTrends(athleteId?: number) {
     queryKey: ['trends', athleteId],
     queryFn: () => api<Trends>(`/api/athletes/${athleteId}/trends`),
     enabled: athleteId != null,
+  });
+}
+
+/** Stored engine signals between two days (stage 2-2, ADR 0021); at most 400 days per request. */
+export function useSignals(athleteId: number | undefined, from: string | undefined, to: string | undefined) {
+  return useQuery({
+    queryKey: ['signals', athleteId, from, to],
+    queryFn: () => api<StoredSignals[]>(`/api/athletes/${athleteId}/signals?from=${from}&to=${to}`),
+    enabled: athleteId != null && !!from && !!to,
+  });
+}
+
+/** Running tolerance with its derivation and the override history (ADR 0021 D11). */
+export function useTolerance(athleteId?: number) {
+  return useQuery({
+    queryKey: ['tolerance', athleteId],
+    queryFn: () => api<ToleranceView>(`/api/athletes/${athleteId}/tolerance`),
+    enabled: athleteId != null,
+  });
+}
+
+/** Coach: set the tolerance override (km per week), or clear it with null. */
+export function useSetToleranceOverride(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { kmPerWeek: number | null; note?: string }) =>
+      api<ToleranceView>(`/api/athletes/${athleteId}/tolerance/override`, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: (view) => {
+      qc.setQueryData(['tolerance', athleteId], view);
+      qc.invalidateQueries({ queryKey: ['signals', athleteId] });
+    },
   });
 }
 

@@ -92,7 +92,7 @@ class SignalsIT extends IntegrationTest {
         assertThat(o.days()).isEqualTo(DAYS);
         assertThat(o.from()).isEqualTo(first);
         assertThat(o.settingsVersion()).isEqualTo(settings.current().id());
-        assertThat(count("SELECT count(*) FROM day_signals WHERE athlete_id = ? AND signals_version = 's1'", a)).isEqualTo(DAYS);
+        assertThat(count("SELECT count(*) FROM day_signals WHERE athlete_id = ? AND signals_version = 's2'", a)).isEqualTo(DAYS);
 
         var stored = new HashMap<LocalDate, com.fasterxml.jackson.databind.JsonNode>();
         signals.read(a, first, first.plusDays(DAYS - 1)).forEach(s -> stored.put(s.date(), s.signals()));
@@ -150,7 +150,7 @@ class SignalsIT extends IntegrationTest {
         long a = newAthlete("Signals settings");
         seed(a, firstDay(a));
         long before = signals.recompute(a).settingsVersion();
-        double edwardsAcute = signals.recompute(a).latest().load().acute();
+        double edwardsAcute = signals.recompute(a).latest().load().load().acute();
 
         ObjectNode changed = settings.current().settings().deepCopy();
         ((ObjectNode) changed.get("signals").get("load")).put("dailyLoad", "banister");
@@ -158,8 +158,8 @@ class SignalsIT extends IntegrationTest {
         try {
             var o = signals.recompute(a);
             assertThat(o.settingsVersion()).isGreaterThan(before);
-            assertThat(o.latest().load().method()).isEqualTo("banister");
-            assertThat(o.latest().load().acute()).isCloseTo(edwardsAcute * 0.8, within(0.2));
+            assertThat(o.latest().load().load().method()).isEqualTo("banister");
+            assertThat(o.latest().load().load().acute()).isCloseTo(edwardsAcute * 0.8, within(0.2));
             assertThat(count("SELECT count(*) FROM day_signals WHERE athlete_id = ? AND settings_version = ?", a, before))
                     .as("rows of the older settings version stay, for suggestions that name it").isEqualTo(DAYS);
             assertThat(count("SELECT count(*) FROM day_signals WHERE athlete_id = ?", a)).isEqualTo(2L * DAYS);
@@ -202,5 +202,113 @@ class SignalsIT extends IntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(28))
                 .andExpect(jsonPath("$[27].signals.load.method").value("edwards"));
         mvc.perform(get("/api/athletes/{id}/signals", other).with(user(athlete))).andExpect(status().isForbidden());
+    }
+
+    private void scoresFrom(long athlete, LocalDate first, int fromIndex) {
+        jdbc.sql("""
+                INSERT INTO model_version (athlete_id, version, status, feature_version, coefficients, metrics, passed, report_html)
+                VALUES (?, ?, 'ACTIVE', 'f3', '{}'::jsonb, '{}', true, '')""").params(athlete, "m-sig-" + athlete).update();
+        jdbc.sql("UPDATE day_features SET rmssd = 55, sleep_minutes = 420 WHERE athlete_id = ? AND cycle_date >= ?")
+                .params(athlete, first.plusDays(fromIndex)).update();
+        for (int i = fromIndex; i < DAYS; i++) {
+            if (!year().containsKey(i)) continue;
+            boolean lastThree = i >= DAYS - 3;
+            jdbc.sql("""
+                    INSERT INTO derived_day_metrics (athlete_id, cycle_date, model_version, feature_version, recovery_pct, recovery_band,
+                        strain, sleep_performance_pct, sleep_need_min)
+                    VALUES (?, ?, ?, 'f3', ?, ?, 10, 88, 480)""")
+                    .params(athlete, first.plusDays(i), "m-sig-" + athlete, lastThree ? 50 : 70, lastThree ? "YELLOW" : "GREEN").update();
+        }
+    }
+
+    @Test
+    void readinessSleepCheckinsSessionsAndToleranceOverTheYear() {
+        long a = newAthlete("Signals all");
+        LocalDate first = firstDay(a);
+        LocalDate today = first.plusDays(DAYS - 1);
+        seed(a, first);
+        scoresFrom(a, first, 200);
+        jdbc.sql("INSERT INTO subjective_log (athlete_id, log_date, niggle_location, niggle_severity) VALUES (?, ?, 'calf', 2)")
+                .params(a, today.minusDays(2)).update();
+        jdbc.sql("INSERT INTO planned_session (athlete_id, session_date, session_type, demand, est_strain, title) VALUES (?, ?, 'threshold', 'KEY', 14.5, 'Tempo')")
+                .params(a, today).update();
+        jdbc.sql("INSERT INTO planned_session (athlete_id, session_date, session_type, demand, status, title) VALUES (?, ?, 'easy', 'EASY', 'SKIPPED', 'Easy')")
+                .params(a, today).update();
+
+        var o = signals.recompute(a);
+        var day = o.latest();
+        assertThat(day.date()).isEqualTo(today);
+
+        // Readiness: three yellow days after green ones; nothing before the first HRV day.
+        assertThat(day.readiness().band()).isEqualTo("YELLOW");
+        assertThat(day.readiness().nonGreenStreakDays()).isEqualTo(3);
+        assertThat(day.readiness().trendShort()).isCloseTo(50 - (50 + 50 + 70) / 3.0, within(0.05));
+        var stored = new HashMap<LocalDate, com.fasterxml.jackson.databind.JsonNode>();
+        signals.read(a, first, today).forEach(r -> stored.put(r.date(), r.signals()));
+        assertThat(stored.get(first.plusDays(150)).get("readiness").get("beforeHrv").asBoolean()).isTrue();
+
+        // Sleep: 7 nights of 420 min against a need of 480.
+        assertThat(day.sleep().debtMin()).isEqualTo(420);
+        assertThat(day.sleep().nightsOfNeed()).isEqualTo(0.88);
+
+        // Check-ins: the calf niggle reported two days ago is in its third day.
+        assertThat(day.subjective().niggles()).singleElement().satisfies(n -> assertThat(n.persistDays()).isEqualTo(3));
+
+        // Session demand: the skipped session doesn't count.
+        assertThat(day.sessions().maxDemand()).isEqualTo("KEY");
+        assertThat(day.sessions().planned()).hasSize(1);
+
+        // Tolerance: the peak is the hard block (3 weeks at 90 km + 1 ordinary week ≈ 80 km/week), well before the
+        // niggle; the taper is time away and the chronic running volume caps it.
+        var t = day.tolerance();
+        assertThat(t.source()).isEqualTo("computed");
+        assertThat(t.peakKmPerWeek()).isBetween(75.0, 85.0);
+        assertThat(t.peakTo()).isBefore(today.minusDays(2));
+        assertThat(t.flaggedWindows()).isPositive();
+        assertThat(t.interruptedWeeks()).isPositive();
+        assertThat(t.kmPerWeek()).isEqualTo(t.computedKmPerWeek()).isLessThan(t.peakKmPerWeek());
+        if (t.capped()) assertThat(t.kmPerWeek()).isEqualTo(t.capKmPerWeek());
+        else assertThat(t.kmPerWeek()).isEqualTo(t.decayedKmPerWeek());
+    }
+
+    @Test
+    void theCoachSetsAndClearsATolerOverrideAndACheckinRecomputes() throws Exception {
+        long a = newAthlete("Signals override");
+        seed(a, firstDay(a));
+        signals.recompute(a);
+        CurrentUser coach = users.findById(users.insert("coach-tol-" + System.nanoTime(), "x", Role.COACH, null)).orElseThrow();
+        CurrentUser athlete = users.findById(users.insert("ath-tol-" + System.nanoTime(), "x", Role.ATHLETE, a)).orElseThrow();
+
+        mvc.perform(post("/api/athletes/{id}/tolerance/override", a).with(user(athlete)).with(csrf())
+                        .contentType("application/json").content("{\"kmPerWeek\": 45}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/athletes/{id}/tolerance/override", a).with(user(coach)).with(csrf())
+                        .contentType("application/json").content("{\"kmPerWeek\": 2000}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/athletes/{id}/tolerance/override", a).with(user(coach)).with(csrf())
+                        .contentType("application/json").content("{\"kmPerWeek\": 45, \"note\": \"old calf trouble\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tolerance.kmPerWeek").value(45.0))
+                .andExpect(jsonPath("$.tolerance.source").value("override"))
+                .andExpect(jsonPath("$.tolerance.computedKmPerWeek").isNumber())
+                .andExpect(jsonPath("$.overrides[0].note").value("old calf trouble"));
+        mvc.perform(get("/api/athletes/{id}/tolerance", a).with(user(athlete)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.tolerance.kmPerWeek").value(45.0));
+        mvc.perform(post("/api/athletes/{id}/tolerance/override", a).with(user(coach)).with(csrf())
+                        .contentType("application/json").content("{\"kmPerWeek\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tolerance.source").value("computed"))
+                .andExpect(jsonPath("$.overrides.length()").value(2));
+        assertThat(count("SELECT count(*) FROM tolerance_override WHERE athlete_id = ?", a)).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> jdbc.sql("DELETE FROM tolerance_override WHERE athlete_id = ?").param(a).update()).hasMessageContaining("append-only");
+
+        // A check-in through the API recomputes today's flags.
+        mvc.perform(post("/api/athletes/{id}/checkins", a).with(user(athlete)).with(csrf())
+                        .contentType("application/json").content("{\"illness\": true}"))
+                .andExpect(status().isCreated());
+        LocalDate today = signals.today(a);
+        var todays = signals.read(a, today, today);
+        assertThat(todays).singleElement().satisfies(r -> assertThat(r.signals().get("subjective").get("illness").asBoolean()).isTrue());
     }
 }

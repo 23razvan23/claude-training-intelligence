@@ -579,3 +579,102 @@ export interface CheckinInput {
   illness: boolean;
   note?: string;
 }
+
+// Adaptive engine signals (stage 2-2, ADR 0021): GET /api/athletes/{id}/signals. A missing number is absent, never 0.
+export interface ToleranceOverrideValue {
+  kmPerWeek?: number | null;
+  note?: string | null;
+  since?: string | null;
+}
+
+export interface ToleranceSignal {
+  kmPerWeek?: number | null;
+  /** computed | override | none (no running in the last 12 months) */
+  source: 'computed' | 'override' | 'none';
+  computedKmPerWeek?: number | null;
+  peakKmPerWeek?: number | null;
+  peakFrom?: string | null;
+  peakTo?: string | null;
+  cleanWindows: number;
+  flaggedWindows: number;
+  interruptedWeeks: number;
+  decayWeeks: number;
+  decayFactor: number;
+  decayedKmPerWeek?: number | null;
+  chronicKmPerWeek?: number | null;
+  capKmPerWeek?: number | null;
+  capped: boolean;
+  override?: ToleranceOverrideValue | null;
+}
+
+export interface RunningSignal {
+  shortWindowDays: number;
+  shortKm: number;
+  shortMinutes: number;
+  longWindowDays: number;
+  longKm: number;
+  longMinutes: number;
+  longWeeklyAvgKm: number;
+}
+
+export interface DaySignals {
+  load: {
+    method: string;
+    daily?: number | null;
+    acute?: number | null;
+    chronic?: number | null;
+    acwr?: number | null;
+    running: { daily?: number | null; acute?: number | null; chronic?: number | null; acwr?: number | null };
+  };
+  foster: { windowDays: number; knownDays: number; weekLoad?: number | null; monotony?: number | null; strain?: number | null };
+  running: RunningSignal;
+  readiness?: {
+    recoveryPct?: number | null;
+    band?: Band | null;
+    trendShort?: number | null;
+    trendShortDays: number;
+    trendLong?: number | null;
+    trendLongDays: number;
+    bandStreakDays: number;
+    nonGreenStreakDays: number;
+    beforeHrv: boolean;
+  };
+  sleep?: { windowDays: number; knownNights: number; debtMin?: number | null; nightsOfNeed?: number | null };
+  subjective?: {
+    checkins: number;
+    dayRpe?: number | null;
+    maxSessionRpe?: number | null;
+    soreness?: number | null;
+    illness: boolean;
+    injury: boolean;
+    illnessDaysLast7: number;
+    injuryDaysLast7: number;
+    niggles: { location: string; since: string; persistDays: number; severity?: number | null }[];
+    flagged: boolean;
+  };
+  sessions?: { maxDemand?: string | null; planned: { id: number; type: string; demand: string; estStrain?: number | null }[] };
+  tolerance?: ToleranceSignal;
+}
+
+export interface StoredSignals {
+  date: string;
+  signalsVersion: string;
+  settingsVersion: number;
+  signals: DaySignals;
+  computedAt: string;
+}
+
+export interface ToleranceOverrideRow {
+  id: number;
+  kmPerWeek?: number | null;
+  note?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+}
+
+export interface ToleranceView {
+  date?: string | null;
+  tolerance?: ToleranceSignal | null;
+  running?: RunningSignal | null;
+  overrides: ToleranceOverrideRow[];
+}

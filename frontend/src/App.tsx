@@ -9,6 +9,7 @@ import { ImportsPage } from './pages/ImportsPage';
 import { CoveragePage } from './pages/CoveragePage';
 import { CalibrationPage } from './pages/CalibrationPage';
 import { HoldoutPage } from './pages/HoldoutPage';
+import { CheckinPage } from './pages/CheckinPage';
 import { TodayPage } from './pages/TodayPage';
 import { PlanPage } from './pages/PlanPage';
 import { TrendsPage } from './pages/TrendsPage';
@@ -26,6 +27,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
+          <Route path="/checkin" element={<CheckinPage />} />
           <Route path="/trends" element={<TrendsPage />} />
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/athletes" element={<AthletesPage />} />

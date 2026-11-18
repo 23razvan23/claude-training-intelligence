@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n';
 import type { GarminSyncStatus, Today, TodayDay } from '../api/types';
@@ -57,7 +58,9 @@ function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <TodayPage />
+      <MemoryRouter>
+        <TodayPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

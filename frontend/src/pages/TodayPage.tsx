@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useGarminSyncStatus, useToday } from '../api/hooks';
 import type { Band, GarminSyncStatus, StrainTarget, Today, TodayDay } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
@@ -38,6 +39,10 @@ export function TodayView({ data, sync }: { data: Today; sync?: GarminSyncStatus
         <span className="muted">
           <time dateTime={data.today}>{day(data.today)}</time>
         </span>
+        <span className="spacer" />
+        <Link className="button-link" to="/checkin" data-testid="checkin-link">
+          {t('today.checkin')}
+        </Link>
       </div>
 
       <LastSync sync={sync} />

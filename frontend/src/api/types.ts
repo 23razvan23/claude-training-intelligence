@@ -514,3 +514,68 @@ export interface SessionRevision {
   changedBy?: string | null;
   changedAt: string;
 }
+
+// Check-in (stage 2-1b, ADR 0020). `scope` is what the answers are about: a planned session, an activity, or the whole day.
+export type CheckinScope = 'session' | 'activity' | 'day';
+
+export interface Checkin {
+  id: number;
+  athleteId: number;
+  athleteName: string;
+  date: string;
+  scope: CheckinScope;
+  plannedSessionId: number | null;
+  activityId: number | null;
+  rpe: number | null;
+  soreness: number | null;
+  niggleLocation: string | null;
+  niggleSeverity: number | null;
+  niggleResolved: boolean;
+  injury: boolean;
+  illness: boolean;
+  note: string | null;
+  source: 'MANUAL' | 'GARMIN_SEED';
+  onBehalf: boolean;
+  createdAt: string;
+}
+
+export interface CheckinActivityOption {
+  id: number;
+  sport: string;
+  startAt: string;
+  durationS: number | null;
+  distanceM: number | null;
+}
+
+export interface CheckinSessionOption {
+  id: number;
+  title: string;
+  sessionType: string;
+  demand: string;
+  status: string;
+}
+
+export interface CheckinOptions {
+  today: string;
+  date: string;
+  timezone: string;
+  activities: CheckinActivityOption[];
+  sessions: CheckinSessionOption[];
+  current: Checkin[];
+  locations: string[];
+  maxBackdateDays: number;
+}
+
+export interface CheckinInput {
+  date?: string;
+  plannedSessionId?: number;
+  activityId?: number;
+  rpe?: number;
+  soreness?: number;
+  niggleLocation?: string;
+  niggleSeverity?: number;
+  niggleResolved: boolean;
+  injury: boolean;
+  illness: boolean;
+  note?: string;
+}

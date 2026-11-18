@@ -1,5 +1,6 @@
 package app.training.metrics;
 
+import app.training.adaptation.signals.SignalService;
 import app.training.athletes.AthleteRepository;
 import app.training.common.ApiException;
 import app.training.security.AccessPolicy;
@@ -21,10 +22,12 @@ public class MetricsController {
     private final MetricsProperties props;
     private final AccessPolicy access;
     private final FeatureRecomputeService recompute;
+    private final SignalService signals;
 
     public MetricsController(AthleteRepository athletes, MetricsRepository repo, MetricsProperties props, AccessPolicy access,
-                             FeatureRecomputeService recompute) {
+                             FeatureRecomputeService recompute, SignalService signals) {
         this.recompute = recompute;
+        this.signals = signals;
         this.athletes = athletes;
         this.repo = repo;
         this.props = props;
@@ -35,12 +38,15 @@ public class MetricsController {
      * Recomputes activity loads and day features for the athlete's whole history, then the daily
      * scores from the ACTIVE model, in one transaction. Needed after an import or a profile change
      * (HRmax, HRrest, sex). Without a usable ACTIVE model the features are still recomputed and
-     * {@code scores.skipped} says why there are no scores.
+     * {@code scores.skipped} says why there are no scores. Afterwards, in their own transaction, the adaptive
+     * engine's signals (stage 2-2, ADR 0021); a failure there never undoes the scores.
      */
     @PostMapping("/athletes/{athleteId}/features/recompute")
     @PreAuthorize("hasRole('COACH')")
     public FeatureRecomputeService.RecomputeResult recompute(@PathVariable long athleteId, @AuthenticationPrincipal CurrentUser user) {
-        return recompute.recompute(athleteId, user == null ? null : user.id(), FeatureRecomputeService.SOURCE_MANUAL);
+        var result = recompute.recompute(athleteId, user == null ? null : user.id(), FeatureRecomputeService.SOURCE_MANUAL);
+        signals.recomputeQuietly(athleteId);
+        return result;
     }
 
     @GetMapping("/athletes/{athleteId}/features/summary")

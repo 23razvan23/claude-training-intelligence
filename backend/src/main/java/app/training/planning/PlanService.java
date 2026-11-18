@@ -27,10 +27,12 @@ public class PlanService {
 
     private final PlanRepository repo;
     private final AthleteRepository athletes;
+    private final DemandDefaults demandDefaults;
 
-    public PlanService(PlanRepository repo, AthleteRepository athletes) {
+    public PlanService(PlanRepository repo, AthleteRepository athletes, DemandDefaults demandDefaults) {
         this.repo = repo;
         this.athletes = athletes;
+        this.demandDefaults = demandDefaults;
     }
 
     public List<Plan> plans(long athleteId) {
@@ -133,8 +135,8 @@ public class PlanService {
         return p;
     }
 
-    private static SessionRequest valid(SessionRequest r) {
-        var result = SessionValidator.check(r);
+    private SessionRequest valid(SessionRequest r) {
+        var result = SessionValidator.check(r, demandDefaults.current());
         if (!result.ok()) throw ApiException.badRequest(String.join("; ", result.problems()));
         return result.session();
     }

@@ -24,7 +24,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Stage 2-1b (ADR 0019) against a real database: append-only, latest wins per scope, who may log. */
+/** Stage 2-1b (ADR 0020) against a real database: append-only, latest wins per scope, who may log. */
 @AutoConfigureMockMvc
 class CheckinIT extends IntegrationTest {
     @Autowired MockMvc mvc;

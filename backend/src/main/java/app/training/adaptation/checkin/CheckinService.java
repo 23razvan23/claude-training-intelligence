@@ -11,7 +11,7 @@ import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
-/** Check-ins (stage 2-1b, ADR 0019): resolve the scope, validate, append. Never updates or deletes. */
+/** Check-ins (stage 2-1b, ADR 0020): resolve the scope, validate, append. Never updates or deletes. */
 @Service
 public class CheckinService {
     private final CheckinRepository repo;

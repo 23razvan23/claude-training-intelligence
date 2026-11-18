@@ -1,4 +1,4 @@
-// Today and Trends screenshots at phone width (390 px), light and dark, on synthetic data only.
+// Today, Trends and Plan screenshots at phone width (390 px), light and dark, on synthetic data only.
 // Usage: npm run build && npx vite preview --port 4173 &  then  node scripts/screenshots.cjs <outDir>
 // The API is faked in the browser: nothing here talks to a backend or reads real data.
 const { chromium } = require('playwright');
@@ -120,6 +120,28 @@ scenarios['sync-failed'] = scenarios.stale;
 scenarios['sync-reconnect'] = scenarios.stale;
 scenarios['sync-nodata'] = scenarios.stale;
 
+
+// Synthetic Plan (stage 2-1a): this week and next, a skipped session, an empty later week.
+const PLAN_NOW = '2026-11-18T08:00:00Z';
+const planBody = [{ id: 7, athleteId: 1, name: 'Autumn block', origin: 'MANUAL', status: 'ACTIVE', startDate: '2026-11-16', endDate: '2026-12-13' }];
+const sess = (id, date, sessionType, demand, over = {}) => ({ id, athleteId: 1, planId: 7, date, sessionType, demand, title: '', status: 'PLANNED', ...over });
+const sessionsBody = [
+  sess(1, '2026-11-16', 'rest', 'EASY', { status: 'DONE' }),
+  sess(2, '2026-11-17', 'easy', 'EASY', { targetDistanceKm: 10, targetDurationMin: 55, status: 'DONE', description: 'Z2, relaxed' }),
+  sess(3, '2026-11-18', 'vo2max', 'KEY', { title: 'Track 5 × 1 km', targetDistanceKm: 12, targetDurationMin: 65, description: '3 km warm-up, 5 × 1 km @ 3:35 /km with 2 min jog, 2 km cool-down' }),
+  sess(4, '2026-11-19', 'recovery', 'EASY', { targetDistanceKm: 6, description: 'Very easy, HR under Z2' }),
+  sess(5, '2026-11-20', 'strides', 'EASY', { title: 'Easy + strides', targetDistanceKm: 8, description: '6 × 20 s strides at the end' }),
+  sess(6, '2026-11-22', 'long', 'KEY', { targetDistanceKm: 24, targetDurationMin: 125, description: 'Last 5 km at marathon effort', notes: 'Take a gel at 60 min' }),
+  sess(7, '2026-11-24', 'easy', 'EASY', { targetDistanceKm: 10 }),
+  sess(8, '2026-11-25', 'threshold', 'KEY', { title: 'Tempo', targetDistanceKm: 13, description: '3 km WU, 2 × 15 min @ T, 2 km CD' }),
+  sess(9, '2026-11-26', 'hills', 'SUPPORTING', { targetDistanceKm: 10, status: 'SKIPPED' }),
+  sess(10, '2026-11-29', 'long', 'KEY', { targetDistanceKm: 26 }),
+];
+const planTypes = ['easy', 'recovery', 'long', 'long_fast_finish', 'threshold', 'vo2max', 'race_pace', 'hills', 'strides', 'race', 'cross', 'rest'].map((code) => ({
+  code,
+  defaultDemand: ['long', 'long_fast_finish', 'threshold', 'vo2max', 'race_pace', 'race'].includes(code) ? 'KEY' : code === 'hills' ? 'SUPPORTING' : 'EASY',
+}));
+
 (async () => {
   const browser = await chromium.launch();
   for (const scheme of ['light', 'dark']) {
@@ -170,7 +192,34 @@ scenarios['sync-nodata'] = scenarios.stale;
       await ctx.close();
     }
   }
-
+  for (const scheme of ['light', 'dark']) {
+    for (const view of ['coach', 'edit', 'athlete']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme });
+      const page = await ctx.newPage();
+      await page.clock.setFixedTime(new Date(PLAN_NOW));
+      await page.route('**/api/**', (route) => {
+        const url = new URL(route.request().url()).pathname;
+        const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+        const role = view === 'athlete' ? 'ATHLETE' : 'COACH';
+        if (url === '/api/auth/me') return json({ username: role.toLowerCase(), role, athleteId: 1 });
+        if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
+        if (url === '/api/athletes/1/plans') return json(planBody);
+        if (url === '/api/athletes/1/sessions') return json(sessionsBody);
+        if (url === '/api/plan/session-types') return json(planTypes);
+        return route.fulfill({ status: 404, body: '' });
+      });
+      await page.goto(`${BASE}/plan`);
+      await page.waitForSelector('section.plan .session');
+      if (view === 'edit') await page.getByRole('button', { name: 'Edit', exact: true }).nth(2).click();
+      await page.waitForTimeout(150);
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      const name = `plan-${view}-${scheme}.png`;
+      if (width > 390) throw new Error(`${name}: horizontal scroll (${width}px wide)`);
+      await page.screenshot({ path: path.join(out, name), fullPage: true });
+      console.log(`${name} (scrollWidth ${width})`);
+      await ctx.close();
+    }
+  }
   // Check-in (stage 2-1b): the empty form, a filled form with a niggle, and the coach's view with everyone's list.
   const checkinOptions = (current) => ({
     today: TODAY, date: TODAY, timezone: 'Europe/Bucharest',

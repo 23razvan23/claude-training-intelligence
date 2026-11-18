@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import type { Checkin, CheckinInput, CheckinOptions } from './api/types';
 
-// Pure helpers for the Check-in form (stage 2-1b, ADR 0019): the form state, what is sent, what is prefilled.
+// Pure helpers for the Check-in form (stage 2-1b, ADR 0020): the form state, what is sent, what is prefilled.
 
 /** What the athlete is answering about: the whole day, one activity or one planned session. */
 export type Scope = { kind: 'day' } | { kind: 'activity'; id: number } | { kind: 'session'; id: number };

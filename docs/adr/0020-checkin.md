@@ -1,4 +1,4 @@
-# ADR 0019: Athlete check-in (stage 2-1b)
+# ADR 0020: Athlete check-in (stage 2-1b)
 
 - Status: accepted (2026-11-18; coach answers the same day: the coach may log for an athlete, RPE of the day, niggle severity included, seeding from Garmin wanted but not built yet)
 - Related: ADR 0018 D6 (what "latest wins" means; `subjective_current`), ADR 0008 (scoring, **unchanged**), ADR 0017 (golden check). Migration: `V23__checkin.sql`.

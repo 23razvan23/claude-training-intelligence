@@ -1,4 +1,4 @@
--- Stage 2-1b: athlete check-in (ADR 0019). subjective_log becomes truly append-only,
+-- Stage 2-1b: athlete check-in (ADR 0020). subjective_log becomes truly append-only,
 -- says where a row came from and whether the coach entered it, and refuses incoherent niggle answers.
 
 -- 1. Where a row came from, and who it was entered for.

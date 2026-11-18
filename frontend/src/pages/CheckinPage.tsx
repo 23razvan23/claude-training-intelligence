@@ -29,7 +29,7 @@ import {
 } from '../checkin';
 import { formatDay } from '../today';
 
-// The 10-second check-in (stage 2-1b, ADR 0019). Every save adds a row; the newest answer for a day and scope counts.
+// The 10-second check-in (stage 2-1b, ADR 0020). Every save adds a row; the newest answer for a day and scope counts.
 
 const RPE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const FIVE = [1, 2, 3, 4, 5];

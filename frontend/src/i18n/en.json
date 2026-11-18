@@ -1,6 +1,6 @@
 {
   "app": { "name": "Training Intelligence", "short": "TI" },
-  "nav": { "today": "Today", "checkin": "Check-in", "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "holdout": "Holdout", "trends": "Trends", "logout": "Log out" },
+  "nav": { "today": "Today", "checkin": "Check-in", "athletes": "Athletes", "imports": "Imports", "coverage": "Coverage", "calibration": "Calibration", "holdout": "Holdout", "trends": "Trends", "plan": "Plan", "logout": "Log out" },
   "theme": { "toggle": "Switch theme", "light": "Light", "dark": "Dark", "system": "System" },
   "common": {
     "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "loading": "Loading…",
@@ -21,6 +21,39 @@
     "login": "Athlete login", "loginExists": "Has login: {{username}}", "createLogin": "Create login",
     "loginHint": "Lets the athlete see their own data. Password at least 10 characters.",
     "loginCreated": "Login created."
+  },
+  "plan": {
+    "title": "Plan", "addSession": "Add session", "editSession": "Edit session", "newPlan": "New plan", "editPlan": "Edit plan",
+    "completePlan": "Mark plan completed",
+    "noPlanCoach": "No active plan yet. Create one, then add this week's sessions.",
+    "noPlanAthlete": "Your coach hasn't entered a plan yet.",
+    "readOnly": "Your coach plans these sessions. Ask them if a day doesn't work for you.",
+    "weekOf": "Week of {{date}}",
+    "weekSummary_one": "{{count}} session · {{km}} km · {{key}} key",
+    "weekSummary_other": "{{count}} sessions · {{km}} km · {{key}} key",
+    "emptyWeek": "Nothing planned.",
+    "km": "{{value}} km", "min": "{{value}} min", "strain": "strain {{value}}",
+    "history": "History",
+    "preferSkip": "Session not happening? Set its status to Skipped or Replaced instead of deleting it: a delete also removes its history.",
+    "confirmDelete": "Delete this session and its history? This cannot be undone. Setting it to Skipped keeps the history.",
+    "demand": { "KEY": "Key", "SUPPORTING": "Supporting", "EASY": "Easy" },
+    "status": { "PLANNED": "Planned", "DONE": "Done", "SKIPPED": "Skipped", "REPLACED": "Replaced" },
+    "change": { "CREATE": "Created", "EDIT": "Edited", "DELETE": "Deleted" },
+    "type": {
+      "easy": "Easy", "recovery": "Recovery", "long": "Long run", "long_fast_finish": "Long run with fast finish",
+      "threshold": "Threshold / tempo", "vo2max": "VO2max intervals", "race_pace": "Race pace", "hills": "Hills",
+      "strides": "Strides", "race": "Race", "cross": "Cross-training", "rest": "Rest"
+    },
+    "field": {
+      "date": "Date", "type": "Type", "demand": "Demand", "title": "Title (optional)", "description": "Workout",
+      "descriptionHint": "e.g. 3 km warm-up, 5 × 1 km @ 3:50 /km, 2 km cool-down", "km": "Distance (km)", "min": "Duration (min)",
+      "strain": "Estimated strain (0–21)", "strainHint": "optional", "status": "Status", "notes": "Notes",
+      "planName": "Plan name", "start": "Starts", "end": "Ends"
+    },
+    "changed": {
+      "date": "date", "sessionType": "type", "demand": "demand", "title": "title", "description": "workout",
+      "targetDistanceKm": "distance", "targetDurationMin": "duration", "estStrain": "strain", "status": "status", "notes": "notes"
+    }
   },
   "imports": {
     "title": "Imports",

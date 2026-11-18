@@ -448,7 +448,74 @@ export interface GarminCheckReport {
   }[];
 }
 
-// Check-in (stage 2-1b, ADR 0019). `scope` is what the answers are about: a planned session, an activity, or the whole day.
+/** Plans and planned sessions (stage 2-1a, ADR 0019). */
+export type Demand = 'KEY' | 'SUPPORTING' | 'EASY';
+export type SessionStatus = 'PLANNED' | 'DONE' | 'SKIPPED' | 'REPLACED';
+export type PlanStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+
+export interface Plan {
+  id: number;
+  athleteId: number;
+  name: string;
+  origin: 'GENERATED' | 'MANUAL' | 'IMPORTED';
+  status: PlanStatus;
+  startDate: string;
+  endDate: string;
+}
+
+export interface PlanInput {
+  name: string;
+  startDate: string;
+  endDate: string;
+  status?: PlanStatus;
+}
+
+export interface SessionTypeInfo {
+  code: string;
+  defaultDemand: Demand;
+}
+
+export interface PlannedSession {
+  id: number;
+  athleteId: number;
+  planId?: number | null;
+  date: string;
+  sessionType: string;
+  demand: Demand;
+  title: string;
+  description?: string | null;
+  targetDistanceKm?: number | null;
+  targetDurationMin?: number | null;
+  estStrain?: number | null;
+  status: SessionStatus;
+  notes?: string | null;
+}
+
+export interface SessionInput {
+  planId?: number;
+  date: string;
+  sessionType: string;
+  demand?: Demand;
+  title?: string;
+  description?: string;
+  targetDistanceKm?: number;
+  targetDurationMin?: number;
+  estStrain?: number;
+  status?: SessionStatus;
+  notes?: string;
+}
+
+export interface SessionRevision {
+  id: number;
+  sessionId: number;
+  changeKind: 'CREATE' | 'EDIT' | 'DELETE';
+  before?: PlannedSession | null;
+  after?: PlannedSession | null;
+  changedBy?: string | null;
+  changedAt: string;
+}
+
+// Check-in (stage 2-1b, ADR 0020). `scope` is what the answers are about: a planned session, an activity, or the whole day.
 export type CheckinScope = 'session' | 'activity' | 'day';
 
 export interface Checkin {

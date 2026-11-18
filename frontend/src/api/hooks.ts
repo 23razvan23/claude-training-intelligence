@@ -16,6 +16,12 @@ import type {
   ImportBatch,
   Me,
   ModelVersion,
+  Plan,
+  PlanInput,
+  PlannedSession,
+  SessionInput,
+  SessionRevision,
+  SessionTypeInfo,
   RecomputeResult,
   Today,
   Trends,
@@ -310,5 +316,71 @@ export function useGarminCheck(athleteId?: number) {
   return useMutation({
     mutationFn: (range: { from: string; to: string }) =>
       api<GarminCheckReport>(`/api/athletes/${athleteId}/garmin/check`, { method: 'POST', body: JSON.stringify(range) }),
+  });
+}
+
+// ---- Plan (stage 2-1a, ADR 0019) ----
+
+export function useSessionTypes() {
+  return useQuery({ queryKey: ['sessionTypes'], queryFn: () => api<SessionTypeInfo[]>('/api/plan/session-types'), staleTime: Infinity });
+}
+
+export function usePlans(athleteId?: number) {
+  return useQuery({
+    queryKey: ['plans', athleteId],
+    queryFn: () => api<Plan[]>(`/api/athletes/${athleteId}/plans`),
+    enabled: athleteId != null,
+  });
+}
+
+export function useSessions(athleteId: number | undefined, from: string, to: string) {
+  return useQuery({
+    queryKey: ['sessions', athleteId, from, to],
+    queryFn: () => api<PlannedSession[]>(`/api/athletes/${athleteId}/sessions?from=${from}&to=${to}`),
+    enabled: athleteId != null,
+  });
+}
+
+export function useSessionRevisions(sessionId?: number) {
+  return useQuery({
+    queryKey: ['sessionRevisions', sessionId],
+    queryFn: () => api<SessionRevision[]>(`/api/sessions/${sessionId}/revisions`),
+    enabled: sessionId != null,
+  });
+}
+
+function invalidatePlan(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['plans'] });
+  void qc.invalidateQueries({ queryKey: ['sessions'] });
+  void qc.invalidateQueries({ queryKey: ['sessionRevisions'] });
+}
+
+export function useSavePlan(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: number; input: PlanInput }) =>
+      id
+        ? api<Plan>(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+        : api<Plan>(`/api/athletes/${athleteId}/plans`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => invalidatePlan(qc),
+  });
+}
+
+export function useSaveSession(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: number; input: SessionInput }) =>
+      id
+        ? api<PlannedSession>(`/api/sessions/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+        : api<PlannedSession>(`/api/athletes/${athleteId}/sessions`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => invalidatePlan(qc),
+  });
+}
+
+export function useDeleteSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
+    onSuccess: () => invalidatePlan(qc),
   });
 }

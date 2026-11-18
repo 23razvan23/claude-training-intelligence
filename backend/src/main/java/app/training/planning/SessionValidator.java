@@ -5,6 +5,7 @@ import app.training.planning.SessionTypes.Status;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Checks one session before it is saved, and fills in what may be left out (demand from the type, status PLANNED).
@@ -27,7 +28,16 @@ public final class SessionValidator {
         }
     }
 
+    /** Checks with the built-in default demand per type (settings version 1's values). */
     public static Result check(SessionRequest r) {
+        return check(r, SessionTypes::defaultDemand);
+    }
+
+    /**
+     * Checks one session; a session without a demand gets {@code defaultDemand} of its type, normally the current
+     * settings store values ({@link DemandDefaults#current()}, ADR 0021).
+     */
+    public static Result check(SessionRequest r, Function<String, SessionTypes.Demand> defaultDemand) {
         List<String> problems = new ArrayList<>();
         if (r == null) return new Result(null, List.of("No session given"));
         if (r.date() == null) problems.add("Date is missing");
@@ -45,7 +55,7 @@ public final class SessionValidator {
         if (!problems.isEmpty()) return new Result(null, List.copyOf(problems));
 
         var completed = new SessionRequest(r.planId(), r.date(), r.sessionType(),
-                r.demand() != null ? r.demand() : SessionTypes.defaultDemand(r.sessionType()),
+                r.demand() != null ? r.demand() : defaultDemand.apply(r.sessionType()),
                 blankToNull(r.title()), blankToNull(r.description()), r.targetDistanceKm(), r.targetDurationMin(),
                 r.estStrain(), r.status() != null ? r.status() : Status.PLANNED, blankToNull(r.notes()));
         return new Result(completed, List.of());

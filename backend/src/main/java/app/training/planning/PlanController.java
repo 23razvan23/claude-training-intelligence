@@ -27,16 +27,18 @@ public class PlanController {
     private final PlanService plans;
     private final AccessPolicy access;
     private final PlanImportService imports;
+    private final DemandDefaults demandDefaults;
 
-    public PlanController(PlanService plans, AccessPolicy access, PlanImportService imports) {
+    public PlanController(PlanService plans, AccessPolicy access, PlanImportService imports, DemandDefaults demandDefaults) {
         this.plans = plans;
         this.imports = imports;
         this.access = access;
+        this.demandDefaults = demandDefaults;
     }
 
     @GetMapping("/plan/session-types")
     public List<SessionTypes.SessionType> sessionTypes() {
-        return SessionTypes.all();
+        return SessionTypes.all(demandDefaults.current());
     }
 
     @GetMapping("/athletes/{athleteId}/plans")

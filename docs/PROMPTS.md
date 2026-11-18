@@ -265,6 +265,11 @@ Done when: tests pass; on my data, a SQL or UI spot check of my tolerance and AC
 plausible to me.
 ```
 
+Status (2026-11-18): split in two PRs (ADR 0021). PR 1 (settings store, coach-wide by the coach's
+decision; default demand per type moved into it; load signals) is done. For PR 2, continue from
+ADR 0021 D9–D11 (readiness, sleep debt, check-in flags, session demand, running tolerance with a
+coach override, Athletes and Trends screens); the coach's answers are recorded there.
+
 ---
 
 ## Stage 2-3: Rules engine & suggestion workflow

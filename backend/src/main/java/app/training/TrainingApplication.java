@@ -16,6 +16,9 @@ public class TrainingApplication {
         if (args.length > 0 && app.training.metrics.GoldenCli.COMMAND.equals(args[0])) {
             System.exit(app.training.metrics.GoldenCli.main(TrainingApplication.class, args));
         }
+        if (args.length > 0 && app.training.adaptation.signals.SignalsCli.COMMAND.equals(args[0])) {
+            System.exit(app.training.adaptation.signals.SignalsCli.main(TrainingApplication.class, args));
+        }
         SpringApplication.run(TrainingApplication.class, args);
     }
 }

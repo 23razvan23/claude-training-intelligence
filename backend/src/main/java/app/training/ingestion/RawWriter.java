@@ -225,6 +225,21 @@ public class RawWriter {
     }
 
     /**
+     * Keeps the effort fields of a Garmin summary (ADR 0020 amendment), once per activity. A summary
+     * that comes again, or that matched an activity already stored from a FIT file, fills in the
+     * activity's row if it has none; an existing row is never changed.
+     */
+    public void activityEffort(Ctx ctx, long activityId, Integer workoutRpe, Integer workoutFeel) {
+        if (workoutRpe == null && workoutFeel == null) return;
+        int n = jdbc.sql("""
+                INSERT INTO activity_effort (activity_id, workout_rpe, workout_feel, import_batch_id)
+                VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING""")
+                .params(activityId, workoutRpe, workoutFeel, ctx.batchId()).update();
+        if (n > 0) ctx.stats().inserted("activity_effort", n);
+        else ctx.stats().duplicates("activity_effort", 1);
+    }
+
+    /**
      * Finds an activity from {@code source} that started within {@code tolerance} of {@code start}.
      * Used to recognise the same workout arriving as a summary and as a FIT file.
      */

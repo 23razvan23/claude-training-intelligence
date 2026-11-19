@@ -48,6 +48,9 @@ public final class SettingsCatalog {
         s.add(new Setting("signals.sleep.debtWindowDays", 7, "Spec: accumulated shortfall over the last 7 days."));
         s.add(new Setting("signals.sleep.surplusPaysBack", true,
                 "A longer night pays back an earlier short one; the debt never goes below 0 (coach, 2026-11-18)."));
+        // Check-in flags.
+        s.add(new Setting("signals.subjective.niggleStaleDays", 7,
+                "A niggle not reported for a week is taken as gone even if nobody said so; a heuristic, the athlete can mark it gone sooner."));
         // Running tolerance (SPEC.md Module 3), in km per week (coach, 2026-11-18).
         s.add(new Setting("signals.tolerance.lookbackDays", 365, "Spec: the last 12 months."));
         s.add(new Setting("signals.tolerance.windowWeeks", 4, "Spec: the highest 4-week average of weekly running volume."));

@@ -548,5 +548,55 @@
       "spo2": "Blood oxygen in sleep {{v}}%",
       "bodyBattery": "Body Battery peak {{v}}"
     }
+  },
+  "signals": {
+    "title": "Engine signals",
+    "none": "No signals yet. They are computed after Recompute features and the morning sync.",
+    "asOf": "Newest day: {{date}}. These are what the adaptive engine will weigh; it suggests, you decide.",
+    "readiness": "Recovery {{pct}}% ({{band}}); vs the previous {{shortDays}} days {{short}}, vs {{longDays}} days {{long}}.",
+    "readinessNone": "No recovery score for this day.",
+    "nonGreen": "Not green for {{n}} days in a row.",
+    "sleep": "Sleep debt over {{days}} nights: {{h}} h ({{nights}} of a night's need).",
+    "sleepNone": "No sleep debt: sleep or sleep need not recorded.",
+    "acwr": "Acute ÷ chronic load: {{total}} overall, {{running}} running.",
+    "acwrNote": "The load ratio is one signal among several, not a verdict: its value as an injury predictor is disputed.",
+    "foster": "Monotony {{monotony}}, weekly strain {{strain}} (Foster).",
+    "fosterNone": "No monotony: {{n}} of {{days}} days recorded, or every day had the same load.",
+    "illness": "Illness reported",
+    "injury": "Injury reported",
+    "niggle": "{{where}} niggle, day {{days}}",
+    "hrvNote": "Readiness signals start on {{date}}, the first night with overnight HRV.",
+    "volume": {
+      "title": "Running: last 7 days vs tolerance",
+      "km7": "Running km, last 7 days",
+      "tolerance": "Tolerance (km/week)",
+      "now": "Running: {{km7}} km in the last 7 days, {{avg21}} km/week over 3 weeks; tolerance {{tol}} km/week ({{share}}% used this week)."
+    }
+  },
+  "tolerance": {
+    "title": "Running tolerance: {{name}}",
+    "notYet": "Not computed yet. Press Recompute features on the Calibration page, or wait for the morning sync.",
+    "value": "{{km}} km/week",
+    "noValue": "No tolerance",
+    "source": { "computed": "computed", "override": "your override", "none": "no running in the last 12 months" },
+    "now": "Now: {{km7}} km in the last 7 days ({{share}}% of tolerance), {{avg21}} km/week over 3 weeks.",
+    "note": "Settings: 4-week window, 12 months, −10% per interrupted week beyond the first, capped by the chronic running volume. All configurable (stage 2-5). Check-ins only exist from November 2026, so earlier weeks count as free of niggles.",
+    "steps": {
+      "none": "No running recorded in the last 12 months.",
+      "peak": "Best 4-week average without a niggle or injury in the last 12 months: {{km}} km/week ({{from}} to {{to}}).",
+      "flagged": "{{n}} four-week windows were left out because a niggle or injury was reported in them.",
+      "decay": "{{weeks}} interrupted weeks since then; {{decayWeeks}} beyond the first take {{pct}}% off: {{km}} km/week.",
+      "noDecay": "Interrupted weeks since then: {{weeks}}; no decay.",
+      "noCap": "Not capped yet: too few days for a chronic running volume.",
+      "capped": "Capped by the chronic running volume ({{chronic}} km/week): {{km}} km/week.",
+      "underCap": "Below the chronic cap of {{km}} km/week.",
+      "override": "Your override of {{km}} km/week counts since {{since}} (computed: {{computed}} km/week)."
+    },
+    "overrideKm": "Override (km/week)",
+    "overrideNote": "Why (optional)",
+    "setOverride": "Set override",
+    "clearOverride": "Use the computed value",
+    "history": "Override history ({{n}})",
+    "cleared": "override cleared"
   }
 }

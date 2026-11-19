@@ -310,3 +310,7 @@ button.save { min-height: 48px; font-weight: 600; }
 .import-row .problem { color: var(--danger); margin: 0; }
 .import-row .caution { color: var(--warn); margin: 0; }
 .import-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* Stage 2-2: tolerance card */
+.big { font-size: 1.5rem; font-weight: 600; margin: 0; }
+.grow { flex: 1 1 12rem; }

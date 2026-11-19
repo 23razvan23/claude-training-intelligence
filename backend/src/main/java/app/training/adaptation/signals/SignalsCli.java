@@ -65,12 +65,13 @@ public final class SignalsCli {
 
     static String summary(SignalService.Outcome o) {
         if (o.days() == 0) return "Signals " + o.signalsVersion() + ": no days with features yet (settings version " + o.settingsVersion() + ").";
-        var l = o.latest();
+        var l = o.latest().load();
+        var tol = o.latest().tolerance();
         return "Signals " + o.signalsVersion() + " (settings version " + o.settingsVersion() + "): " + o.days() + " days, " + o.from()
                 + " to " + o.to() + ". On " + l.date() + ": acute " + l.load().acute() + ", chronic " + l.load().chronic() + ", ACWR "
                 + l.load().acwr() + "; running ACWR " + l.load().running().acwr() + "; running " + l.running().shortKm() + " km in "
                 + l.running().shortWindowDays() + " days, " + l.running().longKm() + " km in " + l.running().longWindowDays()
-                + " days; monotony " + l.foster().monotony() + ".";
+                + " days; monotony " + l.foster().monotony() + "; running tolerance " + tol.kmPerWeek() + " km/week (" + tol.source() + ").";
     }
 
     public static int main(Class<?> app, String[] args) {

@@ -1,5 +1,6 @@
 package app.training.adaptation.checkin;
 
+import app.training.adaptation.signals.SignalService;
 import app.training.security.AccessPolicy;
 import app.training.security.CurrentUser;
 import java.time.LocalDate;
@@ -20,10 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class CheckinController {
     private final CheckinService checkins;
     private final AccessPolicy access;
+    private final SignalService signals;
 
-    public CheckinController(CheckinService checkins, AccessPolicy access) {
+    public CheckinController(CheckinService checkins, AccessPolicy access, SignalService signals) {
         this.checkins = checkins;
         this.access = access;
+        this.signals = signals;
     }
 
     @GetMapping("/api/athletes/{athleteId}/checkins/options")
@@ -38,7 +41,11 @@ public class CheckinController {
     public CheckinView create(@PathVariable long athleteId, @RequestBody CheckinRequest request,
                               @AuthenticationPrincipal CurrentUser user) {
         access.requireAthlete(user, athleteId);
-        return checkins.create(athleteId, request, user);
+        var saved = checkins.create(athleteId, request, user);
+        // Stage 2-2 (ADR 0021 D8): the check-in flags and running tolerance follow the new answer; a failure there
+        // is logged and never loses the check-in, which is already saved.
+        signals.recomputeQuietly(athleteId);
+        return saved;
     }
 
     @GetMapping("/api/athletes/{athleteId}/checkins/recent")

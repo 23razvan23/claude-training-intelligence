@@ -99,6 +99,49 @@ const scenarios = {
   },
 };
 
+// Synthetic engine signals (stage 2-2, ADR 0021) for the last 365 days of the trends window.
+function signalsBody() {
+  const DAY = 86400000;
+  const iso = (n) => new Date(n * DAY).toISOString().slice(0, 10);
+  const to = Math.round(Date.parse(TODAY + 'T00:00:00Z') / DAY);
+  const rows = [];
+  for (let n = to - 364; n <= to; n++) {
+    const date = iso(n);
+    if (date >= '2026-10-20' && date <= '2026-10-26') continue;
+    const i = n - (to - 364);
+    const km7 = Math.round((38 + 14 * Math.sin(i / 20) + (i % 5)) * 10) / 10;
+    const tol = Math.round((44 + 6 * Math.sin(i / 60)) * 10) / 10;
+    rows.push({
+      date,
+      signalsVersion: 's2',
+      settingsVersion: 2,
+      computedAt: `${date}T05:05:00Z`,
+      signals: {
+        load: { method: 'edwards', daily: 120, acute: 112.4, chronic: 101.9, acwr: 1.103, running: { daily: 95, acute: 88.1, chronic: 70.2, acwr: 1.255 } },
+        foster: { windowDays: 7, knownDays: 7, weekLoad: 742, mean: 106, sd: 61.2, monotony: 1.732, strain: 1285 },
+        running: { shortWindowDays: 7, shortKm: km7, shortMinutes: km7 * 5.6, longWindowDays: 21, longKm: km7 * 3, longMinutes: km7 * 17, longWeeklyAvgKm: km7 },
+        readiness: { recoveryPct: 54, band: 'YELLOW', trendShort: -7.3, trendShortDays: 3, trendLong: -11, trendLongDays: 7, bandStreakDays: 2, nonGreenStreakDays: 2, beforeHrv: false },
+        sleep: { windowDays: 7, knownNights: 7, debtMin: 312, nightsOfNeed: 0.69 },
+        subjective: { checkins: 1, illness: false, injury: false, illnessDaysLast7: 0, injuryDaysLast7: 0, niggles: [{ location: 'calf', since: '2026-11-14', persistDays: 3, severity: 2 }], flagged: true },
+        tolerance: { kmPerWeek: tol, source: 'computed', computedKmPerWeek: tol, peakKmPerWeek: 61.3, peakFrom: '2026-04-13', peakTo: '2026-05-10', cleanWindows: 330, flaggedWindows: 4, interruptedWeeks: 2, decayWeeks: 1, decayFactor: 0.9, decayedKmPerWeek: 55.2, chronicKmPerWeek: tol, capKmPerWeek: tol, capped: true },
+      },
+    });
+  }
+  return rows;
+}
+
+const toleranceBody = (override) => {
+  const last = signalsBody().slice(-1)[0];
+  const t = { ...last.signals.tolerance };
+  if (override) Object.assign(t, { kmPerWeek: 50, source: 'override', override: { kmPerWeek: 50, note: 'marathon build, no niggles', since: '2026-11-16' } });
+  return {
+    date: last.date,
+    tolerance: t,
+    running: last.signals.running,
+    overrides: override ? [{ id: 1, kmPerWeek: 50, note: 'marathon build, no niggles', createdBy: 'coach', createdAt: '2026-11-16T08:00:00Z' }] : [],
+  };
+};
+
 // Garmin sync states on Today (ADR 0015 D9): the same stale day, three different reasons.
 const synced = (over) => ({
   connection: 'CONNECTED',
@@ -178,6 +221,7 @@ const planTypes = ['easy', 'recovery', 'long', 'long_fast_finish', 'threshold', 
         if (url === '/api/auth/me') return json({ username: 'coach', role: 'COACH', athleteId: 1 });
         if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
         if (url === '/api/athletes/1/trends') return json(trendsBody());
+        if (url === '/api/athletes/1/signals') return json(signalsBody());
         return route.fulfill({ status: 404, body: '' });
       });
       await page.goto(`${BASE}/trends`);
@@ -261,6 +305,31 @@ const planTypes = ['easy', 'recovery', 'long', 'long_fast_finish', 'threshold', 
       await page.waitForTimeout(250);
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       const file = `${name}-${scheme}.png`;
+      if (width > 390) throw new Error(`${file}: horizontal scroll (${width}px wide)`);
+      await page.screenshot({ path: path.join(out, file), fullPage: true });
+      console.log(`${file} (scrollWidth ${width})`);
+      await ctx.close();
+    }
+  }
+  // Athletes: running tolerance with its derivation and the override (stage 2-2, ADR 0021 D11).
+  for (const scheme of ['light', 'dark']) {
+    for (const override of [false, true]) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme });
+      const page = await ctx.newPage();
+      await page.route('**/api/**', (route) => {
+        const url = new URL(route.request().url()).pathname;
+        const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+        if (url === '/api/auth/me') return json({ username: 'coach', role: 'COACH' });
+        if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest', hrMax: 184 }]);
+        if (url === '/api/athletes/1/tolerance') return json(toleranceBody(override));
+        if (url === '/api/users') return json([]);
+        return route.fulfill({ status: 404, body: '' });
+      });
+      await page.goto(`${BASE}/athletes`);
+      await page.waitForSelector('[data-testid="tolerance-card"]');
+      if (override) await page.getByText('Override history').click();
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      const file = `tolerance-${override ? 'override' : 'computed'}-${scheme}.png`;
       if (width > 390) throw new Error(`${file}: horizontal scroll (${width}px wide)`);
       await page.screenshot({ path: path.join(out, file), fullPage: true });
       console.log(`${file} (scrollWidth ${width})`);

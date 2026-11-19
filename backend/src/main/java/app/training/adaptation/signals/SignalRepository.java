@@ -74,8 +74,96 @@ public class SignalRepository {
         return out;
     }
 
+    public record Score(Integer recoveryPct, String band, Integer sleepNeedMin) {}
+
+    /** Module 1 scores of one model version (the ACTIVE one), per day. */
+    public Map<LocalDate, Score> scores(long athleteId, String modelVersion) {
+        var out = new HashMap<LocalDate, Score>();
+        jdbc.sql("""
+                SELECT cycle_date, recovery_pct, recovery_band, sleep_need_min FROM derived_day_metrics
+                WHERE athlete_id = ? AND model_version = ?""")
+                .params(athleteId, modelVersion)
+                .query(rs -> {
+                    out.put(rs.getObject("cycle_date", LocalDate.class), new Score((Integer) rs.getObject("recovery_pct"),
+                            rs.getString("recovery_band"), (Integer) rs.getObject("sleep_need_min")));
+                });
+        return out;
+    }
+
+    /** Minutes asleep per night (read only from day_features; Garmin main sleep, as the features count it). */
+    public Map<LocalDate, Integer> sleptMinutes(long athleteId, String featureVersion) {
+        var out = new HashMap<LocalDate, Integer>();
+        jdbc.sql("SELECT cycle_date, sleep_minutes FROM day_features WHERE athlete_id = ? AND feature_version = ? AND sleep_minutes IS NOT NULL")
+                .params(athleteId, featureVersion)
+                .query(rs -> {
+                    out.put(rs.getObject("cycle_date", LocalDate.class), rs.getInt("sleep_minutes"));
+                });
+        return out;
+    }
+
+    /** The first day with overnight HRV (from 2025-09-17 on the coach's data, ADR 0004). */
+    public Optional<LocalDate> firstHrvDay(long athleteId, String featureVersion) {
+        return jdbc.sql("SELECT min(cycle_date) FROM day_features WHERE athlete_id = ? AND feature_version = ? AND rmssd IS NOT NULL")
+                .params(athleteId, featureVersion).query(LocalDate.class).optional();
+    }
+
+    /** The current check-ins (subjective_current, ADR 0018 D6), oldest first. */
+    public List<Subjective.Checkin> checkins(long athleteId) {
+        return jdbc.sql("""
+                SELECT log_date, scope_key, rpe, soreness, niggle_location, niggle_severity, niggle_resolved, injury, illness
+                FROM subjective_current WHERE athlete_id = ? ORDER BY log_date, created_at, id""")
+                .param(athleteId)
+                .query((rs, row) -> new Subjective.Checkin(rs.getObject("log_date", LocalDate.class), "day".equals(rs.getString("scope_key")),
+                        (Integer) rs.getObject("rpe"), (Integer) rs.getObject("soreness"), rs.getString("niggle_location"),
+                        (Integer) rs.getObject("niggle_severity"), rs.getBoolean("niggle_resolved"), rs.getBoolean("injury"),
+                        rs.getBoolean("illness")))
+                .list();
+    }
+
+    public record PlannedSession(long id, String type, String demand, Double estStrain, Double distanceKm, Integer durationMin, String status) {}
+
+    /** Planned sessions that still count (not skipped or replaced), per day. */
+    public Map<LocalDate, List<PlannedSession>> sessions(long athleteId, LocalDate from, LocalDate to) {
+        var out = new HashMap<LocalDate, List<PlannedSession>>();
+        jdbc.sql("""
+                SELECT id, session_date, session_type, demand, est_strain, target_distance_m, target_duration_min, status
+                FROM planned_session WHERE athlete_id = ? AND session_date BETWEEN ? AND ? AND status NOT IN ('SKIPPED', 'REPLACED')
+                ORDER BY session_date, id""")
+                .params(athleteId, from, to)
+                .query(rs -> {
+                    var strain = rs.getBigDecimal("est_strain");
+                    var dist = rs.getBigDecimal("target_distance_m");
+                    out.computeIfAbsent(rs.getObject("session_date", LocalDate.class), k -> new java.util.ArrayList<>())
+                            .add(new PlannedSession(rs.getLong("id"), rs.getString("session_type"), rs.getString("demand"),
+                                    strain == null ? null : strain.doubleValue(), dist == null ? null : dist.doubleValue() / 1000.0,
+                                    (Integer) rs.getObject("target_duration_min"), rs.getString("status")));
+                });
+        return out;
+    }
+
+    public record OverrideRow(long id, Double kmPerWeek, String note, String createdBy, Instant createdAt) {}
+
+    /** The coach's tolerance overrides, oldest first (append-only, ADR 0021 D11). */
+    public List<OverrideRow> overrides(long athleteId) {
+        return jdbc.sql("""
+                SELECT o.id, o.km_per_week, o.note, u.username, o.created_at FROM tolerance_override o
+                LEFT JOIN app_user u ON u.id = o.created_by WHERE o.athlete_id = ? ORDER BY o.created_at, o.id""")
+                .param(athleteId)
+                .query((rs, row) -> {
+                    var km = rs.getBigDecimal("km_per_week");
+                    return new OverrideRow(rs.getLong("id"), km == null ? null : km.doubleValue(), rs.getString("note"),
+                            rs.getString("username"), rs.getTimestamp("created_at").toInstant());
+                }).list();
+    }
+
+    public long insertOverride(long athleteId, Double kmPerWeek, String note, Long userId) {
+        return jdbc.sql("INSERT INTO tolerance_override (athlete_id, km_per_week, note, created_by) VALUES (?, ?, ?, ?) RETURNING id")
+                .params(athleteId, kmPerWeek == null ? null : java.math.BigDecimal.valueOf(kmPerWeek), note, userId)
+                .query(Long.class).single();
+    }
+
     /** Replaces this athlete's rows of one signals and settings version with {@code days}. */
-    public void replace(long athleteId, String signalsVersion, long settingsVersion, List<LoadSignals.Day> days) {
+    public void replace(long athleteId, String signalsVersion, long settingsVersion, List<DaySignals> days) {
         jdbc.sql("DELETE FROM day_signals WHERE athlete_id = ? AND signals_version = ? AND settings_version = ?")
                 .params(athleteId, signalsVersion, settingsVersion).update();
         template.batchUpdate("""
@@ -108,12 +196,17 @@ public class SignalRepository {
                 }).list();
     }
 
-    private String write(LoadSignals.Day d) {
+    private String write(DaySignals d) {
         try {
             var node = json.createObjectNode();
-            node.set("load", json.valueToTree(d.load()));
-            node.set("foster", json.valueToTree(d.foster()));
-            node.set("running", json.valueToTree(d.running()));
+            node.set("load", json.valueToTree(d.load().load()));
+            node.set("foster", json.valueToTree(d.load().foster()));
+            node.set("running", json.valueToTree(d.load().running()));
+            node.set("readiness", json.valueToTree(d.readiness()));
+            node.set("sleep", json.valueToTree(d.sleep()));
+            node.set("subjective", json.valueToTree(d.subjective()));
+            node.set("sessions", json.valueToTree(d.sessions()));
+            node.set("tolerance", json.valueToTree(d.tolerance()));
             return json.writeValueAsString(node);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(e);

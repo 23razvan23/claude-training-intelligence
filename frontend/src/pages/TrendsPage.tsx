@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useTrends } from '../api/hooks';
-import type { Trends } from '../api/types';
+import { useSignals, useTrends } from '../api/hooks';
+import type { StoredSignals, Trends } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
 import { LineChart } from '../components/LineChart';
+import { SignalsSection } from '../components/SignalsSection';
 import { formatDay } from '../today';
 import {
   ACUTE_DAYS,
@@ -26,15 +27,18 @@ export function TrendsPage() {
   const { t } = useTranslation();
   const { athleteId } = useAthleteSelection();
   const { data, error, isLoading } = useTrends(athleteId);
+  // Engine signals (stage 2-2, ADR 0021) for the longest range, once the trends say which day is today.
+  const signalsFrom = data ? dateGrid(data.from, data.to).slice(-RANGE_DAYS['12m'])[0] : undefined;
+  const { data: signals } = useSignals(athleteId, signalsFrom, data?.to);
 
   if (athleteId == null) return <p className="muted">{t('common.selectAthlete')}</p>;
   if (isLoading) return <p className="muted">{t('common.loading')}</p>;
   if (error) return <p className="warn">{t('common.error', { message: error.message })}</p>;
   if (!data) return null;
-  return <TrendsView data={data} />;
+  return <TrendsView data={data} signals={signals} />;
 }
 
-export function TrendsView({ data }: { data: Trends }) {
+export function TrendsView({ data, signals }: { data: Trends; signals?: StoredSignals[] }) {
   const { t, i18n } = useTranslation();
   const [range, setRange] = useState<Range>('3m');
 
@@ -191,6 +195,8 @@ export function TrendsView({ data }: { data: Trends }) {
         )}
         <p className="muted small">{t('trends.load.note')}</p>
       </div>
+
+      {signals && <SignalsSection rows={signals} dates={dates} firstHrvDate={data.firstHrvDate ?? null} />}
     </section>
   );
 }

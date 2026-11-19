@@ -9,6 +9,7 @@ import {
 } from '../api/hooks';
 import type { Athlete, AthleteInput, Zone } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
+import { ToleranceCard } from '../components/ToleranceCard';
 import { formatPace, parsePace } from '../pace';
 
 const EMPTY: AthleteInput = { name: '', timezone: 'Europe/Bucharest' };
@@ -18,7 +19,8 @@ const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
 export function AthletesPage() {
   const { t } = useTranslation();
   const { data: athletes, isLoading } = useAthletes();
-  const { setAthleteId } = useAthleteSelection();
+  const { athleteId, setAthleteId } = useAthleteSelection();
+  const selected = athletes?.find((a) => a.id === athleteId);
   const [editing, setEditing] = useState<Athlete | 'new' | null>(null);
 
   if (isLoading) return <p className="muted">{t('common.loading')}</p>;
@@ -59,6 +61,7 @@ export function AthletesPage() {
           </li>
         ))}
       </ul>
+      {selected && <ToleranceCard key={selected.id} athleteId={selected.id} athleteName={selected.name} />}
     </section>
   );
 }

@@ -163,7 +163,7 @@ describe('Trends', () => {
   it('shows the engine signals and running volume against tolerance (stage 2-2)', async () => {
     const row = (date: string, km: number): StoredSignals => ({
       date,
-      signalsVersion: 's2',
+      signalsVersion: 's3',
       settingsVersion: 1,
       computedAt: `${date}T06:00:00Z`,
       signals: {

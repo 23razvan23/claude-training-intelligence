@@ -10,9 +10,12 @@ import java.util.List;
  * <ol>
  *   <li><b>Peak</b>: the highest average weekly running km over any {@code windowWeeks}-week window [4] that lies in the
  *       last {@code lookbackDays} [365] and has no flagged day (a niggle not marked gone, or an injury).</li>
- *   <li><b>Decay for time away</b>: walking back from the day in 7-day blocks until the peak window, a block with less
- *       than {@code interruptedWeekShare} [0.5] of the peak is an interrupted week; each interrupted week beyond
- *       {@code graceWeeks} [1] takes {@code decayPerWeek} [10 %] of the peak off, down to 0.</li>
+ *   <li><b>Decay for time away</b>: a 7-day block with less than {@code interruptedWeekShare} [0.5] of the peak is an
+ *       interrupted week. Only the <i>current break</i> counts: walking back from the day in 7-day blocks (not past the
+ *       peak window), the interrupted weeks are counted until {@code returnWeeks} [2] normal weeks in a row are found,
+ *       which mark the end of the last break (ADR 0021 amendment, 2026-11-19: easier weeks scattered through steady
+ *       training are not time away). Each interrupted week of the current break beyond {@code graceWeeks} [1] takes
+ *       {@code decayPerWeek} [10 %] of the peak off, down to 0.</li>
  *   <li><b>Cap</b>: never above the chronic running volume (EWMA of daily running km over the chronic span, × 7) ×
  *       {@code chronicCapFactor} [1.0]. Without a chronic value yet (too few days), no cap is applied and that is said.</li>
  *   <li><b>Override</b>: the coach's newest override from its own day on replaces the computed number (shown beside it).</li>
@@ -23,11 +26,12 @@ public final class Tolerance {
     private Tolerance() {}
 
     public record Settings(int lookbackDays, int windowWeeks, double interruptedWeekShare, double decayPerWeek, int graceWeeks,
-                           double chronicCapFactor, int chronicSpanDays) {
+                           int returnWeeks, double chronicCapFactor, int chronicSpanDays) {
         public static Settings from(AppSettings s) {
             return new Settings(s.intAt("signals.tolerance.lookbackDays"), s.intAt("signals.tolerance.windowWeeks"),
                     s.doubleAt("signals.tolerance.interruptedWeekShare"), s.doubleAt("signals.tolerance.decayPerWeek"),
-                    s.intAt("signals.tolerance.graceWeeks"), s.doubleAt("signals.tolerance.chronicCapFactor"),
+                    s.intAt("signals.tolerance.graceWeeks"), s.intAt("signals.tolerance.returnWeeks"),
+                    s.doubleAt("signals.tolerance.chronicCapFactor"),
                     s.intAt("signals.load.chronicSpanDays"));
         }
     }
@@ -80,10 +84,16 @@ public final class Tolerance {
                         r(cap), false, override));
                 continue;
             }
-            int interrupted = 0;
-            for (int end = i; end - 6 > peakEnd; end -= 7) {
+            // The current break: interrupted weeks back from the day, until returnWeeks normal weeks in a row end it.
+            int interrupted = 0, normalInRow = 0;
+            for (int end = i; end - 6 > peakEnd && normalInRow < s.returnWeeks(); end -= 7) {
                 double block = km[end + 1] - km[end - 6];
-                if (block < s.interruptedWeekShare() * peak) interrupted++;
+                if (block < s.interruptedWeekShare() * peak) {
+                    interrupted++;
+                    normalInRow = 0;
+                } else {
+                    normalInRow++;
+                }
             }
             int decayWeeks = Math.max(0, interrupted - s.graceWeeks());
             double factor = Math.max(0, 1 - s.decayPerWeek() * decayWeeks);

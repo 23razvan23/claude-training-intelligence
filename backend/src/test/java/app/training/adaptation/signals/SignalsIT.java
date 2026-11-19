@@ -92,7 +92,7 @@ class SignalsIT extends IntegrationTest {
         assertThat(o.days()).isEqualTo(DAYS);
         assertThat(o.from()).isEqualTo(first);
         assertThat(o.settingsVersion()).isEqualTo(settings.current().id());
-        assertThat(count("SELECT count(*) FROM day_signals WHERE athlete_id = ? AND signals_version = 's2'", a)).isEqualTo(DAYS);
+        assertThat(count("SELECT count(*) FROM day_signals WHERE athlete_id = ? AND signals_version = 's3'", a)).isEqualTo(DAYS);
 
         var stored = new HashMap<LocalDate, com.fasterxml.jackson.databind.JsonNode>();
         signals.read(a, first, first.plusDays(DAYS - 1)).forEach(s -> stored.put(s.date(), s.signals()));

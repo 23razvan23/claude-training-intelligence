@@ -29,7 +29,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class SignalService {
     /** Version of the signal code; bump it when a formula changes, so stored rows say which code made them. */
-    public static final String SIGNALS_VERSION = "s2"; // s1: load signals only (PR 1); s2: + readiness, sleep, check-ins, sessions, tolerance
+    // s1: load signals only (PR 1); s2: + readiness, sleep, check-ins, sessions, tolerance; s3: tolerance decays only for the
+    // current break (ADR 0021 amendment, 2026-11-19).
+    public static final String SIGNALS_VERSION = "s3";
     private static final Logger log = LoggerFactory.getLogger(SignalService.class);
 
     private final SignalRepository repo;

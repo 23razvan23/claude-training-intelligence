@@ -87,6 +87,28 @@ Over the last **7** nights including the day: sleep need (Module 1) minus minute
 - **Athletes:** for the selected athlete, the tolerance, its derivation, how much of it this week used, the override form (km and why), "use the computed value", and the override history.
 - Both screens work at 390 px, light and dark, with every string an i18n key. Screenshots: `docs/screenshots/2-2/`.
 
+## Amendment (2026-11-19): the decay counts only the current break
+**What went wrong.** On the coach's data the tolerance read **12.4 km/week** while the coach was running about 37 km/week (last 7 days 42.5 km). The peak (62 km/week, 25 Jan – 21 Feb 2026) was right, and so were the running km: no double counting, and every Garmin running type was counted (checked with read-only SQL). The cause was step 2 of D11. It counted **every** week under half the peak since the peak window, across 9 months. Easier weeks spread through steady training (28, 26, 17 km…) added up to 9 "interrupted" weeks, so the decay was 80 %. The spec means a reduction for *time away*, and a tolerance below what the athlete is running now contradicts itself.
+
+**The rule now (D11 step 2 replaced):**
+- A 7-day block under **50 %** of the peak is an interrupted week (unchanged).
+- Only the **current break** counts. Walking back from the day in 7-day blocks, not past the peak window, interrupted weeks are counted until **2 normal weeks in a row** are found; those end the last break.
+  - `signals.tolerance.returnWeeks` = 2 [configurable] (coach, 2026-11-19; a heuristic). One normal week inside a break does not end it.
+- Each interrupted week of the current break beyond the first takes **10 %** of the peak off, down to 0 (unchanged).
+- After a return, the chronic cap (step 3) holds the number near what the athlete runs again, because the 28-day average is low after time off.
+
+**The cap factor stays 1.0.** The coach answered "go with your recommendation", but I had offered 1.0, 1.3 (about 49 km/week on their data) and 1.5 (about 56) without recommending one. So 1.0 stays: it is the spec's literal reading and changes no setting. Flagged again. With it, the coach's tolerance becomes the chronic volume, **about 37.6 km/week**, not the 50–60 the coach expected. The stored weekly km agree with that level: about 35 km/week on average over the last 6 months.
+
+**Versions.**
+- Signals version becomes **`s3`**; the `s2` rows stay (derived data).
+- The new setting is saved as a new settings version on first read (D2).
+- No migration, no feature, `FEATURE_VERSION` or scoring change, so the golden check stays at **0 differences**.
+
+**Tests.** `ToleranceTest`:
+- `scatteredLowWeeksWhileTrainingSteadilyAreNotTimeAway` (written first; it failed with 0 km/week against a chronic volume of 38.7);
+- `oneNormalWeekDoesNotEndABreakTwoInARowDo`;
+- `aSingleNormalWeekInsideABreakDoesNotResetIt`.
+
 ## Why the live holdout and the golden check are unaffected
 - PR 1 adds **no migration**. It writes only `settings_version` and `day_signals` (both from V22), and reads `day_features`, `activity_with_cycle` and `activity_load` without changing them.
 - PR 2 adds V25: a new table `tolerance_override` and a column comment on `whoop_reference.cycle_date` (the R-15 backlog item; a comment changes no row). It additionally reads `derived_day_metrics`, `subjective_current` and `planned_session`. `FEATURE_VERSION` stays `f3`; no score is computed differently.

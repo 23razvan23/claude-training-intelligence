@@ -58,6 +58,8 @@ public final class SettingsCatalog {
                 "A week with less than half the peak weekly average counts as interrupted training (coach, 2026-11-18); a heuristic."));
         s.add(new Setting("signals.tolerance.decayPerWeek", 0.10, "Spec example: -10% per week of interrupted training."));
         s.add(new Setting("signals.tolerance.graceWeeks", 1, "Spec: the decay starts after one interrupted week."));
+        s.add(new Setting("signals.tolerance.returnWeeks", 2,
+                "Only the current break decays the tolerance; two normal weeks in a row end a break (coach, 2026-11-19); a heuristic."));
         s.add(new Setting("signals.tolerance.chronicCapFactor", 1.0,
                 "Spec: tolerance is capped by the chronic running volume; 1.0 = exactly that, a higher value leaves room above it."));
         // Planning: the demand a new session starts with, per type (ADR 0019 D3).

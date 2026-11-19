@@ -63,6 +63,23 @@ class ToleranceTest {
     }
 
     @Test
+    void scatteredLowWeeksWhileTrainingSteadilyAreNotTimeAway() {
+        // A 62 km block, then 36 weeks of steady but uneven training (~36 km/week, synthetic) in which some easier
+        // weeks fall under half of the peak (31 km), and a normal last week. The athlete never stopped, so there is
+        // no time away to decay for: the tolerance is the peak capped by the chronic volume, not a fraction of it.
+        double[] cycle = {40, 28, 36, 45, 27, 38, 30, 44, 35};
+        double[] w = new double[4 + 4 * cycle.length + 1];
+        java.util.Arrays.fill(w, 0, 4, 62);
+        for (int k = 0; k < 4 * cycle.length; k++) w[4 + k] = cycle[k % cycle.length];
+        w[w.length - 1] = 42;
+        var t = last(weeks(w), S);
+        assertThat(t.peakKmPerWeek()).isEqualTo(62.0);
+        assertThat(t.decayWeeks()).as("the last week is above half the peak: no current break").isZero();
+        assertThat(t.capped()).isTrue();
+        assertThat(t.kmPerWeek()).as("never below the chronic volume the athlete is running").isEqualTo(t.chronicKmPerWeek());
+    }
+
+    @Test
     void theDecayStopsAtZero() {
         double[] w = new double[20];
         java.util.Arrays.fill(w, 0, 4, 50);

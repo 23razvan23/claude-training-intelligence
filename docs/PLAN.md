@@ -209,6 +209,9 @@ At the end of Phase 2, stop: every rule has a passing scenario test, and the bac
   - Dates and clocks: the DST/timezone cases live in `DayAssignmentDstIT` (Europe/Bucharest 2026-03-29 and 2026-10-25, America/New_York); add a case there whenever day-assignment code changes.
 - **Backups:** `deploy/backup/backup.sh` keeps a file only after it decrypts, passes `gunzip -t` and has pg_dump's footer; it prunes only after that, writes `backups/STATUS`, and fails with a non-zero exit and a stderr message otherwise. `deploy/backup/test-backup.sh` (CI job `backup`) tests failure, the size floor `BACKUP_MIN_BYTES` (default 10240), pruning and a full restore. Locally without the image: `TEST_HOST=1 sh deploy/backup/test-backup.sh`.
 - **CI:** `.github/workflows/ci.yml` (the `tools-py39` job runs in `python:3.9-slim`).
+  - Runs once per push to a pull request, on every push to `main` (merges), and by hand from the Actions tab ("Run workflow"). Pushes to other branches without a PR don't run it.
+  - A newer push to the same PR cancels the older, still-running run; runs on `main` are never cancelled.
+  - The repository is private, so Actions minutes are limited (2,000 a month on the free plan): don't add triggers or jobs without weighing the cost. `images` (all five Docker images) runs only on pull requests.
 
 ### Notes for the cloud session environment (not the coach's machine)
 - The Docker daemon may need starting: `nohup dockerd >/tmp/dockerd.log 2>&1 &`.

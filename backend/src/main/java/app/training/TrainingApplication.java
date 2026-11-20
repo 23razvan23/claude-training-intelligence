@@ -25,6 +25,9 @@ public class TrainingApplication {
         if (args.length > 0 && app.training.adaptation.signals.SignalsCli.COMMAND.equals(args[0])) {
             System.exit(app.training.adaptation.signals.SignalsCli.main(TrainingApplication.class, args));
         }
+        if (args.length > 0 && app.training.adaptation.backtest.BacktestCli.COMMAND.equals(args[0])) {
+            System.exit(app.training.adaptation.backtest.BacktestCli.main(TrainingApplication.class, args));
+        }
         SpringApplication.run(TrainingApplication.class, args);
     }
 }

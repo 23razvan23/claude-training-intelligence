@@ -305,11 +305,10 @@ Scope:
 Done when: every starting rule has a passing scenario test; I can act on suggestions in the UI.
 ```
 
-Status: split in two PRs (ADR 0022). **PR 1** (engine, rules, guardrails, tests, storing suggestions with
-re-run expiry, `suggest` command, run after the sync and a check-in) is done in code. **PR 2** remains: accept,
-edit and reject (through `PlanService`, setting `changed_by_suggestion_id` / `replaces_session_id` and writing a
-revision with the suggestion id), the Today card with health messages, per-session suggestions on Plan, a
-"Check the plan now" button, and a Taper checkbox on the session form (`planned_session.is_taper`).
+Status: done in code in two PRs (ADR 0022). **PR 1**: engine, rules, guardrails, tests, storing suggestions with
+re-run expiry, `suggest` command, run after the sync and a check-in. **PR 2**: accept / edit / reject through
+`PlanService` (`changed_by_suggestion_id`, `replaces_session_id`, a revision naming the suggestion), the Today card with
+health messages, per-session suggestions on Plan, "Check the plan now", and the Taper checkbox.
 
 ---
 

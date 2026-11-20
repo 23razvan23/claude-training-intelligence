@@ -150,3 +150,57 @@ Not stored. A day without suggestions shows "no changes suggested" (PR 2), so th
   - access, and 404 for an unknown athlete;
   - an illness check-in through the API produces the rest suggestion at once.
 - `SuggestCliTest`.
+
+## PR 2: deciding on suggestions, and the screens (2026-11-20)
+
+### In plain words
+Pending suggestions now show on **Today**, below the morning numbers, with any health message above them. On **Plan**, each one shows on the session it would change. As coach you tap:
+- **Accept:** the plan changes as suggested;
+- **Edit:** change the date, type, distance, time or workout first, then "Accept my version";
+- **Reject:** with an optional note.
+
+Every decision is kept: who made it, when, and your note. "Check the plan now" on Today runs the engine at once, with fresh signals. An athlete sees their own suggestions and health messages, without the buttons.
+
+### D1. Accepting goes through the plan code
+- Accepting calls `PlanService`, the same code a typed session goes through, so the same checks and messages apply. A bad edit (e.g. an unknown type) is refused, and nothing changes.
+- **Reduce, add and move:** one session edited.
+- **Swap:** both sessions edited.
+- **Replace:** a new session in the same plan with `replaces_session_id` pointing at the old one. The old one is set to REPLACED, not deleted, so its history stays (ADR 0018 D5).
+- Every changed session gets `changed_by_suggestion_id`, and a `planned_session_revision` row that names the suggestion. Everything happens in one transaction: the plan and the decision change together, or not at all.
+
+### D2. Edited or accepted
+- The suggestion becomes **EDITED** when the version you accept differs from the suggested one, and **ACCEPTED** otherwise.
+- The comparison is on the session itself, so 8 and 8.0 km count as the same, and so do an empty note and none.
+- The suggestion row keeps what the engine proposed. The version actually applied is in the history rows linked to it. That pair is the training data for stage 4-3. No migration was needed.
+
+### D3. Out-of-date suggestions are refused
+- If a session was edited after the suggestion was made (its last-changed time differs), or was deleted, accepting is refused: "The session was changed after this suggestion was made. Run the check again."
+- A suggestion that was already decided or has expired can't be decided again.
+
+### D4. Taper
+- The session form has a **"Part of a taper"** checkbox; Plan shows a Taper badge.
+- The plan API takes an optional `taper`: left out, a new session is not taper and an edit keeps the current value. So the spreadsheet import and older screens are unaffected.
+- The engine has read this flag since PR 1 (Q1).
+
+### D5. Screens and API
+- **Today:** the Suggestions section with health messages, one card per pending suggestion (action, now → suggested, swap partner, reasons, confidence, Accept / Edit / Reject) and "No changes suggested for the next 7 days" when there are none.
+- **Plan:** a "Suggestion" badge and the card on the session it changes, and a "Suggestions" link on every session for its history, with each decision.
+- **Display:** 390 px without sideways scrolling, light and dark, every string an i18n key. A reason is shown through its code's translation when one exists, otherwise the English text. Screenshots: `docs/screenshots/2-3/`.
+- **API:**
+  - `POST /api/suggestions/{id}/accept` (body optional: `after`, `note`) and `POST …/reject` (`note`), coach only;
+  - `GET /api/sessions/{id}/suggestions` and `GET /api/athletes/{id}/suggestions/today` (AccessPolicy).
+
+### Tests (PR 2)
+- `DecisionIT`:
+  - accepting a swap (both sessions moved and linked, two history rows);
+  - accepting a replacement (new session, old one REPLACED, CREATE and EDIT rows);
+  - edit → EDITED with the coach's version; an unchanged version → ACCEPTED;
+  - reject with a note leaves the plan alone, and a second decision is refused;
+  - an outdated suggestion is refused; a bad edit changes nothing;
+  - only the coach decides, athletes read their own;
+  - the taper flag is saved, kept on an edit, and guards the session.
+- Frontend: `suggestions.test.ts`, `Suggestions.test.tsx` (card, accept, reject with note, edit, check now, athlete view, nothing to change), and a `PlanPage.test.tsx` addition (badge and card on the session, taper checkbox).
+
+### Golden check
+- PR 2 writes `planned_session`, `planned_session_revision` and `adaptation_suggestion`, through the plan code.
+- No migration, nothing in `metrics/` or `ingestion/`; `FEATURE_VERSION` and scoring unchanged. So the golden check still prints **0 differences**.

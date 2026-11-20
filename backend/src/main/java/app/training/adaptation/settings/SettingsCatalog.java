@@ -62,6 +62,37 @@ public final class SettingsCatalog {
                 "Only the current break decays the tolerance; two normal weeks in a row end a break (coach, 2026-11-19); a heuristic."));
         s.add(new Setting("signals.tolerance.chronicCapFactor", 1.0,
                 "Spec: tolerance is capped by the chronic running volume; 1.0 = exactly that, a higher value leaves room above it."));
+        // Rules engine (stage 2-3, ADR 0022). Starting values, not settled science; each is a coaching heuristic unless the spec names it.
+        s.add(new Setting("engine.horizonDays", 7, "Spec: every morning the engine reviews the next 7 days."));
+        s.add(new Setting("engine.red.swapWindowDays", 3,
+                "Red day: swap the hard session with an easy one at most 3 days later, so it stays close to where the coach put it (ADR 0022 Q7)."));
+        s.add(new Setting("engine.replace.easyShare", 0.6,
+                "An easy session that replaces a hard one is 60% of its distance and time: clearly easier, but keeps the routine (heuristic)."));
+        s.add(new Setting("engine.yellow.streakDays", 2, "Spec: recovery yellow 2+ days in a row."));
+        s.add(new Setting("engine.reduce.share", 0.25,
+                "Spec: reduce reps or time at intensity by 20-30%; 25% is the middle. Distance and time are cut by this share (ADR 0022 Q4)."));
+        s.add(new Setting("engine.volume.toleranceMargin", 0.10, "Spec: running volume above tolerance + 10%."));
+        s.add(new Setting("engine.volume.acwrThreshold", 1.3,
+                "Spec: running ACWR above 1.3. One signal among several, never a gate on its own: alone it gives a low-confidence suggestion."));
+        s.add(new Setting("engine.volume.maxEasyCutShare", 0.3,
+                "Trim each easy run by at most 30%, so it is still worth doing; then shorten the long run (spec order)."));
+        s.add(new Setting("engine.volume.maxLongCutShare", 0.2,
+                "Shorten the long run by at most 20%; it is a key session, so it is cut last and least (heuristic)."));
+        s.add(new Setting("engine.volume.acwrOnlyEasyCutShare", 0.2,
+                "When only the running ACWR is high, easy runs are trimmed by 20%: a light touch for a disputed signal (heuristic)."));
+        s.add(new Setting("engine.sleep.debtNights", 1.0, "Spec: sleep debt above one night's need."));
+        s.add(new Setting("engine.sleep.minKnownNights", 5,
+                "Sleep debt from fewer than 5 recorded nights out of 7 gives a medium-confidence suggestion only (heuristic)."));
+        s.add(new Setting("engine.niggle.healthMessageDays", 3, "Spec: a health message if a niggle persists 3+ days."));
+        s.add(new Setting("engine.illness.activeDays", 2,
+                "Illness counts as current when reported today or yesterday: athletes do not check in every day (ADR 0022 Q8; heuristic)."));
+        s.add(new Setting("engine.illness.returnDays", 2, "Spec: a graded return over 2-3 days; day 1 easy, day 2 reduced (ADR 0022 Q8)."));
+        s.add(new Setting("engine.restore.weeks", 2, "Spec: load well under plan for 2+ weeks."));
+        s.add(new Setting("engine.restore.underShare", 0.8,
+                "'Well under plan' = less than 80% of the planned running km in each of those weeks (ADR 0022 Q6; heuristic)."));
+        s.add(new Setting("engine.restore.stepShare", 0.10,
+                "One progression step = 10% of the coming week's planned km, the common '10% rule' of thumb, never above tolerance (ADR 0022 Q6)."));
+        s.add(new Setting("engine.raceWeekDays", 7, "Race week = the 7 days ending on race day; it gets only reductions (spec guardrail)."));
         // Planning: the demand a new session starts with, per type (ADR 0019 D3).
         for (var t : SessionTypes.all()) {
             s.add(new Setting("planning.defaultDemand." + t.code(), t.defaultDemand().name(),

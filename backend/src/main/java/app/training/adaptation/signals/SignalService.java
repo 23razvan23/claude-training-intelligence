@@ -9,7 +9,6 @@ import app.training.metrics.MetricsRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,74 +65,22 @@ public class SignalService {
     private Outcome compute(long athleteId) {
         Athlete athlete = athletes.findById(athleteId).orElseThrow(() -> ApiException.notFound("Athlete"));
         var current = settings.current();
-        var s = SignalSettings.from(current);
         LocalDate today = today(athlete);
         LocalDate first = repo.firstFeatureDay(athleteId, metrics.featureVersion()).orElse(null);
         if (first == null || first.isAfter(today)) {
             repo.replace(athleteId, SIGNALS_VERSION, current.id(), List.of());
             return new Outcome(athleteId, SIGNALS_VERSION, current.id(), 0, null, null, null);
         }
-        var totals = repo.totalLoads(athleteId, metrics.featureVersion());
-        var running = repo.running(athleteId);
-        boolean banister = SignalSettings.BANISTER.equals(s.dailyLoad());
-        var grid = new ArrayList<LocalDate>();
-        var inputs = new ArrayList<LoadSignals.DayInput>();
-        for (LocalDate d = first; !d.isAfter(today); d = d.plusDays(1)) {
-            grid.add(d);
-            var t = totals.get(d);
-            var r = running.get(d);
-            Double total = t == null ? null : banister ? t.banister() : t.edwards();
-            Double runLoad = r == null ? null : banister ? r.banister() : r.edwards();
-            inputs.add(new LoadSignals.DayInput(d, total, runLoad, r == null ? 0 : r.km(), r == null ? 0 : r.minutes()));
-        }
-        var load = LoadSignals.compute(inputs, s);
-
         // Readiness and sleep need come from the ACTIVE model's scores; without one there are none (said by nulls).
         var model = models.active(athleteId).orElse(null);
         var scores = model == null ? java.util.Map.<LocalDate, SignalRepository.Score>of() : repo.scores(athleteId, model.version());
-        var slept = repo.sleptMinutes(athleteId, metrics.featureVersion());
-        LocalDate firstHrv = repo.firstHrvDay(athleteId, metrics.featureVersion()).orElse(null);
-        var readinessIn = new ArrayList<Readiness.Input>();
-        var sleepIn = new ArrayList<SleepDebt.Input>();
-        for (LocalDate d : grid) {
-            var sc = scores.get(d);
-            readinessIn.add(new Readiness.Input(d, sc == null ? null : sc.recoveryPct(), sc == null ? null : sc.band()));
-            sleepIn.add(new SleepDebt.Input(d, sc == null ? null : sc.sleepNeedMin(), slept.get(d)));
-        }
-        var readiness = Readiness.compute(readinessIn, current.intAt("signals.readiness.trendShortDays"),
-                current.intAt("signals.readiness.trendLongDays"), firstHrv);
-        var sleep = SleepDebt.compute(sleepIn, current.intAt("signals.sleep.debtWindowDays"), current.boolAt("signals.sleep.surplusPaysBack"));
-        var subjective = Subjective.compute(grid, repo.checkins(athleteId), current.intAt("signals.subjective.niggleStaleDays"));
-        var sessions = repo.sessions(athleteId, first, today);
-
-        var tolIn = new ArrayList<Tolerance.Input>();
-        for (int i = 0; i < grid.size(); i++) {
-            tolIn.add(new Tolerance.Input(grid.get(i), inputs.get(i).runKm(), inputs.get(i).totalLoad() != null, subjective.get(i).flagged()));
-        }
-        var tolerance = Tolerance.compute(tolIn, Tolerance.Settings.from(current), overridesPerDay(athlete, grid));
-
-        var days = new ArrayList<DaySignals>(grid.size());
-        for (int i = 0; i < grid.size(); i++) {
-            days.add(new DaySignals(grid.get(i), load.get(i), readiness.get(i), sleep.get(i), subjective.get(i),
-                    DaySignals.Sessions.of(sessions.getOrDefault(grid.get(i), List.of())), tolerance.get(i)));
-        }
+        var in = new SignalCalculator.Inputs(first, today, repo.totalLoads(athleteId, metrics.featureVersion()), repo.running(athleteId),
+                scores, repo.sleptMinutes(athleteId, metrics.featureVersion()),
+                repo.firstHrvDay(athleteId, metrics.featureVersion()).orElse(null), repo.checkins(athleteId),
+                repo.sessions(athleteId, first, today), repo.overrides(athleteId), ZoneId.of(athlete.timezone()));
+        var days = SignalCalculator.compute(in, current);
         repo.replace(athleteId, SIGNALS_VERSION, current.id(), days);
         return new Outcome(athleteId, SIGNALS_VERSION, current.id(), days.size(), first, today, days.get(days.size() - 1));
-    }
-
-    /** The override in force on each day: the newest one set on or before that day (athlete's timezone). */
-    private List<Tolerance.OverrideValue> overridesPerDay(Athlete athlete, List<LocalDate> grid) {
-        ZoneId zone = ZoneId.of(athlete.timezone());
-        var rows = repo.overrides(athlete.id());
-        var out = new ArrayList<Tolerance.OverrideValue>(grid.size());
-        int k = -1;
-        for (LocalDate d : grid) {
-            while (k + 1 < rows.size() && !rows.get(k + 1).createdAt().atZone(zone).toLocalDate().isAfter(d)) k++;
-            if (k < 0 || rows.get(k).kmPerWeek() == null) out.add(null);
-            else out.add(new Tolerance.OverrideValue(rows.get(k).kmPerWeek(), rows.get(k).note(),
-                    rows.get(k).createdAt().atZone(zone).toLocalDate()));
-        }
-        return out;
     }
 
     /** For the feature recompute and the sync: a failure here is logged and never undoes or fails the scores. */

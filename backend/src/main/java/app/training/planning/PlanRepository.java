@@ -83,12 +83,12 @@ public class PlanRepository {
             km(rs.getBigDecimal("target_distance_m")), (Integer) rs.getObject("target_duration_min"),
             rs.getBigDecimal("est_strain"), Status.valueOf(rs.getString("status")), rs.getString("notes"),
             (Long) rs.getObject("replaces_session_id"), (Long) rs.getObject("changed_by_suggestion_id"),
-            instant(rs.getTimestamp("updated_at")));
+            instant(rs.getTimestamp("updated_at")), rs.getBoolean("is_taper"));
 
     private static final String SESSION_COLUMNS = """
             id, athlete_id, plan_id, session_date, session_type, demand, title, structure -> 0 ->> 'text' AS description,
             target_distance_m, target_duration_min, est_strain, status, notes, replaces_session_id,
-            changed_by_suggestion_id, updated_at""";
+            changed_by_suggestion_id, updated_at, is_taper""";
 
     public Optional<Session> session(long sessionId) {
         return jdbc.sql("SELECT " + SESSION_COLUMNS + " FROM planned_session WHERE id = ?")
@@ -116,11 +116,11 @@ public class PlanRepository {
     public long insertSession(long athleteId, long planId, SessionRequest r) {
         return jdbc.sql("""
                 INSERT INTO planned_session (athlete_id, plan_id, session_date, session_type, demand, title, structure,
-                    target_distance_m, target_duration_min, est_strain, status, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?) RETURNING id""")
+                    target_distance_m, target_duration_min, est_strain, status, notes, is_taper)
+                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?) RETURNING id""")
                 .params(athleteId, planId, r.date(), r.sessionType(), r.demand().name(), title(r),
                         structure(r.description()), metres(r.targetDistanceKm()), r.targetDurationMin(), r.estStrain(),
-                        r.status().name(), r.notes())
+                        r.status().name(), r.notes(), Boolean.TRUE.equals(r.taper()))
                 .query(Long.class).single();
     }
 
@@ -128,11 +128,11 @@ public class PlanRepository {
         jdbc.sql("""
                 UPDATE planned_session SET plan_id = ?, session_date = ?, session_type = ?, demand = ?, title = ?,
                     structure = ?::jsonb, target_distance_m = ?, target_duration_min = ?, est_strain = ?, status = ?,
-                    notes = ?, updated_at = now()
+                    notes = ?, is_taper = COALESCE(?, is_taper), updated_at = now()
                 WHERE id = ?""")
                 .params(planId, r.date(), r.sessionType(), r.demand().name(), title(r), structure(r.description()),
                         metres(r.targetDistanceKm()), r.targetDurationMin(), r.estStrain(), r.status().name(), r.notes(),
-                        sessionId)
+                        r.taper(), sessionId)
                 .update();
     }
 
@@ -143,10 +143,23 @@ public class PlanRepository {
     // ---- history ----
 
     public void insertRevision(long athleteId, long sessionId, String kind, Session before, Session after, Long userId) {
+        insertRevision(athleteId, sessionId, kind, before, after, userId, null);
+    }
+
+    /** A history row; {@code suggestionId} names the accepted suggestion that caused the change (ADR 0018 D5). */
+    public void insertRevision(long athleteId, long sessionId, String kind, Session before, Session after, Long userId, Long suggestionId) {
         jdbc.sql("""
-                INSERT INTO planned_session_revision (athlete_id, planned_session_id, change_kind, before, after, changed_by)
-                VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?)""")
-                .params(athleteId, sessionId, kind, toJson(before), toJson(after), userId).update();
+                INSERT INTO planned_session_revision (athlete_id, planned_session_id, change_kind, before, after, changed_by, suggestion_id)
+                VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)""")
+                .params(athleteId, sessionId, kind, toJson(before), toJson(after), userId, suggestionId).update();
+    }
+
+    /** Which accepted suggestion last changed the session, and (for a replacement) which session it replaces. */
+    public void linkSuggestion(long sessionId, long suggestionId, Long replacesSessionId) {
+        jdbc.sql("""
+                UPDATE planned_session SET changed_by_suggestion_id = ?, replaces_session_id = COALESCE(?, replaces_session_id)
+                WHERE id = ?""")
+                .params(suggestionId, replacesSessionId, sessionId).update();
     }
 
     public List<Revision> revisions(long sessionId) {

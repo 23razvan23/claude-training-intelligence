@@ -79,14 +79,14 @@ class SettingsIT extends IntegrationTest {
         ((ObjectNode) changed.get("planning").get("defaultDemand")).put("hills", "KEY");
         repo.insert(changed, "test: hills start as KEY", null);
         try {
-            var s = plans.createSession(a, new SessionRequest(null, d, "hills", null, null, null, null, null, null, null, null), coach);
+            var s = plans.createSession(a, new SessionRequest(null, d, "hills", null, null, null, null, null, null, null, null, null), coach);
             assertThat(s.demand()).isEqualTo(Demand.KEY);
         } finally {
             ObjectNode back = settings.current().settings().deepCopy();
             ((ObjectNode) back.get("planning").get("defaultDemand")).put("hills", "SUPPORTING");
             repo.insert(back, "test: back to the default", null);
         }
-        var s = plans.createSession(a, new SessionRequest(null, d, "hills", null, null, null, null, null, null, null, null), coach);
+        var s = plans.createSession(a, new SessionRequest(null, d, "hills", null, null, null, null, null, null, null, null, null), coach);
         assertThat(s.demand()).isEqualTo(Demand.SUPPORTING);
     }
 

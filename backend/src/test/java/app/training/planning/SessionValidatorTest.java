@@ -13,7 +13,7 @@ class SessionValidatorTest {
     private static final LocalDate D = LocalDate.of(2026, 11, 23);
 
     private static SessionRequest req(LocalDate date, String type, Demand demand, BigDecimal km, Integer min, BigDecimal strain) {
-        return new SessionRequest(null, date, type, demand, "  Tempo  ", " 3 km WU, 20 min @ T, 2 km CD ", km, min, strain, null, "  ");
+        return new SessionRequest(null, date, type, demand, "  Tempo  ", " 3 km WU, 20 min @ T, 2 km CD ", km, min, strain, null, "  ", null);
     }
 
     @Test

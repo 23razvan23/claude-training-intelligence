@@ -132,7 +132,7 @@ public final class PlanImportParser {
         // The shared rules (known type, limits) are SessionValidator's, so typed and imported sessions agree.
         var request = new SessionRequest(null, d, type.isEmpty() ? null : type, demand,
                 cell(r, index, "title").text(), cell(r, index, "workout").text(), km, min, null, null,
-                cell(r, index, "notes").text());
+                cell(r, index, "notes").text(), null);
         for (String p : SessionValidator.check(request).problems()) {
             if (p.equals("Date is missing")) continue; // already reported above, in the coach's own words
             if (p.equals("Unknown type '" + type + "'")) p = "Unknown type '" + typeText + "'"; // the coach's spelling

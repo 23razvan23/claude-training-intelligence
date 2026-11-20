@@ -25,12 +25,15 @@ public final class PlanModels {
     public record Session(long id, long athleteId, Long planId, LocalDate date, String sessionType, Demand demand,
                           String title, String description, BigDecimal targetDistanceKm, Integer targetDurationMin,
                           BigDecimal estStrain, Status status, String notes, Long replacesSessionId,
-                          Long changedBySuggestionId, Instant updatedAt) {}
+                          Long changedBySuggestionId, Instant updatedAt, boolean taper) {}
 
-    /** Create or edit a session. Missing demand: the type's default. Missing status: PLANNED. */
+    /**
+     * Create or edit a session. Missing demand: the type's default. Missing status: PLANNED. Missing taper (part of
+     * a taper, for the engine's guardrail, ADR 0022): not taper on create, unchanged on edit.
+     */
     public record SessionRequest(Long planId, LocalDate date, String sessionType, Demand demand, String title,
                                  String description, BigDecimal targetDistanceKm, Integer targetDurationMin,
-                                 BigDecimal estStrain, Status status, String notes) {}
+                                 BigDecimal estStrain, Status status, String notes, Boolean taper) {}
 
     /** One row of planned_session_revision. */
     public record Revision(long id, long sessionId, String changeKind, JsonNode before, JsonNode after,

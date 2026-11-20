@@ -49,7 +49,7 @@ class SuggestionIT extends IntegrationTest {
 
     private long session(long athlete, long coach, LocalDate date, String type, double km, int min) {
         return plans.createSession(athlete, new SessionRequest(null, date, type, null, null, "workout", BigDecimal.valueOf(km), min, null, null,
-                null), coach).id();
+                null, null), coach).id();
     }
 
     /** A threshold session today and an easy run in two days (or tomorrow when today is Sunday, the week's end). */

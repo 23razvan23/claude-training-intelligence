@@ -7,6 +7,7 @@ import app.training.planning.PlanModels.PlanRequest;
 import app.training.planning.PlanModels.Revision;
 import app.training.planning.PlanModels.Session;
 import app.training.planning.PlanModels.SessionRequest;
+import app.training.planning.SessionTypes.Status;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -103,15 +104,49 @@ public class PlanService {
 
     @Transactional
     public Session updateSession(long sessionId, SessionRequest request, long userId) {
+        return updateSession(sessionId, request, userId, null);
+    }
+
+    /**
+     * Edits a session; with {@code suggestionId} the edit is the acceptance of that suggestion (stage 2-3, ADR 0022):
+     * the session's {@code changed_by_suggestion_id} is set and the history row names the suggestion (ADR 0018 D5).
+     */
+    @Transactional
+    public Session updateSession(long sessionId, SessionRequest request, long userId, Long suggestionId) {
         Session before = session(sessionId);
         SessionRequest r = valid(request);
         long planId = r.planId() != null ? targetPlan(before.athleteId(), r.planId()).id()
                 : before.planId() != null ? before.planId() : targetPlan(before.athleteId(), null).id();
         repo.stretchPlan(planId, r.date());
         repo.updateSession(sessionId, planId, r);
+        if (suggestionId != null) repo.linkSuggestion(sessionId, suggestionId, null);
         Session after = session(sessionId);
-        repo.insertRevision(before.athleteId(), sessionId, "EDIT", before, after, userId);
+        repo.insertRevision(before.athleteId(), sessionId, "EDIT", before, after, userId, suggestionId);
         return after;
+    }
+
+    /**
+     * Accepting a REPLACE suggestion (stage 2-3, ADR 0022): a new session in the same plan pointing at the one it replaces
+     * ({@code replaces_session_id}), and the old one set to REPLACED, not deleted, so its history stays (ADR 0018 D5).
+     * Both get {@code changed_by_suggestion_id} and a history row naming the suggestion. Returns the new session.
+     */
+    @Transactional
+    public Session replaceSession(long sessionId, SessionRequest replacement, long userId, long suggestionId) {
+        Session old = session(sessionId);
+        SessionRequest r = valid(replacement);
+        long planId = old.planId() != null ? old.planId() : targetPlan(old.athleteId(), null).id();
+        repo.stretchPlan(planId, r.date());
+        long id = repo.insertSession(old.athleteId(), planId, r);
+        repo.linkSuggestion(id, suggestionId, sessionId);
+        Session created = session(id);
+        repo.insertRevision(old.athleteId(), id, "CREATE", null, created, userId, suggestionId);
+
+        var asReplaced = new SessionRequest(old.planId(), old.date(), old.sessionType(), old.demand(), old.title(), old.description(),
+                old.targetDistanceKm(), old.targetDurationMin(), old.estStrain(), Status.REPLACED, old.notes(), old.taper());
+        repo.updateSession(sessionId, planId, asReplaced);
+        repo.linkSuggestion(sessionId, suggestionId, null);
+        repo.insertRevision(old.athleteId(), sessionId, "EDIT", old, session(sessionId), userId, suggestionId);
+        return created;
     }
 
     /**

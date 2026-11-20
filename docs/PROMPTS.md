@@ -332,6 +332,11 @@ Done when: the report runs on my data; I review a sample. Then Phase 2 is comple
 give me the phase summary.
 ```
 
+Status: split in two PRs (ADR 0023). **PR 1** (done in code 2026-11-20): replay with the live signals and rules code,
+the no-look-ahead rules (body data up to waking; typed rows before 09:00; Garmin RPE from its activity), the stand-in plan
+from Garmin activities, storage under a run id (V26, marks table included), `backtest --athlete N`, `NoLookAheadIT`.
+**PR 2**: the HTML report and the marking screen; needs the coach's race dates and hard weeks.
+
 ---
 
 ## Stage 2-5: Settings screen (UI only)

@@ -209,7 +209,7 @@ public class SuggestionService {
         return new SessionRequest(s.planId(), c.date(), c.type(), SessionTypes.Demand.valueOf(c.demand()), c.title(), c.description(),
                 c.distanceKm() == null ? null : BigDecimal.valueOf(c.distanceKm()), c.durationMin(),
                 replacement || s.estStrain() == null ? null : BigDecimal.valueOf(s.estStrain()), SessionTypes.Status.PLANNED,
-                replacement ? null : s.notes());
+                replacement ? null : s.notes(), s.taper());
     }
 
     /** Today's or yesterday's stored signals as the rules read them; null when that day has none. */
@@ -239,6 +239,23 @@ public class SuggestionService {
 
     private static String textOrNull(JsonNode n) {
         return n.isTextual() ? n.asText() : null;
+    }
+
+    /** What Today shows: the pending suggestions of the next days and the health messages (stage 2-3 PR 2). */
+    public record TodayView(LocalDate date, List<Suggestion> pending, List<Reason> healthMessages) {}
+
+    public TodayView todayView(long athleteId) {
+        LocalDate today = signals.today(athleteId);
+        var current = settings.current();
+        var s = EngineSettings.from(current);
+        DayState st = null;
+        for (var row : signalRepo.read(athleteId, SignalService.SIGNALS_VERSION, current.id(), today, today)) st = state(today, row.signals());
+        return new TodayView(today, repo.list(athleteId, "PENDING", today, RulesEngine.lastDay(today, s)), RulesEngine.healthMessages(st, s));
+    }
+
+    /** Every suggestion about one session, newest first (Plan: suggestion history per session). */
+    public List<Suggestion> forSession(long sessionId) {
+        return repo.forSession(sessionId);
     }
 
     /** For the API: today in the athlete's timezone; 404 for an unknown athlete. */

@@ -162,11 +162,15 @@ public final class RulesEngine {
 
     /** SPEC.md niggle rule: a health message when a niggle persists {@code niggle.healthMessageDays}+ days. */
     static List<Reason> healthMessages(Context c) {
-        var st = c.todayState();
+        return healthMessages(c.todayState(), c.s);
+    }
+
+    /** The health messages for one day's signals (also shown on Today without a run). */
+    public static List<Reason> healthMessages(Model.DayState st, EngineSettings s) {
         var out = new ArrayList<Reason>();
         if (st == null || st.niggles() == null) return out;
         for (var n : st.niggles()) {
-            if (n.persistDays() < c.s.niggleHealthMessageDays()) continue;
+            if (n.persistDays() < s.niggleHealthMessageDays()) continue;
             out.add(reason("health.niggle", "The " + n.location() + " niggle has lasted " + n.persistDays() + " days (since " + day(n.since())
                     + "). If it does not settle, consider having it checked by a physio or doctor.", "location", n.location(),
                     "persistDays", n.persistDays(), "since", n.since().toString()));

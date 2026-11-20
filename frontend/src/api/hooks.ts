@@ -27,6 +27,11 @@ import type {
   SessionInput,
   SessionRevision,
   SessionTypeInfo,
+  DecisionOutcome,
+  EngineRun,
+  SessionChange,
+  Suggestion,
+  SuggestionsToday,
   RecomputeResult,
   Today,
   Trends,
@@ -391,6 +396,59 @@ function invalidatePlan(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ['plans'] });
   void qc.invalidateQueries({ queryKey: ['sessions'] });
   void qc.invalidateQueries({ queryKey: ['sessionRevisions'] });
+  void qc.invalidateQueries({ queryKey: ['suggestions'] });
+}
+
+/** Today's pending suggestions and health messages (stage 2-3, ADR 0022). */
+export function useSuggestionsToday(athleteId?: number) {
+  return useQuery({
+    queryKey: ['suggestions', 'today', athleteId],
+    queryFn: () => api<SuggestionsToday>(`/api/athletes/${athleteId}/suggestions/today`),
+    enabled: athleteId != null,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** Pending suggestions about the days from {@code from} (default today) for two weeks. */
+export function usePendingSuggestions(athleteId: number | undefined, from: string, to: string) {
+  return useQuery({
+    queryKey: ['suggestions', 'pending', athleteId, from, to],
+    queryFn: () => api<Suggestion[]>(`/api/athletes/${athleteId}/suggestions?status=PENDING&from=${from}&to=${to}`),
+    enabled: athleteId != null,
+  });
+}
+
+export function useSessionSuggestions(sessionId?: number) {
+  return useQuery({
+    queryKey: ['suggestions', 'session', sessionId],
+    queryFn: () => api<Suggestion[]>(`/api/sessions/${sessionId}/suggestions`),
+    enabled: sessionId != null,
+  });
+}
+
+/** The coach's "Check the plan now": fresh signals, then the engine. */
+export function useRunSuggestions(athleteId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<EngineRun>(`/api/athletes/${athleteId}/suggestions/run`, { method: 'POST' }),
+    onSuccess: () => invalidatePlan(qc),
+  });
+}
+
+export type DecisionInput =
+  | { id: number; kind: 'accept'; note?: string; after?: { session: SessionChange; counterpart?: SessionChange } }
+  | { id: number; kind: 'reject'; note?: string };
+
+export function useDecideSuggestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: DecisionInput) =>
+      api<DecisionOutcome>(`/api/suggestions/${d.id}/${d.kind}`, {
+        method: 'POST',
+        body: JSON.stringify(d.kind === 'accept' ? { note: d.note, after: d.after } : { note: d.note }),
+      }),
+    onSuccess: () => invalidatePlan(qc),
+  });
 }
 
 export function useSavePlan(athleteId?: number) {

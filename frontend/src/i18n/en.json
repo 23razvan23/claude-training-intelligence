@@ -23,7 +23,7 @@
     "loginCreated": "Login created."
   },
   "plan": {
-    "title": "Plan", "addSession": "Add session", "editSession": "Edit session", "newPlan": "New plan", "editPlan": "Edit plan",
+    "title": "Plan", "taper": "Taper", "addSession": "Add session", "editSession": "Edit session", "newPlan": "New plan", "editPlan": "Edit plan",
     "completePlan": "Mark plan completed",
     "noPlanCoach": "No active plan yet. Create one, then add this week's sessions.",
     "noPlanAthlete": "Your coach hasn't entered a plan yet.",
@@ -62,11 +62,13 @@
       "date": "Date", "type": "Type", "demand": "Demand", "title": "Title (optional)", "description": "Workout",
       "descriptionHint": "e.g. 3 km warm-up, 5 × 1 km @ 3:50 /km, 2 km cool-down", "km": "Distance (km)", "min": "Duration (min)",
       "strain": "Estimated strain (0–21)", "strainHint": "optional", "status": "Status", "notes": "Notes",
+      "taper": "Part of a taper (the engine then suggests only reductions)",
       "planName": "Plan name", "start": "Starts", "end": "Ends"
     },
     "changed": {
       "date": "date", "sessionType": "type", "demand": "demand", "title": "title", "description": "workout",
-      "targetDistanceKm": "distance", "targetDurationMin": "duration", "estStrain": "strain", "status": "status", "notes": "notes"
+      "targetDistanceKm": "distance", "targetDurationMin": "duration", "estStrain": "strain", "status": "status", "notes": "notes",
+      "taper": "taper"
     }
   },
   "imports": {
@@ -598,5 +600,18 @@
     "clearOverride": "Use the computed value",
     "history": "Override history ({{n}})",
     "cleared": "override cleared"
+  },
+  "suggestions": {
+    "title": "Suggestions", "none": "No changes suggested for the next 7 days.", "runNow": "Check the plan now", "running": "Checking…",
+    "ran": "Checked: {{created}} new, {{expired}} out of date.", "health": "Health", "forDay": "For {{date}}",
+    "action": { "KEEP": "Keep", "REDUCE": "Reduce", "SWAP": "Swap", "REPLACE": "Replace", "MOVE": "Move", "ADD": "Add" },
+    "confidence": { "LOW": "Low confidence", "MEDIUM": "Medium confidence", "HIGH": "High confidence" },
+    "status": { "PENDING": "Pending", "ACCEPTED": "Accepted", "REJECTED": "Rejected", "EDITED": "Edited and accepted", "EXPIRED": "Out of date" },
+    "before": "Now", "after": "Suggested", "swapWith": "Swaps with {{other}} ({{date}})",
+    "accept": "Accept", "edit": "Edit", "reject": "Reject", "acceptEdited": "Accept my version", "note": "Note (optional)",
+    "rejectWhy": "Why not? (optional)", "confirmReject": "Reject", "counterpartDate": "Date of {{other}}",
+    "editHint": "Change what the session becomes, then accept. Your version is what goes into the plan.",
+    "decidedBy": "{{status}} by {{who}}", "history": "Suggestions", "noHistory": "No suggestions for this session yet.",
+    "pendingBadge": "Suggestion", "readOnly": "Your coach decides on suggestions."
   }
 }

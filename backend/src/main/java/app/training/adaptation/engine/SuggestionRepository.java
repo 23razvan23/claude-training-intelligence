@@ -92,6 +92,23 @@ public class SuggestionRepository {
                 .params(athleteId, status, status, from, to).query(this::map).list();
     }
 
+    public java.util.Optional<Suggestion> find(long id) {
+        return jdbc.sql(SELECT + " WHERE s.id = ?").param(id).query(this::map).optional();
+    }
+
+    /** Every suggestion about a session, as the one changed or as a swap partner, newest first. */
+    public List<Suggestion> forSession(long sessionId) {
+        return jdbc.sql(SELECT + " WHERE s.planned_session_id = ? OR s.counterpart_session_id = ? ORDER BY s.created_at DESC, s.id DESC")
+                .params(sessionId, sessionId).query(this::map).list();
+    }
+
+    /** Records the coach's decision; only a PENDING suggestion can be decided. Returns false if it was not pending. */
+    public boolean decide(long id, String status, long userId, String note) {
+        return jdbc.sql("""
+                UPDATE adaptation_suggestion SET status = ?, decided_by = ?, decided_at = now(), coach_note = ?
+                WHERE id = ? AND status = 'PENDING'""").params(status, userId, note, id).update() == 1;
+    }
+
     public void expire(long id) {
         jdbc.sql("UPDATE adaptation_suggestion SET status = 'EXPIRED' WHERE id = ? AND status = 'PENDING'").param(id).update();
     }

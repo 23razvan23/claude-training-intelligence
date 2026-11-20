@@ -4,6 +4,7 @@ import {
   useAthletes,
   useDeleteSession,
   useMe,
+  usePendingSuggestions,
   usePlans,
   useSavePlan,
   useSaveSession,
@@ -11,8 +12,9 @@ import {
   useSessions,
   useSessionTypes,
 } from '../api/hooks';
-import type { Demand, Plan, PlannedSession, SessionInput, SessionStatus } from '../api/types';
+import type { Demand, Plan, PlannedSession, SessionInput, SessionStatus, Suggestion } from '../api/types';
 import { PlanImport } from '../components/PlanImport';
+import { SessionSuggestions, SuggestionCard } from '../components/Suggestions';
 import { useAthleteSelection } from '../athleteContext';
 import { addDays, formatSessionDay, groupByWeek, parseNumber, shownRange, todayIn } from '../plan';
 
@@ -31,6 +33,7 @@ export function PlanPage() {
   const { from, to } = shownRange(today);
   const plans = usePlans(athleteId);
   const sessions = useSessions(athleteId, from, to);
+  const pending = usePendingSuggestions(athleteId, today, to);
   const [editing, setEditing] = useState<PlannedSession | 'new' | null>(null);
   const [importing, setImporting] = useState(false);
   const [planForm, setPlanForm] = useState<Plan | 'new' | null>(null);
@@ -43,6 +46,12 @@ export function PlanPage() {
 
   const active = plans.data?.find((p) => p.status === 'ACTIVE');
   const weeks = groupByWeek(sessions.data ?? [], from, to);
+  // A pending suggestion is shown on the session it changes (and on a swap's partner).
+  const bySession = new Map<number, Suggestion>();
+  for (const s of pending.data ?? []) {
+    if (s.plannedSessionId != null) bySession.set(s.plannedSessionId, s);
+    if (s.counterpartSessionId != null && !bySession.has(s.counterpartSessionId)) bySession.set(s.counterpartSessionId, s);
+  }
 
   return (
     <section className="stack plan">
@@ -119,7 +128,14 @@ export function PlanPage() {
                   <SessionForm athleteId={athleteId} session={s} defaultDate={s.date} onDone={() => setEditing(null)} />
                 </li>
               ) : (
-                <SessionCard key={s.id} s={s} past={s.date < today} onEdit={isCoach ? () => setEditing(s) : undefined} />
+                <SessionCard
+                  key={s.id}
+                  s={s}
+                  past={s.date < today}
+                  suggestion={bySession.get(s.id)}
+                  isCoach={isCoach}
+                  onEdit={isCoach ? () => setEditing(s) : undefined}
+                />
               ),
             )}
           </ul>
@@ -129,8 +145,21 @@ export function PlanPage() {
   );
 }
 
-function SessionCard({ s, past, onEdit }: { s: PlannedSession; past: boolean; onEdit?: () => void }) {
+function SessionCard({
+  s,
+  past,
+  suggestion,
+  isCoach,
+  onEdit,
+}: {
+  s: PlannedSession;
+  past: boolean;
+  suggestion?: Suggestion;
+  isCoach: boolean;
+  onEdit?: () => void;
+}) {
   const { t, i18n } = useTranslation();
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const struck = s.status === 'SKIPPED' || s.status === 'REPLACED';
   const facts = [
     s.targetDistanceKm != null && t('plan.km', { value: s.targetDistanceKm }),
@@ -143,6 +172,12 @@ function SessionCard({ s, past, onEdit }: { s: PlannedSession; past: boolean; on
         <span className="session-day">{formatSessionDay(s.date, i18n.language)}</span>
         <span className={`badge demand ${s.demand.toLowerCase()}`}>{t(`plan.demand.${s.demand}`)}</span>
         {s.status !== 'PLANNED' && <span className={`badge status ${s.status.toLowerCase()}`}>{t(`plan.status.${s.status}`)}</span>}
+        {s.taper && <span className="badge taper">{t('plan.taper')}</span>}
+        {suggestion && (
+          <span className="badge pending" data-testid="suggestion-badge">
+            {t('suggestions.pendingBadge')}
+          </span>
+        )}
         <span className="spacer" />
         {onEdit && (
           <button className="ghost" onClick={onEdit}>
@@ -157,6 +192,13 @@ function SessionCard({ s, past, onEdit }: { s: PlannedSession; past: boolean; on
       {facts.length > 0 && <div className="small">{facts.join(' · ')}</div>}
       {s.description && <div className="muted small pre">{s.description}</div>}
       {s.notes && <div className="muted small pre">{s.notes}</div>}
+      {suggestion && !showSuggestions && <SuggestionCard s={suggestion} isCoach={isCoach} compact />}
+      <div>
+        <button className="link small" onClick={() => setShowSuggestions((v) => !v)} aria-expanded={showSuggestions}>
+          {t('suggestions.history')}
+        </button>
+      </div>
+      {showSuggestions && <SessionSuggestions sessionId={s.id} isCoach={isCoach} />}
     </li>
   );
 }
@@ -173,6 +215,7 @@ interface SessionFields {
   strain: string;
   status: SessionStatus;
   notes: string;
+  taper: boolean;
 }
 
 function fieldsOf(s: PlannedSession | undefined, date: string, defaultDemand: (type: string) => Demand): SessionFields {
@@ -188,6 +231,7 @@ function fieldsOf(s: PlannedSession | undefined, date: string, defaultDemand: (t
     strain: s?.estStrain != null ? String(s.estStrain) : '',
     status: s?.status ?? 'PLANNED',
     notes: s?.notes ?? '',
+    taper: s?.taper ?? false,
   };
 }
 
@@ -225,6 +269,7 @@ function SessionForm({
       estStrain: parseNumber(f.strain),
       status: f.status,
       notes: f.notes,
+      taper: f.taper,
     };
     save.mutate({ id: session?.id, input }, { onSuccess: onDone });
   };
@@ -304,6 +349,10 @@ function SessionForm({
           </label>
         )}
       </div>
+      <label className="check">
+        <input type="checkbox" checked={f.taper} onChange={(e) => set('taper', e.target.checked)} />
+        {t('plan.field.taper')}
+      </label>
       <label>
         {t('plan.field.notes')}
         <textarea value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={2000} rows={2} />
@@ -355,7 +404,7 @@ function History({ sessionId }: { sessionId: number }) {
 }
 
 const COMPARED: (keyof PlannedSession)[] = [
-  'date', 'sessionType', 'demand', 'title', 'description', 'targetDistanceKm', 'targetDurationMin', 'estStrain', 'status', 'notes',
+  'date', 'sessionType', 'demand', 'title', 'description', 'targetDistanceKm', 'targetDurationMin', 'estStrain', 'status', 'notes', 'taper',
 ];
 
 function changedFields(before: PlannedSession, after: PlannedSession, t: (k: string) => string): string[] {

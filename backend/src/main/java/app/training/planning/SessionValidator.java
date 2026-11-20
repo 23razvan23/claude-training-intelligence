@@ -57,7 +57,7 @@ public final class SessionValidator {
         var completed = new SessionRequest(r.planId(), r.date(), r.sessionType(),
                 r.demand() != null ? r.demand() : defaultDemand.apply(r.sessionType()),
                 blankToNull(r.title()), blankToNull(r.description()), r.targetDistanceKm(), r.targetDurationMin(),
-                r.estStrain(), r.status() != null ? r.status() : Status.PLANNED, blankToNull(r.notes()));
+                r.estStrain(), r.status() != null ? r.status() : Status.PLANNED, blankToNull(r.notes()), r.taper());
         return new Result(completed, List.of());
     }
 

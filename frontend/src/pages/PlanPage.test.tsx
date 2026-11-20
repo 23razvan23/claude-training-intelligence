@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n';
-import type { Plan, PlannedSession } from '../api/types';
+import type { Plan, PlannedSession, Suggestion } from '../api/types';
 import { PlanPage } from './PlanPage';
 
 // The Plan screen (stage 2-1a) on synthetic data, through the real page and a faked fetch.
@@ -23,7 +23,7 @@ const SESSIONS: PlannedSession[] = [
 
 let posted: unknown[] = [];
 
-function mockApi(role: 'COACH' | 'ATHLETE', plans: Plan[] = [PLAN]) {
+function mockApi(role: 'COACH' | 'ATHLETE', plans: Plan[] = [PLAN], pending: Suggestion[] = []) {
   posted = [];
   vi.stubGlobal(
     'fetch',
@@ -34,6 +34,7 @@ function mockApi(role: 'COACH' | 'ATHLETE', plans: Plan[] = [PLAN]) {
       if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
       if (url === '/api/athletes/1/plans') return json(plans);
       if (url === '/api/plan/session-types') return json(TYPES);
+      if (url.startsWith('/api/athletes/1/suggestions?status=PENDING')) return json(pending);
       if (url.startsWith('/api/athletes/1/sessions') && (init?.method ?? 'GET') === 'GET') {
         expect(url).toBe('/api/athletes/1/sessions?from=2026-11-16&to=2027-01-10');
         return json(SESSIONS);
@@ -94,6 +95,30 @@ describe('PlanPage', () => {
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(posted[0]).toMatchObject({ date: '2026-11-18', sessionType: 'long', demand: 'KEY', targetDistanceKm: 22.5, status: 'PLANNED' });
+  });
+
+  it('shows a pending suggestion on the session it changes, and the coach can mark a session as taper', async () => {
+    const suggestion: Suggestion = {
+      id: 8, athleteId: 1, plannedSessionId: 2, forDate: '2026-11-19', action: 'REDUCE',
+      before: { session: SESSIONS[1] },
+      after: { session: { date: '2026-11-19', sessionType: 'threshold', demand: 'KEY', title: 'Tempo', targetDistanceKm: 9.4, targetDurationMin: 45 } },
+      reasons: [{ code: 'yellow.streak', text: 'Recovery has not been green for 2 days in a row (yellow today, 52%).' }],
+      confidence: 'MEDIUM', status: 'PENDING', rulesVersion: 'r1', createdAt: '2026-11-18T06:00:00Z',
+    };
+    mockApi('COACH', [PLAN], [suggestion]);
+    renderPage();
+    const badge = await screen.findByTestId('suggestion-badge');
+    const card = badge.closest('li') as HTMLElement;
+    expect(within(card).getAllByText('Tempo', { selector: 'strong' })).toHaveLength(2); // the session and its suggestion
+    expect(within(card).getByText(/not been green for 2 days/)).toBeTruthy();
+    expect(within(card).getByTestId('after').textContent).toBe('Thu, Nov 19 · Threshold / tempo · 9.4 km · 45 min');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add session' }));
+    const form = await screen.findByRole('form', { name: 'Add session' });
+    fireEvent.click(within(form).getByLabelText(/Part of a taper/));
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ taper: true });
   });
 
   it('shows an athlete their plan read-only', async () => {

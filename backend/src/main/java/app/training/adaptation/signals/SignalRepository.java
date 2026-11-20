@@ -173,7 +173,7 @@ public class SignalRepository {
             ps.setDate(2, Date.valueOf(d.date()));
             ps.setString(3, signalsVersion);
             ps.setLong(4, settingsVersion);
-            ps.setString(5, write(d));
+            ps.setString(5, toJson(d));
         });
     }
 
@@ -196,7 +196,8 @@ public class SignalRepository {
                 }).list();
     }
 
-    private String write(DaySignals d) {
+    /** The JSON stored in day_signals.signals (the backtest stores the same shape, ADR 0023). */
+    public String toJson(DaySignals d) {
         try {
             var node = json.createObjectNode();
             node.set("load", json.valueToTree(d.load().load()));

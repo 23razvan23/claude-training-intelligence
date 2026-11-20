@@ -48,9 +48,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class SuggestionService {
     private static final Logger log = LoggerFactory.getLogger(SuggestionService.class);
     /** How far back the plan and the km run are read: the restore rule looks at the last full weeks. */
-    static final int PAST_DAYS = 28;
+    public static final int PAST_DAYS = 28;
     /** How far ahead the plan is read: race week can start after the 7 reviewed days. */
-    static final int AHEAD_DAYS = 14;
+    public static final int AHEAD_DAYS = 14;
+    /** How many days of stored signals before today the run reads (recent illness reports). */
+    static final int STATE_DAYS = 8;
 
     private final SuggestionRepository repo;
     private final SignalService signals;
@@ -111,17 +113,10 @@ public class SuggestionService {
         String signalsVersion = SignalService.SIGNALS_VERSION;
 
         var states = new HashMap<LocalDate, JsonNode>();
-        for (var row : signalRepo.read(athleteId, signalsVersion, current.id(), today.minusDays(8), today)) states.put(row.date(), row.signals());
-        var illness = new HashSet<LocalDate>();
-        states.forEach((d, n) -> {
-            if (n.path("subjective").path("illness").asBoolean(false)) illness.add(d);
-        });
+        for (var row : signalRepo.read(athleteId, signalsVersion, current.id(), today.minusDays(STATE_DAYS), today)) states.put(row.date(), row.signals());
         var runKm = new HashMap<LocalDate, Double>();
-        signalRepo.running(athleteId).forEach((d, r) -> {
-            if (!d.isBefore(today.minusDays(PAST_DAYS)) && !d.isAfter(today)) runKm.put(d, r.km());
-        });
-        var input = new Model.Input(today, state(today, states.get(today)), state(today.minusDays(1), states.get(today.minusDays(1))),
-                illness, runKm, repo.sessions(athleteId, today.minusDays(PAST_DAYS), today.plusDays(AHEAD_DAYS)),
+        signalRepo.running(athleteId).forEach((d, r) -> runKm.put(d, r.km()));
+        var input = input(today, states, runKm, repo.sessions(athleteId, today.minusDays(PAST_DAYS), today.plusDays(AHEAD_DAYS)),
                 repo.decidedSessions(athleteId, today), repo.restoreAcceptedSince(athleteId, today.minusDays(6)));
         var result = RulesEngine.evaluate(input, s);
         String model = models.active(athleteId).map(m -> m.version()).orElse(null);
@@ -155,6 +150,29 @@ public class SuggestionService {
         }
         return new RunOutcome(athleteId, today, RulesEngine.RULES_VERSION, current.id(), signalsVersion, created, kept, expired,
                 repo.pending(athleteId), result.healthMessages(), result.notes());
+    }
+
+    /**
+     * The engine's input for the morning of {@code today}, from that morning's stored signals and the plan. Shared with
+     * the backtest (stage 2-4, ADR 0023), which hands it the signals it replayed for a past morning.
+     * <ul>
+     *   <li>{@code states}: day_signals JSON per day; only {@code today − 8} … {@code today} is read.</li>
+     *   <li>{@code runKm}: running km per day; only the last {@link #PAST_DAYS} days up to today are used.</li>
+     *   <li>{@code sessions}: the plan from {@link #PAST_DAYS} days back to {@link #AHEAD_DAYS} ahead.</li>
+     * </ul>
+     */
+    public static Model.Input input(LocalDate today, java.util.Map<LocalDate, JsonNode> states, java.util.Map<LocalDate, Double> runKm,
+                                    List<Model.Session> sessions, java.util.Set<Long> decided, boolean restoreStepRecently) {
+        var illness = new HashSet<LocalDate>();
+        states.forEach((d, n) -> {
+            if (!d.isBefore(today.minusDays(STATE_DAYS)) && !d.isAfter(today) && n.path("subjective").path("illness").asBoolean(false)) illness.add(d);
+        });
+        var km = new HashMap<LocalDate, Double>();
+        runKm.forEach((d, v) -> {
+            if (!d.isBefore(today.minusDays(PAST_DAYS)) && !d.isAfter(today)) km.put(d, v);
+        });
+        return new Model.Input(today, state(today, states.get(today)), state(today.minusDays(1), states.get(today.minusDays(1))),
+                illness, km, sessions, decided, restoreStepRecently);
     }
 
     /** The six values of dedup_key (ADR 0018 D3). */
@@ -205,7 +223,7 @@ public class SuggestionService {
      * {@link PlanService}. A replacement is a new session: no estimated strain, no notes carried over. Otherwise the
      * estimated strain and notes stay (strain is a log scale, so it is not scaled with the distance).
      */
-    static SessionRequest request(Model.Session s, Change c, boolean replacement) {
+    public static SessionRequest request(Model.Session s, Change c, boolean replacement) {
         return new SessionRequest(s.planId(), c.date(), c.type(), SessionTypes.Demand.valueOf(c.demand()), c.title(), c.description(),
                 c.distanceKm() == null ? null : BigDecimal.valueOf(c.distanceKm()), c.durationMin(),
                 replacement || s.estStrain() == null ? null : BigDecimal.valueOf(s.estStrain()), SessionTypes.Status.PLANNED,
@@ -213,7 +231,7 @@ public class SuggestionService {
     }
 
     /** Today's or yesterday's stored signals as the rules read them; null when that day has none. */
-    static DayState state(LocalDate date, JsonNode n) {
+    public static DayState state(LocalDate date, JsonNode n) {
         if (n == null) return null;
         var r = n.path("readiness");
         var sl = n.path("sleep");

@@ -489,6 +489,10 @@ export interface PlannedSession {
   estStrain?: number | null;
   status: SessionStatus;
   notes?: string | null;
+  replacesSessionId?: number | null;
+  changedBySuggestionId?: number | null;
+  /** Part of a taper: the engine suggests only reductions for it (ADR 0022). */
+  taper?: boolean;
 }
 
 export interface SessionInput {
@@ -503,6 +507,78 @@ export interface SessionInput {
   estStrain?: number;
   status?: SessionStatus;
   notes?: string;
+  taper?: boolean;
+}
+
+// The rules engine's suggestions (stage 2-3, ADR 0022).
+export type SuggestionAction = 'KEEP' | 'REDUCE' | 'SWAP' | 'REPLACE' | 'MOVE' | 'ADD';
+export type SuggestionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EDITED' | 'EXPIRED';
+
+/** One plain reason: a code and its numbers (for a translation) and the English text. */
+export interface SuggestionReason {
+  code: string;
+  text: string;
+  params?: Record<string, unknown>;
+}
+
+/** What a session becomes, in the shape the plan API takes. */
+export interface SessionChange {
+  planId?: number | null;
+  date: string;
+  sessionType: string;
+  demand: Demand;
+  title?: string | null;
+  description?: string | null;
+  targetDistanceKm?: number | null;
+  targetDurationMin?: number | null;
+  estStrain?: number | null;
+  status?: SessionStatus | null;
+  notes?: string | null;
+  taper?: boolean | null;
+}
+
+export interface Suggestion {
+  id: number;
+  athleteId: number;
+  plannedSessionId?: number | null;
+  counterpartSessionId?: number | null;
+  forDate: string;
+  action: SuggestionAction;
+  before: { session: PlannedSession; counterpart?: PlannedSession };
+  after: { session: SessionChange; counterpart?: SessionChange };
+  reasons: SuggestionReason[];
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: SuggestionStatus;
+  coachNote?: string | null;
+  rulesVersion: string;
+  settingsVersion?: number | null;
+  signalsVersion?: string | null;
+  engineRunDate?: string | null;
+  decidedBy?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+}
+
+export interface SuggestionsToday {
+  date: string;
+  pending: Suggestion[];
+  healthMessages: SuggestionReason[];
+}
+
+export interface EngineRun {
+  engineRunDate: string;
+  rulesVersion: string;
+  created: number;
+  kept: number;
+  expired: number;
+  pending: Suggestion[];
+  healthMessages: SuggestionReason[];
+  notes: string[];
+}
+
+export interface DecisionOutcome {
+  suggestion: Suggestion;
+  changed: PlannedSession[];
 }
 
 export interface SessionRevision {

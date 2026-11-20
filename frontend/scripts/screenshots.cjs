@@ -1,4 +1,4 @@
-// Today, Trends and Plan screenshots at phone width (390 px), light and dark, on synthetic data only.
+// Today, Trends, Plan, Check-in, Athletes and suggestion screenshots at phone width (390 px), light and dark, on synthetic data only.
 // Usage: npm run build && npx vite preview --port 4173 &  then  node scripts/screenshots.cjs <outDir>
 // The API is faked in the browser: nothing here talks to a backend or reads real data.
 const { chromium } = require('playwright');
@@ -330,6 +330,74 @@ const planTypes = ['easy', 'recovery', 'long', 'long_fast_finish', 'threshold', 
       if (override) await page.getByText('Override history').click();
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       const file = `tolerance-${override ? 'override' : 'computed'}-${scheme}.png`;
+      if (width > 390) throw new Error(`${file}: horizontal scroll (${width}px wide)`);
+      await page.screenshot({ path: path.join(out, file), fullPage: true });
+      console.log(`${file} (scrollWidth ${width})`);
+      await ctx.close();
+    }
+  }
+  // Suggestions (stage 2-3, ADR 0022): Today with suggestions and a health message, the edit form, the athlete's view, and Plan.
+  const S = (id, action, before, after, reasons, confidence, counterpart) => ({
+    id, athleteId: 1, plannedSessionId: before.id, counterpartSessionId: counterpart ? counterpart.before.id : null, forDate: before.date, action,
+    before: counterpart ? { session: before, counterpart: counterpart.before } : { session: before },
+    after: counterpart ? { session: after, counterpart: counterpart.after } : { session: after },
+    reasons: reasons.map((text, i) => ({ code: `r${i}`, text })), confidence, status: 'PENDING', rulesVersion: 'r1', createdAt: `${TODAY}T05:06:00Z`,
+  });
+  const vo2 = sess(3, TODAY, 'vo2max', 'KEY', { title: 'Track 5 × 1 km', targetDistanceKm: 12, targetDurationMin: 65 });
+  const rec = sess(4, '2026-11-18', 'recovery', 'EASY', { targetDistanceKm: 6, targetDurationMin: 36 });
+  const easy7 = sess(7, '2026-11-20', 'easy', 'EASY', { targetDistanceKm: 10, targetDurationMin: 58 });
+  const pendingSuggestions = [
+    S(31, 'SWAP', vo2, { ...vo2, date: '2026-11-18' }, ['Recovery is red today (28%).', 'Track 5 × 1 km swaps with Wednesday 18 Nov\'s recovery run, so it stays in this week.'], 'HIGH',
+      { before: rec, after: { ...rec, date: TODAY } }),
+    S(32, 'REDUCE', easy7, { ...easy7, targetDistanceKm: 7.6, targetDurationMin: 44 }, [
+      'Running in the 7 days to Sunday 22 Nov would be 48.5 km, above the tolerance of 37.6 km/week + 10% (41.4 km).',
+      'Easy runs are trimmed first: this one by 2.4 km; no volume is added.',
+    ], 'MEDIUM'),
+  ];
+  const suggestionsToday = {
+    date: TODAY,
+    pending: pendingSuggestions,
+    healthMessages: [{ code: 'health.niggle', text: 'The calf niggle has lasted 3 days (since Saturday 14 Nov). If it does not settle, consider having it checked by a physio or doctor.' }],
+  };
+  for (const scheme of ['light', 'dark']) {
+    for (const view of ['today-suggestions', 'today-suggestion-edit', 'today-suggestions-athlete', 'plan-suggestion']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme });
+      const page = await ctx.newPage();
+      const athlete = view === 'today-suggestions-athlete';
+      if (view === 'plan-suggestion') await page.clock.setFixedTime(new Date(PLAN_NOW));
+      await page.route('**/api/**', (route) => {
+        const url = new URL(route.request().url()).pathname;
+        const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+        if (url === '/api/auth/me') return json({ username: athlete ? 'runner' : 'coach', role: athlete ? 'ATHLETE' : 'COACH', athleteId: 1 });
+        if (url === '/api/athletes') return json([{ id: 1, name: 'Synthetic Runner', timezone: 'Europe/Bucharest' }]);
+        if (url === '/api/athletes/1/today') return json({ ...scenarios.fresh, day: day({ recoveryPct: 28, band: 'RED' }) });
+        if (url === '/api/athletes/1/garmin/sync/status') return json(syncStatus.fresh);
+        if (url === '/api/athletes/1/suggestions/today') return json(suggestionsToday);
+        if (url === '/api/athletes/1/suggestions') {
+          const reduce = S(33, 'REPLACE', sessionsBody[2], { ...sessionsBody[2], sessionType: 'threshold', title: 'Threshold (instead of Track 5 × 1 km)' },
+            ['Sleep debt is 9 h 20 min over the last nights, 1.2 nights of sleep need (limit 1).', 'No VO2max work today; threshold work instead, same time.'], 'HIGH');
+          return json([reduce]);
+        }
+        if (url === '/api/athletes/1/plans') return json(planBody);
+        if (url === '/api/athletes/1/sessions') return json(sessionsBody);
+        if (url === '/api/plan/session-types') return json(planTypes);
+        return route.fulfill({ status: 404, body: '' });
+      });
+      if (view === 'plan-suggestion') {
+        await page.goto(`${BASE}/plan`);
+        await page.waitForSelector('[data-testid="suggestion-badge"]');
+      } else {
+        await page.goto(`${BASE}/today`);
+        await page.waitForSelector('[data-testid="suggestion"]');
+        if (view === 'today-suggestion-edit') {
+          await page.getByRole('button', { name: 'Edit', exact: true }).nth(1).click();
+          await page.waitForSelector('[data-testid="accept-edited"]');
+          await page.locator('[data-testid="accept-edited"]').scrollIntoViewIfNeeded();
+        }
+      }
+      await page.waitForTimeout(200);
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      const file = `${view}-${scheme}.png`;
       if (width > 390) throw new Error(`${file}: horizontal scroll (${width}px wide)`);
       await page.screenshot({ path: path.join(out, file), fullPage: true });
       console.log(`${file} (scrollWidth ${width})`);

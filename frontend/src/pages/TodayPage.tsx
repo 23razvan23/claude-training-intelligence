@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useGarminSyncStatus, useToday } from '../api/hooks';
+import { useGarminSyncStatus, useMe, useToday } from '../api/hooks';
 import type { Band, GarminSyncStatus, StrainTarget, Today, TodayDay } from '../api/types';
 import { useAthleteSelection } from '../athleteContext';
 import { LastSync, SyncBanner } from '../components/LastSync';
+import { SuggestionsPanel } from '../components/Suggestions';
 import { syncNotice } from '../sync';
 import { describeContribution, describeReason, formatDay, formatMinutes, formatPoints } from '../today';
 
@@ -18,12 +19,18 @@ export function TodayPage() {
   const { data, error, isLoading } = useToday(athleteId);
   // The sync line is extra information: if it can't be read, Today still shows.
   const { data: sync } = useGarminSyncStatus(athleteId);
+  const { data: me } = useMe();
 
   if (athleteId == null) return <p className="muted">{t('common.selectAthlete')}</p>;
   if (isLoading) return <p className="muted">{t('common.loading')}</p>;
   if (error) return <p className="warn">{t('common.error', { message: error.message })}</p>;
   if (!data) return null;
-  return <TodayView data={data} sync={sync} />;
+  return (
+    <>
+      <TodayView data={data} sync={sync} />
+      <SuggestionsPanel athleteId={athleteId} isCoach={me?.role === 'COACH'} />
+    </>
+  );
 }
 
 export function TodayView({ data, sync }: { data: Today; sync?: GarminSyncStatus | null }) {

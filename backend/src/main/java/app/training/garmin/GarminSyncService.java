@@ -1,5 +1,6 @@
 package app.training.garmin;
 
+import app.training.adaptation.engine.SuggestionService;
 import app.training.adaptation.signals.SignalService;
 import app.training.athletes.AthleteRepository;
 import app.training.common.ApiException;
@@ -60,6 +61,7 @@ public class GarminSyncService {
     private final ImportRunner runner;
     private final FeatureRecomputeService recompute;
     private final SignalService signals;
+    private final SuggestionService suggestions;
     private final AthleteRepository athletes;
     private final GarminSyncProperties props;
     private final Clock clock;
@@ -68,8 +70,9 @@ public class GarminSyncService {
     public GarminSyncService(GarminSetup setup, GarminCredentialRepository credentials, GarminSyncRunRepository runs,
                              SidecarClient sidecar, ImportBatchRepository batches, ImportRunner runner,
                              FeatureRecomputeService recompute, AthleteRepository athletes, GarminSyncProperties props, Clock clock,
-                             SignalService signals) {
+                             SignalService signals, SuggestionService suggestions) {
         this.signals = signals;
+        this.suggestions = suggestions;
         this.setup = setup;
         this.credentials = credentials;
         this.runs = runs;
@@ -200,6 +203,9 @@ public class GarminSyncService {
                 }
             }
             runs.succeed(runId, batchId, inserted, recomputed, missing(payload), Instant.now(clock));
+            // Stage 2-3 (ADR 0022): review the next 7 days after every successful morning sync, new data or not (a new day
+            // is reason enough); a failure is logged and keeps the sync green.
+            suggestions.runQuietly(athleteId);
             log.info("Garmin sync run {} for athlete {} ({} to {}): {} rows inserted{}", runId, athleteId, run.firstDay(),
                     run.lastDay(), inserted, recomputed ? ", features and scores recomputed" : "");
         } catch (SyncFailure f) {

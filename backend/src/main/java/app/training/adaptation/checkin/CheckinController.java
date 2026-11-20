@@ -1,5 +1,6 @@
 package app.training.adaptation.checkin;
 
+import app.training.adaptation.engine.SuggestionService;
 import app.training.adaptation.signals.SignalService;
 import app.training.security.AccessPolicy;
 import app.training.security.CurrentUser;
@@ -22,8 +23,10 @@ public class CheckinController {
     private final CheckinService checkins;
     private final AccessPolicy access;
     private final SignalService signals;
+    private final SuggestionService suggestions;
 
-    public CheckinController(CheckinService checkins, AccessPolicy access, SignalService signals) {
+    public CheckinController(CheckinService checkins, AccessPolicy access, SignalService signals, SuggestionService suggestions) {
+        this.suggestions = suggestions;
         this.checkins = checkins;
         this.access = access;
         this.signals = signals;
@@ -45,6 +48,8 @@ public class CheckinController {
         // Stage 2-2 (ADR 0021 D8): the check-in flags and running tolerance follow the new answer; a failure there
         // is logged and never loses the check-in, which is already saved.
         signals.recomputeQuietly(athleteId);
+        // Stage 2-3 (ADR 0022): an illness or niggle reported now updates the suggestions at once.
+        suggestions.runQuietly(athleteId);
         return saved;
     }
 
